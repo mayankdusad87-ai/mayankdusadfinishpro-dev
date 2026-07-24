@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { activityRows } from '@/lib/mock-data';
 import { ActivityRow, ActivityStatus } from '@/lib/types';
+import { getActivityConfig, ActivityConfig } from '@/lib/activity-config-store';
 
 const ASSIGNED_FLOORS = [3, 4, 5];
 const supervisorRows = activityRows.filter(r => ASSIGNED_FLOORS.includes(r.floor_number || 0));
@@ -15,17 +16,50 @@ const STATUS_CONFIG: Record<ActivityStatus, { label: string; bg: string; text: s
   on_hold: { label: 'ON HOLD', bg: 'bg-orange-100', text: 'text-orange-700' },
 };
 
+const STATUS_OPTIONS: { value: ActivityStatus | ''; label: string }[] = [
+  { value: '', label: 'All Status' },
+  { value: 'not_started', label: 'Not Started' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'delayed', label: 'Delayed' },
+  { value: 'on_hold', label: 'On Hold' },
+];
+
 export default function SupervisorHomePage() {
   const [activeFloor, setActiveFloor] = useState<number>(ASSIGNED_FLOORS[0]);
   const [statusFilter, setStatusFilter] = useState<ActivityStatus | null>(null);
+  const [stageFilter, setStageFilter] = useState('');
+  const [subStageFilter, setSubStageFilter] = useState('');
+  const [activityFilter, setActivityFilter] = useState('');
+  const [statusDropdown, setStatusDropdown] = useState('');
   const [search, setSearch] = useState('');
   const [selectedDetail, setSelectedDetail] = useState<ActivityRow | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [config, setConfig] = useState<ActivityConfig>({ stages: [], subStages: {}, activities: {} });
+
+  useEffect(() => {
+    setConfig(getActivityConfig());
+  }, []);
+
+  const subStageOptions = useMemo(() => {
+    if (!stageFilter || !config.subStages[stageFilter]) return [];
+    return config.subStages[stageFilter];
+  }, [stageFilter, config]);
+
+  const activityOptions = useMemo(() => {
+    if (!stageFilter || !subStageFilter) return [];
+    const key = `${stageFilter}||${subStageFilter}`;
+    return config.activities[key] || [];
+  }, [stageFilter, subStageFilter, config]);
 
   const floorRows = useMemo(() => {
     let rows = supervisorRows.filter(r => r.floor_number === activeFloor);
     if (statusFilter) rows = rows.filter(r => r.status === statusFilter);
+    if (statusDropdown) rows = rows.filter(r => r.status === statusDropdown);
+    if (stageFilter) rows = rows.filter(r => r.stage_name === stageFilter);
+    if (subStageFilter) rows = rows.filter(r => r.stage_gate_name === subStageFilter);
+    if (activityFilter) rows = rows.filter(r => r.activity_name === activityFilter);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
@@ -35,7 +69,7 @@ export default function SupervisorHomePage() {
       );
     }
     return rows;
-  }, [activeFloor, statusFilter, search]);
+  }, [activeFloor, statusFilter, statusDropdown, stageFilter, subStageFilter, activityFilter, search]);
 
   const statusCounts = useMemo(() => {
     const rows = supervisorRows.filter(r => r.floor_number === activeFloor);
@@ -54,6 +88,17 @@ export default function SupervisorHomePage() {
       return next;
     });
   }
+
+  function clearFilters() {
+    setStageFilter('');
+    setSubStageFilter('');
+    setActivityFilter('');
+    setStatusDropdown('');
+    setStatusFilter(null);
+    setSearch('');
+  }
+
+  const hasFilters = stageFilter || subStageFilter || activityFilter || statusDropdown || statusFilter;
 
   return (
     <div className="min-h-screen bg-navy-dark flex flex-col max-w-md mx-auto">
@@ -97,7 +142,7 @@ export default function SupervisorHomePage() {
           {ASSIGNED_FLOORS.map(f => (
             <button
               key={f}
-              onClick={() => { setActiveFloor(f); setStatusFilter(null); setSearch(''); setSelectedIds(new Set()); }}
+              onClick={() => { setActiveFloor(f); clearFilters(); setSelectedIds(new Set()); }}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 activeFloor === f
                   ? 'bg-primary text-white'
@@ -115,10 +160,10 @@ export default function SupervisorHomePage() {
         {/* Summary strip */}
         <div className="flex gap-2 mb-4">
           {[
-            { label: 'Total', count: statusCounts.total, icon: '📋', filter: null as ActivityStatus | null },
-            { label: 'In Progress', count: statusCounts.in_progress, icon: '🔵', filter: 'in_progress' as ActivityStatus },
-            { label: 'Delayed', count: statusCounts.delayed, icon: '🔴', filter: 'delayed' as ActivityStatus },
-            { label: 'On Hold', count: statusCounts.on_hold, icon: '🟠', filter: 'on_hold' as ActivityStatus },
+            { label: 'Total', count: statusCounts.total, filter: null as ActivityStatus | null },
+            { label: 'In Progress', count: statusCounts.in_progress, filter: 'in_progress' as ActivityStatus },
+            { label: 'Delayed', count: statusCounts.delayed, filter: 'delayed' as ActivityStatus },
+            { label: 'On Hold', count: statusCounts.on_hold, filter: 'on_hold' as ActivityStatus },
           ].map(stat => (
             <button
               key={stat.label}
@@ -135,18 +180,60 @@ export default function SupervisorHomePage() {
           ))}
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 mb-3">
-          <select className="flex-1 h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700">
-            <option>Floor</option>
+        {/* Filters - Stage, Sub Stage, Activities, Status */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <select
+            value={stageFilter}
+            onChange={(e) => { setStageFilter(e.target.value); setSubStageFilter(''); setActivityFilter(''); }}
+            className="h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700"
+          >
+            <option value="">Stage</option>
+            {config.stages.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select className="flex-1 h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700">
-            <option>Stage</option>
+
+          <select
+            value={subStageFilter}
+            onChange={(e) => { setSubStageFilter(e.target.value); setActivityFilter(''); }}
+            disabled={!stageFilter}
+            className="h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 disabled:opacity-50 disabled:bg-gray-100"
+          >
+            <option value="">Sub Stage</option>
+            {subStageOptions.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <select className="flex-1 h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700">
-            <option>Status</option>
+
+          <select
+            value={activityFilter}
+            onChange={(e) => setActivityFilter(e.target.value)}
+            disabled={!subStageFilter}
+            className="h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 disabled:opacity-50 disabled:bg-gray-100"
+          >
+            <option value="">Activities</option>
+            {activityOptions.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+
+          <select
+            value={statusDropdown}
+            onChange={(e) => setStatusDropdown(e.target.value)}
+            className="h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700"
+          >
+            {STATUS_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
         </div>
+
+        {/* Clear filters */}
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="text-xs text-primary font-medium mb-3 flex items-center gap-1"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+            Clear all filters
+          </button>
+        )}
 
         {/* Search */}
         <div className="relative mb-4">
@@ -193,8 +280,11 @@ export default function SupervisorHomePage() {
                         <div className="text-sm font-bold text-gray-900">
                           Flat {row.flat_number} &bull; {row.configuration}
                         </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {row.stage_name}
+                        </div>
                         <div className="text-xs font-semibold text-primary mt-0.5">
-                          Stage Gate: {row.stage_gate_name}
+                          Sub Stage: {row.stage_gate_name}
                         </div>
                       </div>
                     </div>
@@ -266,6 +356,9 @@ export default function SupervisorHomePage() {
                   <h2 className="text-lg font-bold text-gray-900">{selectedDetail.activity_name}</h2>
                   <p className="text-xs text-gray-500 mt-0.5">
                     Floor {selectedDetail.floor_number} &bull; Flat {selectedDetail.flat_number} &bull; {selectedDetail.stage_name}
+                  </p>
+                  <p className="text-xs text-primary font-medium mt-0.5">
+                    Sub Stage: {selectedDetail.stage_gate_name}
                   </p>
                 </div>
                 <button onClick={() => setSelectedDetail(null)} className="p-1 hover:bg-gray-100 rounded-lg">

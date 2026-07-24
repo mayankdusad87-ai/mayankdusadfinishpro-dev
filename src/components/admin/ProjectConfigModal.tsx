@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Project } from '@/lib/types';
 import { floorsConfig } from '@/lib/mock-data';
+import ExcelUpload from '@/components/admin/ExcelUpload';
 
 type ConfigTab = 'floors' | 'stages' | 'stage_gates' | 'activities' | 'rooms';
 
@@ -83,7 +84,7 @@ export default function ProjectConfigModal({ project, onClose }: ProjectConfigMo
         <PlaceholderTab title="Stage Gates" description="Configure stage gates for quality checkpoints." />
       )}
       {activeTab === 'activities' && (
-        <PlaceholderTab title="Finishing Activities" description="Define finishing activities, default vendors, and durations." />
+        <ExcelUpload />
       )}
       {activeTab === 'rooms' && (
         <RoomLocationTab onClose={onClose} />
