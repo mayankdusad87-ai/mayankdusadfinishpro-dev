@@ -74,13 +74,13 @@ export default function SupervisorHomePage() {
         if (row.actual_end_date === TODAY) completedToday.push(row);
         continue;
       }
-      if (row.expected_end_date === TODAY && row.status !== 'completed') {
+      if (row.expected_end_date === TODAY) {
         dueToday.push(row);
       }
       if (row.expected_start_date === TODAY && row.status === 'not_started') {
         startingToday.push(row);
       }
-      if (row.expected_end_date < TODAY && row.status !== 'completed') {
+      if (row.expected_end_date < TODAY) {
         overdue.push(row);
       }
     }
