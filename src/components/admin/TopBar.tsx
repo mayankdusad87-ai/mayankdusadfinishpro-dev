@@ -2,28 +2,41 @@
 
 import { useState } from 'react';
 
-export default function TopBar() {
+interface TopBarProps {
+  onMenuClick: () => void;
+}
+
+export default function TopBar({ onMenuClick }: TopBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 gap-4 flex-shrink-0">
-      {/* Project selector */}
+    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-3 md:px-4 gap-2 md:gap-4 flex-shrink-0">
+      {/* Hamburger + Project selector */}
       <div className="flex items-center gap-2 min-w-0">
+        <button
+          onClick={onMenuClick}
+          className="md:hidden p-2 -ml-1 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+          aria-label="Open menu"
+        >
+          <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
         <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 bg-white text-sm text-gray-700 transition-colors cursor-pointer">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-400">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-400 hidden sm:block">
             <path d="M2 20h20" />
             <path d="M5 20V8l7-5 7 5v12" />
             <path d="M9 20v-4h6v4" />
           </svg>
-          <span className="truncate max-w-[160px]">Current Project</span>
+          <span className="truncate max-w-[100px] sm:max-w-[160px]">Current Project</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 text-gray-400">
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
       </div>
 
-      {/* Search bar */}
-      <div className="flex-1 max-w-md">
+      {/* Search bar - hidden on small mobile */}
+      <div className="hidden sm:block flex-1 max-w-md">
         <div className="relative">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">
             <circle cx="11" cy="11" r="8" />
@@ -40,7 +53,15 @@ export default function TopBar() {
       </div>
 
       {/* Right section */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
+        {/* Mobile search toggle */}
+        <button className="sm:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-gray-600">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+        </button>
+
         {/* Notification bell */}
         <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-gray-600">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Logo from '@/components/shared/Logo';
 
 export default function AdminLoginPage() {
@@ -106,6 +107,12 @@ export default function AdminLoginPage() {
               Sign In
             </button>
           </form>
+
+          <div className="mt-6 pt-4 border-t border-gray-100 text-center">
+            <Link href="/supervisor/login" className="text-sm text-gray-500 hover:text-primary transition-colors">
+              Site Supervisor? Login here
+            </Link>
+          </div>
         </div>
       </div>
     </div>

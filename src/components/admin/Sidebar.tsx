@@ -66,11 +66,16 @@ const navItems = [
   },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}
+
+export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
-  return (
+  const sidebarContent = (
     <aside
       className={`flex flex-col h-screen bg-sidebar text-white transition-all duration-200 flex-shrink-0 ${
         collapsed ? 'w-[60px]' : 'w-[170px]'
@@ -87,10 +92,21 @@ export default function Sidebar() {
           </svg>
         </div>
         {!collapsed && (
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-xs font-bold leading-tight tracking-wide">FINISHING PRO</div>
             <div className="text-[10px] text-gray-400 leading-tight">Head Office</div>
           </div>
+        )}
+        {/* Close button on mobile */}
+        {!collapsed && (
+          <button
+            onClick={onMobileClose}
+            className="md:hidden p-1 hover:bg-sidebar-hover rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         )}
       </div>
 
@@ -102,6 +118,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onMobileClose}
               className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-colors relative group ${
                 isActive
                   ? 'bg-sidebar-hover text-white'
@@ -118,10 +135,10 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Collapse toggle */}
+      {/* Collapse toggle - desktop only */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center justify-center gap-2 px-3 py-3 text-gray-400 hover:text-white hover:bg-sidebar-hover transition-colors border-t border-white/10 cursor-pointer"
+        className="hidden md:flex items-center justify-center gap-2 px-3 py-3 text-gray-400 hover:text-white hover:bg-sidebar-hover transition-colors border-t border-white/10 cursor-pointer"
       >
         <svg
           viewBox="0 0 24 24"
@@ -137,5 +154,24 @@ export default function Sidebar() {
         {!collapsed && <span className="text-xs">Collapse</span>}
       </button>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar - always visible */}
+      <div className="hidden md:block">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile sidebar - overlay drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={onMobileClose} />
+          <div className="relative z-10">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

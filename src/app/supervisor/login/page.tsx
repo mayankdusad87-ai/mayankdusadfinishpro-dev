@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function SupervisorLoginPage() {
   const router = useRouter();
@@ -115,6 +116,12 @@ export default function SupervisorLoginPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="bg-white py-4 text-center">
+        <Link href="/login" className="text-sm text-gray-500 hover:text-primary transition-colors">
+          Admin Portal Login
+        </Link>
       </div>
 
       <style jsx>{`

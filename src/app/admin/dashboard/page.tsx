@@ -108,7 +108,7 @@ export default function DashboardPage() {
 
         {/* Bulk toolbar */}
         {selectedRows.size > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 flex items-center gap-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 sm:px-4 py-2.5 flex flex-wrap items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-2">
               <input type="checkbox" checked readOnly className="accent-[#E67E22] w-4 h-4" />
               <span className="text-sm font-medium text-blue-800">{selectedRows.size} rows selected</span>
@@ -182,9 +182,9 @@ export default function DashboardPage() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/50">
-            <span className="text-sm text-gray-500">
-              Showing {filtered.length === 0 ? 0 : (safePage - 1) * PER_PAGE + 1} to {Math.min(safePage * PER_PAGE, filtered.length)} of {filtered.length.toLocaleString()} activities
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 border-t border-gray-200 bg-gray-50/50">
+            <span className="text-xs sm:text-sm text-gray-500">
+              Showing {filtered.length === 0 ? 0 : (safePage - 1) * PER_PAGE + 1}-{Math.min(safePage * PER_PAGE, filtered.length)} of {filtered.length.toLocaleString()}
             </span>
             <div className="flex items-center gap-1">
               <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="px-2 py-1 rounded text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-40">&laquo;</button>

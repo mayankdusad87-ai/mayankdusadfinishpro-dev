@@ -50,13 +50,13 @@ export default function FilterBar({
   }
 
   const selectClass =
-    'h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary';
+    'h-9 w-full sm:w-auto rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary';
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-4">
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-2 sm:gap-3">
         {/* Project */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">
           <label className="text-xs font-medium text-gray-500">Project</label>
           <select
             className={selectClass}
@@ -71,7 +71,7 @@ export default function FilterBar({
         </div>
 
         {/* Floor */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">
           <label className="text-xs font-medium text-gray-500">Floor</label>
           <select
             className={selectClass}
@@ -86,7 +86,7 @@ export default function FilterBar({
         </div>
 
         {/* Stage */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">
           <label className="text-xs font-medium text-gray-500">Stage</label>
           <select
             className={selectClass}
@@ -101,7 +101,7 @@ export default function FilterBar({
         </div>
 
         {/* Stage Gate */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">
           <label className="text-xs font-medium text-gray-500">Stage Gate</label>
           <select
             className={selectClass}
@@ -116,7 +116,7 @@ export default function FilterBar({
         </div>
 
         {/* Vendor */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">
           <label className="text-xs font-medium text-gray-500">Vendor</label>
           <select
             className={selectClass}
@@ -131,7 +131,7 @@ export default function FilterBar({
         </div>
 
         {/* Status */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">
           <label className="text-xs font-medium text-gray-500">Status</label>
           <select
             className={selectClass}
@@ -145,7 +145,7 @@ export default function FilterBar({
         </div>
 
         {/* Date Range */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 w-full sm:w-auto">
           <label className="text-xs font-medium text-gray-500">Date Range</label>
           <div className="flex items-center gap-2">
             <input
@@ -165,7 +165,7 @@ export default function FilterBar({
         </div>
 
         {/* Buttons */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
           <button
             onClick={onClear}
             className="h-9 px-4 rounded-md border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
