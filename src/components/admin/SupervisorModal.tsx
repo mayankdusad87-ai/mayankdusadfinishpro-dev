@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Modal from '@/components/shared/Modal';
 import { Supervisor } from '@/lib/types';
+import { getProjects, ManagedProject } from '@/lib/project-store';
 
 interface SupervisorModalProps {
   open: boolean;
@@ -22,36 +23,39 @@ export interface SupervisorFormData {
 
 const FLOORS = Array.from({ length: 18 }, (_, i) => i + 1);
 
-const PROJECT_OPTIONS = [
-  'Riverside Tower – Main Contract',
-  'Skyline Heights - Tower A',
-  'Harbor View Towers',
-  'Greenfield Apartments',
-  'Sunset Community',
-  'Marina Heights',
-];
-
 export default function SupervisorModal({ open, onClose, supervisor, onSave }: SupervisorModalProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [project, setProject] = useState(PROJECT_OPTIONS[0]);
+  const [project, setProject] = useState('');
   const [selectedFloors, setSelectedFloors] = useState<number[]>([]);
   const [allowReassignment, setAllowReassignment] = useState(false);
+  const [realProjects, setRealProjects] = useState<ManagedProject[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      getProjects().then(list => {
+        setRealProjects(list);
+        if (!supervisor && list.length > 0 && !project) {
+          setProject(list[0].name);
+        }
+      });
+    }
+  }, [open]);
 
   useEffect(() => {
     if (supervisor) {
       setName(supervisor.full_name);
       setPhone(supervisor.phone || '');
       setEmail(supervisor.email || '');
-      setProject(supervisor.project_name || PROJECT_OPTIONS[0]);
+      setProject(supervisor.project_name || '');
       setSelectedFloors([...supervisor.assigned_floors]);
       setAllowReassignment(false);
     } else {
       setName('');
       setPhone('');
       setEmail('');
-      setProject(PROJECT_OPTIONS[0]);
+      setProject(realProjects.length > 0 ? realProjects[0].name : '');
       setSelectedFloors([]);
       setAllowReassignment(false);
     }
@@ -129,9 +133,12 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
                 onChange={(e) => setProject(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white"
               >
-                {PROJECT_OPTIONS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
+                {realProjects.length === 0 && (
+                  <option value="">No projects — create one first</option>
+                )}
+                {realProjects.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name} — {p.location}
                   </option>
                 ))}
               </select>

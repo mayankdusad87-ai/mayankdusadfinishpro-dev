@@ -19,7 +19,6 @@ interface CardConfig {
   key: ActivityStatus | 'total';
   label: string;
   icon: React.ReactNode;
-  percentage?: string;
   iconBg: string;
 }
 
@@ -38,7 +37,6 @@ export default function StatusCards({ counts, activeFilter, onFilterChange }: St
     {
       key: 'not_started',
       label: 'Not Started',
-      percentage: '24.50%',
       iconBg: 'bg-gray-100',
       icon: (
         <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,7 +47,6 @@ export default function StatusCards({ counts, activeFilter, onFilterChange }: St
     {
       key: 'in_progress',
       label: 'In Progress',
-      percentage: '40.08%',
       iconBg: 'bg-blue-50',
       icon: (
         <svg className="w-5 h-5 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -61,7 +58,6 @@ export default function StatusCards({ counts, activeFilter, onFilterChange }: St
     {
       key: 'completed',
       label: 'Completed',
-      percentage: '26.31%',
       iconBg: 'bg-green-50',
       icon: (
         <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -72,7 +68,6 @@ export default function StatusCards({ counts, activeFilter, onFilterChange }: St
     {
       key: 'delayed',
       label: 'Delayed',
-      percentage: '6.35%',
       iconBg: 'bg-red-50',
       icon: (
         <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,7 +78,6 @@ export default function StatusCards({ counts, activeFilter, onFilterChange }: St
     {
       key: 'on_hold',
       label: 'On Hold',
-      percentage: '2.44%',
       iconBg: 'bg-orange-50',
       icon: (
         <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,8 +125,10 @@ export default function StatusCards({ counts, activeFilter, onFilterChange }: St
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs text-gray-500">{card.label}</span>
-              {card.percentage && (
-                <span className="text-xs text-gray-400">{card.percentage}</span>
+              {card.key !== 'total' && counts.total > 0 && (
+                <span className="text-xs text-gray-400">
+                  {((getCount(card.key) / counts.total) * 100).toFixed(1)}%
+                </span>
               )}
             </div>
           </button>
