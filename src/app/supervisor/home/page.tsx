@@ -1,16 +1,13 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { activityRows } from '@/lib/mock-data';
-import { ActivityRow, ActivityStatus } from '@/lib/types';
-import { getActivityConfig, ActivityConfig } from '@/lib/activity-config-store';
-
-const ASSIGNED_FLOORS = [3, 4, 5];
-const supervisorRows = activityRows.filter(r => ASSIGNED_FLOORS.includes(r.floor_number || 0));
+import { getProjectData, updateActivityStatus, UploadedActivity, ProjectData } from '@/lib/project-data-store';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
-const STATUS_CONFIG: Record<ActivityStatus, { label: string; bg: string; text: string }> = {
+type SupervisorStatus = 'not_started' | 'in_progress' | 'completed' | 'delayed' | 'on_hold';
+
+const STATUS_CONFIG: Record<SupervisorStatus, { label: string; bg: string; text: string }> = {
   not_started: { label: 'NOT STARTED', bg: 'bg-gray-100', text: 'text-gray-600' },
   in_progress: { label: 'IN PROGRESS', bg: 'bg-blue-100', text: 'text-blue-700' },
   completed: { label: 'COMPLETED', bg: 'bg-green-100', text: 'text-green-700' },
@@ -18,7 +15,7 @@ const STATUS_CONFIG: Record<ActivityStatus, { label: string; bg: string; text: s
   on_hold: { label: 'ON HOLD', bg: 'bg-orange-100', text: 'text-orange-700' },
 };
 
-const STATUS_OPTIONS: { value: ActivityStatus | ''; label: string }[] = [
+const STATUS_OPTIONS: { value: SupervisorStatus | ''; label: string }[] = [
   { value: '', label: 'All Status' },
   { value: 'not_started', label: 'Not Started' },
   { value: 'in_progress', label: 'In Progress' },
@@ -27,11 +24,17 @@ const STATUS_OPTIONS: { value: ActivityStatus | ''; label: string }[] = [
   { value: 'on_hold', label: 'On Hold' },
 ];
 
+function normalizeStatus(raw: string): SupervisorStatus {
+  if (raw === 'in_progress_delayed') return 'delayed';
+  if (raw === 'completed_delayed') return 'completed';
+  if (raw === 'not_started' || raw === 'in_progress' || raw === 'completed' || raw === 'delayed' || raw === 'on_hold') return raw;
+  return 'not_started';
+}
+
 function daysOverdue(endDate: string): number {
   const end = new Date(endDate);
   const today = new Date(TODAY);
-  const diff = Math.floor((today.getTime() - end.getTime()) / (1000 * 60 * 60 * 24));
-  return diff;
+  return Math.floor((today.getTime() - end.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 function getGreeting(): string {
@@ -44,90 +47,104 @@ function getGreeting(): string {
 type PriorityView = 'floor' | 'overdue' | 'due_today' | 'starting_today';
 
 export default function SupervisorHomePage() {
-  const [activeFloor, setActiveFloor] = useState<number>(ASSIGNED_FLOORS[0]);
+  const [projectData, setProjectData] = useState<ProjectData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeFloor, setActiveFloor] = useState<number>(0);
   const [activeView, setActiveView] = useState<PriorityView>('floor');
-  const [statusFilter, setStatusFilter] = useState<ActivityStatus | null>(null);
+  const [statusFilter, setStatusFilter] = useState<SupervisorStatus | null>(null);
   const [stageFilter, setStageFilter] = useState('');
   const [subStageFilter, setSubStageFilter] = useState('');
   const [activityFilter, setActivityFilter] = useState('');
   const [statusDropdown, setStatusDropdown] = useState('');
   const [search, setSearch] = useState('');
-  const [selectedDetail, setSelectedDetail] = useState<ActivityRow | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<UploadedActivity | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [config, setConfig] = useState<ActivityConfig>({ stages: [], subStages: {}, activities: {} });
   const [showPhotoPrompt, setShowPhotoPrompt] = useState<string | null>(null);
+  const [detailStatus, setDetailStatus] = useState('');
+  const [detailActualStart, setDetailActualStart] = useState('');
+  const [detailActualEnd, setDetailActualEnd] = useState('');
+  const [detailReason, setDetailReason] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    setConfig(getActivityConfig());
-  }, []);
+    const data = getProjectData();
+    setProjectData(data);
+    if (data && data.floors.length > 0) {
+      setActiveFloor(data.floors[0]);
+    }
+    setLoading(false);
+  }, [refreshKey]);
 
-  // Priority calculations across all assigned floors
+  const allActivities = projectData?.activities || [];
+  const floors = projectData?.floors || [];
+
   const priorities = useMemo(() => {
-    const overdue: ActivityRow[] = [];
-    const dueToday: ActivityRow[] = [];
-    const startingToday: ActivityRow[] = [];
-    const completedToday: ActivityRow[] = [];
+    const overdue: UploadedActivity[] = [];
+    const dueToday: UploadedActivity[] = [];
+    const startingToday: UploadedActivity[] = [];
+    const completedToday: UploadedActivity[] = [];
 
-    for (const row of supervisorRows) {
-      if (row.status === 'completed') {
-        if (row.actual_end_date === TODAY) completedToday.push(row);
+    for (const row of allActivities) {
+      const status = normalizeStatus(row.status);
+      if (status === 'completed') {
+        if (row.actual_end === TODAY) completedToday.push(row);
         continue;
       }
-      if (row.expected_end_date === TODAY) {
+      if (row.expected_end === TODAY) {
         dueToday.push(row);
       }
-      if (row.expected_start_date === TODAY && row.status === 'not_started') {
+      if (row.expected_start === TODAY && status === 'not_started') {
         startingToday.push(row);
       }
-      if (row.expected_end_date < TODAY) {
+      if (row.expected_end && row.expected_end < TODAY) {
         overdue.push(row);
       }
     }
 
-    overdue.sort((a, b) => daysOverdue(b.expected_end_date) - daysOverdue(a.expected_end_date));
+    overdue.sort((a, b) => daysOverdue(b.expected_end) - daysOverdue(a.expected_end));
 
     return { overdue, dueToday, startingToday, completedToday };
-  }, []);
+  }, [allActivities]);
 
   const subStageOptions = useMemo(() => {
-    if (!stageFilter || !config.subStages[stageFilter]) return [];
-    return config.subStages[stageFilter];
-  }, [stageFilter, config]);
+    if (!stageFilter || !projectData) return [];
+    return projectData.stageGates[stageFilter] || [];
+  }, [stageFilter, projectData]);
 
   const activityOptions = useMemo(() => {
-    if (!stageFilter || !subStageFilter) return [];
+    if (!stageFilter || !subStageFilter || !projectData) return [];
     const key = `${stageFilter}||${subStageFilter}`;
-    return config.activities[key] || [];
-  }, [stageFilter, subStageFilter, config]);
+    return projectData.activityNames[key] || [];
+  }, [stageFilter, subStageFilter, projectData]);
 
   const floorRows = useMemo(() => {
-    let rows = supervisorRows.filter(r => r.floor_number === activeFloor);
-    if (statusFilter) rows = rows.filter(r => r.status === statusFilter);
-    if (statusDropdown) rows = rows.filter(r => r.status === statusDropdown);
-    if (stageFilter) rows = rows.filter(r => r.stage_name === stageFilter);
-    if (subStageFilter) rows = rows.filter(r => r.stage_gate_name === subStageFilter);
-    if (activityFilter) rows = rows.filter(r => r.activity_name === activityFilter);
+    let rows = allActivities.filter(r => r.floor === activeFloor);
+    if (statusFilter) rows = rows.filter(r => normalizeStatus(r.status) === statusFilter);
+    if (statusDropdown) rows = rows.filter(r => normalizeStatus(r.status) === statusDropdown);
+    if (stageFilter) rows = rows.filter(r => r.stage === stageFilter);
+    if (subStageFilter) rows = rows.filter(r => r.stage_gate === subStageFilter);
+    if (activityFilter) rows = rows.filter(r => r.activity === activityFilter);
     if (search) {
       const q = search.toLowerCase();
       rows = rows.filter(r =>
-        r.flat_number?.toLowerCase().includes(q) ||
-        r.activity_name?.toLowerCase().includes(q) ||
-        r.vendor_name?.toLowerCase().includes(q)
+        String(r.flat_number).includes(q) ||
+        r.activity.toLowerCase().includes(q) ||
+        r.vendor.toLowerCase().includes(q)
       );
     }
     return rows;
-  }, [activeFloor, statusFilter, statusDropdown, stageFilter, subStageFilter, activityFilter, search]);
+  }, [allActivities, activeFloor, statusFilter, statusDropdown, stageFilter, subStageFilter, activityFilter, search]);
 
   const statusCounts = useMemo(() => {
-    const rows = supervisorRows.filter(r => r.floor_number === activeFloor);
+    const rows = allActivities.filter(r => r.floor === activeFloor);
     return {
       total: rows.length,
-      in_progress: rows.filter(r => r.status === 'in_progress').length,
-      delayed: rows.filter(r => r.status === 'delayed').length,
-      on_hold: rows.filter(r => r.status === 'on_hold').length,
+      in_progress: rows.filter(r => normalizeStatus(r.status) === 'in_progress').length,
+      delayed: rows.filter(r => normalizeStatus(r.status) === 'delayed').length,
+      on_hold: rows.filter(r => normalizeStatus(r.status) === 'on_hold').length,
     };
-  }, [activeFloor]);
+  }, [allActivities, activeFloor]);
 
   function toggleSelection(id: string) {
     setSelectedIds(prev => {
@@ -146,26 +163,52 @@ export default function SupervisorHomePage() {
     setSearch('');
   }
 
-  function handleQuickAction(row: ActivityRow, action: 'start' | 'complete' | 'delay') {
+  function handleQuickAction(row: UploadedActivity, action: 'start' | 'complete' | 'delay') {
     if (action === 'complete') {
       setShowPhotoPrompt(row.id);
       return;
     }
-    const labels = { start: 'In Progress', delay: 'Delayed' };
-    alert(`Status updated to "${labels[action]}" for ${row.activity_name} - Flat ${row.flat_number} (demo)`);
+    const newStatus = action === 'start' ? 'in_progress' : 'delayed';
+    const updates: Partial<UploadedActivity> = {};
+    if (action === 'start') {
+      updates.actual_start = TODAY;
+    }
+    updateActivityStatus(row.id, newStatus, updates);
+    setRefreshKey(k => k + 1);
   }
 
   function confirmComplete(withPhoto: boolean) {
-    if (withPhoto) {
-      const row = supervisorRows.find(r => r.id === showPhotoPrompt);
-      if (row) setSelectedDetail(row);
-    } else {
-      alert('Marked as Completed (demo)');
+    if (showPhotoPrompt) {
+      updateActivityStatus(showPhotoPrompt, 'completed', { actual_end: TODAY });
+      setRefreshKey(k => k + 1);
+      if (withPhoto) {
+        const row = allActivities.find(r => r.id === showPhotoPrompt);
+        if (row) openDetail({ ...row, status: 'completed', actual_end: TODAY });
+      }
     }
     setShowPhotoPrompt(null);
   }
 
-  function getPriorityRows(): ActivityRow[] {
+  function openDetail(row: UploadedActivity) {
+    setSelectedDetail(row);
+    setDetailStatus(normalizeStatus(row.status));
+    setDetailActualStart(row.actual_start || '');
+    setDetailActualEnd(row.actual_end || '');
+    setDetailReason(row.delay_reason || '');
+  }
+
+  function saveDetail() {
+    if (!selectedDetail) return;
+    updateActivityStatus(selectedDetail.id, detailStatus, {
+      actual_start: detailActualStart,
+      actual_end: detailActualEnd,
+      delay_reason: detailReason,
+    });
+    setSelectedDetail(null);
+    setRefreshKey(k => k + 1);
+  }
+
+  function getPriorityRows(): UploadedActivity[] {
     if (activeView === 'overdue') return priorities.overdue;
     if (activeView === 'due_today') return priorities.dueToday;
     if (activeView === 'starting_today') return priorities.startingToday;
@@ -174,6 +217,36 @@ export default function SupervisorHomePage() {
 
   const hasFilters = stageFilter || subStageFilter || activityFilter || statusDropdown || statusFilter;
   const todayFormatted = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-navy-dark flex items-center justify-center">
+        <div className="text-white text-sm">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!projectData) {
+    return (
+      <div className="min-h-screen bg-navy-dark flex flex-col items-center justify-center px-6 max-w-md mx-auto">
+        <div className="w-20 h-20 rounded-2xl bg-navy-light flex items-center justify-center mb-6">
+          <svg className="w-10 h-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+          </svg>
+        </div>
+        <h2 className="text-white text-lg font-bold mb-2 text-center">No Project Data</h2>
+        <p className="text-gray-400 text-sm text-center mb-6">
+          Ask your admin to upload the project template from the admin panel to get started.
+        </p>
+        <button
+          onClick={() => setRefreshKey(k => k + 1)}
+          className="px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl"
+        >
+          Refresh
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-navy-dark flex flex-col max-w-md mx-auto">
@@ -192,13 +265,17 @@ export default function SupervisorHomePage() {
             <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
             </svg>
-            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">3</span>
+            {priorities.overdue.length > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                {priorities.overdue.length > 9 ? '9+' : priorities.overdue.length}
+              </span>
+            )}
           </button>
         </div>
 
         {/* Greeting + Date */}
         <div className="mb-3">
-          <div className="text-white text-base font-semibold">{getGreeting()}, Ravi</div>
+          <div className="text-white text-base font-semibold">{getGreeting()}, Supervisor</div>
           <div className="text-gray-400 text-xs">{todayFormatted}</div>
         </div>
 
@@ -210,15 +287,12 @@ export default function SupervisorHomePage() {
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-white font-semibold text-sm">Raghav Reserve</div>
-            <div className="text-gray-400 text-xs">Floors {ASSIGNED_FLOORS.join(', ')}</div>
+            <div className="text-white font-semibold text-sm">{projectData.name || projectData.fileName}</div>
+            <div className="text-gray-400 text-xs">{floors.length} Floors &bull; {projectData.totalRows.toLocaleString()} Activities</div>
           </div>
-          <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-          </svg>
         </div>
 
-        {/* Today's Priority Summary */}
+        {/* Today&apos;s Priority Summary */}
         <div className="grid grid-cols-4 gap-2 mb-3">
           <button
             onClick={() => setActiveView(activeView === 'overdue' ? 'floor' : 'overdue')}
@@ -255,12 +329,12 @@ export default function SupervisorHomePage() {
 
         {/* Floor Tabs - only show when in floor view */}
         {activeView === 'floor' && (
-          <div className="flex gap-2">
-            {ASSIGNED_FLOORS.map(f => (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {floors.map(f => (
               <button
                 key={f}
                 onClick={() => { setActiveFloor(f); clearFilters(); setSelectedIds(new Set()); }}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
                   activeFloor === f
                     ? 'bg-primary text-white'
                     : 'bg-navy-light text-gray-300 hover:bg-navy-light/80'
@@ -316,7 +390,7 @@ export default function SupervisorHomePage() {
                 <PriorityCard
                   key={row.id}
                   row={row}
-                  onDetail={() => setSelectedDetail(row)}
+                  onDetail={() => openDetail(row)}
                   onQuickAction={(action) => handleQuickAction(row, action)}
                 />
               ))
@@ -329,12 +403,12 @@ export default function SupervisorHomePage() {
           <>
             {/* Floor summary strip */}
             <div className="flex gap-2 mb-4">
-              {[
-                { label: 'Total', count: statusCounts.total, filter: null as ActivityStatus | null },
-                { label: 'In Progress', count: statusCounts.in_progress, filter: 'in_progress' as ActivityStatus },
-                { label: 'Delayed', count: statusCounts.delayed, filter: 'delayed' as ActivityStatus },
-                { label: 'On Hold', count: statusCounts.on_hold, filter: 'on_hold' as ActivityStatus },
-              ].map(stat => (
+              {([
+                { label: 'Total', count: statusCounts.total, filter: null as SupervisorStatus | null },
+                { label: 'In Progress', count: statusCounts.in_progress, filter: 'in_progress' as SupervisorStatus },
+                { label: 'Delayed', count: statusCounts.delayed, filter: 'delayed' as SupervisorStatus },
+                { label: 'On Hold', count: statusCounts.on_hold, filter: 'on_hold' as SupervisorStatus },
+              ]).map(stat => (
                 <button
                   key={stat.label}
                   onClick={() => setStatusFilter(statusFilter === stat.filter ? null : stat.filter)}
@@ -350,7 +424,7 @@ export default function SupervisorHomePage() {
               ))}
             </div>
 
-            {/* Filters */}
+            {/* Filters - cascading from project data */}
             <div className="grid grid-cols-2 gap-2 mb-3">
               <select
                 value={stageFilter}
@@ -358,7 +432,7 @@ export default function SupervisorHomePage() {
                 className="h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700"
               >
                 <option value="">Stage</option>
-                {config.stages.map(s => <option key={s} value={s}>{s}</option>)}
+                {(projectData?.stages || []).map(s => <option key={s} value={s}>{s}</option>)}
               </select>
 
               <select
@@ -425,16 +499,17 @@ export default function SupervisorHomePage() {
                 </div>
               ) : (
                 floorRows.slice(0, 20).map(row => {
-                  const sc = STATUS_CONFIG[row.status];
-                  const overdueDays = row.status !== 'completed' && row.expected_end_date < TODAY
-                    ? daysOverdue(row.expected_end_date) : 0;
+                  const status = normalizeStatus(row.status);
+                  const sc = STATUS_CONFIG[status];
+                  const overdueDays = status !== 'completed' && row.expected_end && row.expected_end < TODAY
+                    ? daysOverdue(row.expected_end) : 0;
 
                   return (
                     <div
                       key={row.id}
                       className="bg-white rounded-xl border border-gray-200 p-4 transition-colors"
                     >
-                      <div className="flex items-start justify-between mb-1" onClick={() => !bulkMode && setSelectedDetail(row)}>
+                      <div className="flex items-start justify-between mb-1" onClick={() => !bulkMode && openDetail(row)}>
                         <div className="flex items-start gap-3">
                           {bulkMode && (
                             <input
@@ -448,8 +523,8 @@ export default function SupervisorHomePage() {
                             <div className="text-sm font-bold text-gray-900">
                               Flat {row.flat_number} &bull; {row.configuration}
                             </div>
-                            <div className="text-xs text-gray-500 mt-0.5">{row.stage_name}</div>
-                            <div className="text-xs font-semibold text-primary mt-0.5">Sub Stage: {row.stage_gate_name}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{row.stage}</div>
+                            <div className="text-xs font-semibold text-primary mt-0.5">Sub Stage: {row.stage_gate}</div>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
@@ -464,19 +539,19 @@ export default function SupervisorHomePage() {
                         </div>
                       </div>
 
-                      <div className="text-sm font-semibold text-gray-800 mt-1" onClick={() => !bulkMode && setSelectedDetail(row)}>{row.activity_name}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">{row.vendor_name}</div>
+                      <div className="text-sm font-semibold text-gray-800 mt-1" onClick={() => !bulkMode && openDetail(row)}>{row.activity}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{row.vendor}</div>
 
                       <div className="flex items-center justify-between mt-2">
                         <span className="text-xs text-gray-400">
-                          {row.expected_start_date} → {row.expected_end_date}
+                          {row.expected_start} → {row.expected_end}
                         </span>
                       </div>
 
                       {/* Quick Actions */}
-                      {!bulkMode && row.status !== 'completed' && (
+                      {!bulkMode && status !== 'completed' && (
                         <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                          {row.status === 'not_started' && (
+                          {status === 'not_started' && (
                             <button
                               onClick={() => handleQuickAction(row, 'start')}
                               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-colors"
@@ -496,7 +571,7 @@ export default function SupervisorHomePage() {
                             </svg>
                             Complete
                           </button>
-                          {row.status !== 'delayed' && (
+                          {status !== 'delayed' && (
                             <button
                               onClick={() => handleQuickAction(row, 'delay')}
                               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 transition-colors"
@@ -513,6 +588,11 @@ export default function SupervisorHomePage() {
                   );
                 })
               )}
+              {floorRows.length > 20 && (
+                <div className="text-center py-3 text-sm text-gray-500">
+                  Showing 20 of {floorRows.length} activities. Use filters to narrow down.
+                </div>
+              )}
             </div>
           </>
         )}
@@ -525,10 +605,17 @@ export default function SupervisorHomePage() {
             <div className="flex items-center justify-between">
               <span className="text-white text-sm font-medium">{selectedIds.size} selected</span>
               <button
-                onClick={() => { alert(`Bulk update ${selectedIds.size} rows (demo)`); setBulkMode(false); setSelectedIds(new Set()); }}
+                onClick={() => {
+                  for (const id of selectedIds) {
+                    updateActivityStatus(id, 'in_progress', { actual_start: TODAY });
+                  }
+                  setBulkMode(false);
+                  setSelectedIds(new Set());
+                  setRefreshKey(k => k + 1);
+                }}
                 className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg"
               >
-                Update Selected
+                Start Selected
               </button>
             </div>
           ) : (
@@ -589,11 +676,11 @@ export default function SupervisorHomePage() {
             <div className="px-5 pb-24">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">{selectedDetail.activity_name}</h2>
+                  <h2 className="text-lg font-bold text-gray-900">{selectedDetail.activity}</h2>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Floor {selectedDetail.floor_number} &bull; Flat {selectedDetail.flat_number} &bull; {selectedDetail.stage_name}
+                    Floor {selectedDetail.floor} &bull; Flat {selectedDetail.flat_number} &bull; {selectedDetail.stage}
                   </p>
-                  <p className="text-xs text-primary font-medium mt-0.5">Sub Stage: {selectedDetail.stage_gate_name}</p>
+                  <p className="text-xs text-primary font-medium mt-0.5">Sub Stage: {selectedDetail.stage_gate}</p>
                 </div>
                 <button onClick={() => setSelectedDetail(null)} className="p-1 hover:bg-gray-100 rounded-lg">
                   <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -603,13 +690,13 @@ export default function SupervisorHomePage() {
               </div>
 
               {/* Overdue alert in detail */}
-              {selectedDetail.status !== 'completed' && selectedDetail.expected_end_date < TODAY && (
+              {normalizeStatus(selectedDetail.status) !== 'completed' && selectedDetail.expected_end && selectedDetail.expected_end < TODAY && (
                 <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
                   <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                   </svg>
                   <span className="text-sm font-semibold text-red-700">
-                    {daysOverdue(selectedDetail.expected_end_date)} days overdue
+                    {daysOverdue(selectedDetail.expected_end)} days overdue
                   </span>
                 </div>
               )}
@@ -617,11 +704,11 @@ export default function SupervisorHomePage() {
               <div className="grid grid-cols-2 gap-3 mb-5">
                 <div className="bg-gray-50 rounded-lg p-3">
                   <div className="text-[11px] text-gray-500 uppercase tracking-wide">Expected Start</div>
-                  <div className="text-sm font-medium text-gray-900 mt-1">{selectedDetail.expected_start_date}</div>
+                  <div className="text-sm font-medium text-gray-900 mt-1">{selectedDetail.expected_start || '-'}</div>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-3">
                   <div className="text-[11px] text-gray-500 uppercase tracking-wide">Expected End</div>
-                  <div className="text-sm font-medium text-gray-900 mt-1">{selectedDetail.expected_end_date}</div>
+                  <div className="text-sm font-medium text-gray-900 mt-1">{selectedDetail.expected_end || '-'}</div>
                 </div>
               </div>
 
@@ -629,17 +716,31 @@ export default function SupervisorHomePage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Actual Start</label>
-                    <input type="date" defaultValue={selectedDetail.actual_start_date || ''} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+                    <input
+                      type="date"
+                      value={detailActualStart}
+                      onChange={(e) => setDetailActualStart(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Actual End</label>
-                    <input type="date" defaultValue={selectedDetail.actual_end_date || ''} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+                    <input
+                      type="date"
+                      value={detailActualEnd}
+                      onChange={(e) => setDetailActualEnd(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                  <select defaultValue={selectedDetail.status} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                  <select
+                    value={detailStatus}
+                    onChange={(e) => setDetailStatus(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                  >
                     <option value="not_started">Not Started</option>
                     <option value="in_progress">In Progress</option>
                     <option value="completed">Completed</option>
@@ -650,14 +751,15 @@ export default function SupervisorHomePage() {
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Vendor</label>
-                  <input type="text" defaultValue={selectedDetail.vendor_name} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50" readOnly />
+                  <input type="text" defaultValue={selectedDetail.vendor} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50" readOnly />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Delay / Hold Reason</label>
                   <textarea
                     rows={2}
-                    defaultValue={selectedDetail.delay_reason_notes || selectedDetail.hold_reason_notes || ''}
+                    value={detailReason}
+                    onChange={(e) => setDetailReason(e.target.value)}
                     placeholder="Add reason if delayed or on hold..."
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
                   />
@@ -678,7 +780,7 @@ export default function SupervisorHomePage() {
 
             <div className="sticky bottom-0 bg-white border-t border-gray-200 px-5 py-3">
               <button
-                onClick={() => { alert('Saved (demo)'); setSelectedDetail(null); }}
+                onClick={saveDetail}
                 className="w-full py-3 bg-primary hover:bg-primary-dark text-white font-semibold rounded-xl transition-colors"
               >
                 Save Changes
@@ -693,21 +795,22 @@ export default function SupervisorHomePage() {
 
 /* Priority Card - used in overdue/due-today/starting-today views */
 function PriorityCard({ row, onDetail, onQuickAction }: {
-  row: ActivityRow;
+  row: UploadedActivity;
   onDetail: () => void;
   onQuickAction: (action: 'start' | 'complete' | 'delay') => void;
 }) {
-  const sc = STATUS_CONFIG[row.status];
-  const overdueDays = row.expected_end_date < TODAY ? daysOverdue(row.expected_end_date) : 0;
+  const status = normalizeStatus(row.status);
+  const sc = STATUS_CONFIG[status];
+  const overdueDays = row.expected_end && row.expected_end < TODAY ? daysOverdue(row.expected_end) : 0;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
       <div className="flex items-start justify-between mb-1" onClick={onDetail}>
         <div>
           <div className="text-sm font-bold text-gray-900">
-            Floor {row.floor_number} &bull; Flat {row.flat_number}
+            Floor {row.floor} &bull; Flat {row.flat_number}
           </div>
-          <div className="text-xs text-gray-500 mt-0.5">{row.stage_name} &bull; {row.stage_gate_name}</div>
+          <div className="text-xs text-gray-500 mt-0.5">{row.stage} &bull; {row.stage_gate}</div>
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${sc.bg} ${sc.text}`}>
@@ -721,13 +824,13 @@ function PriorityCard({ row, onDetail, onQuickAction }: {
         </div>
       </div>
 
-      <div className="text-sm font-semibold text-gray-800 mt-1" onClick={onDetail}>{row.activity_name}</div>
-      <div className="text-xs text-gray-500 mt-0.5">{row.vendor_name}</div>
-      <div className="text-xs text-gray-400 mt-1">{row.expected_start_date} → {row.expected_end_date}</div>
+      <div className="text-sm font-semibold text-gray-800 mt-1" onClick={onDetail}>{row.activity}</div>
+      <div className="text-xs text-gray-500 mt-0.5">{row.vendor}</div>
+      <div className="text-xs text-gray-400 mt-1">{row.expected_start} → {row.expected_end}</div>
 
-      {row.status !== 'completed' && (
+      {status !== 'completed' && (
         <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-          {row.status === 'not_started' && (
+          {status === 'not_started' && (
             <button
               onClick={() => onQuickAction('start')}
               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-colors"
@@ -747,7 +850,7 @@ function PriorityCard({ row, onDetail, onQuickAction }: {
             </svg>
             Complete
           </button>
-          {row.status !== 'delayed' && (
+          {status !== 'delayed' && (
             <button
               onClick={() => onQuickAction('delay')}
               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 transition-colors"
