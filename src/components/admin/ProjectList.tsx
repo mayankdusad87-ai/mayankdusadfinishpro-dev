@@ -80,8 +80,9 @@ export default function ProjectList() {
       await refreshProjects();
       setShowForm(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to save project';
-      setFormError(msg);
+      const e = err as { message?: string; details?: string; hint?: string; code?: string };
+      const msg = e?.message || e?.details || 'Failed to save project';
+      setFormError(msg + (e?.hint ? ` (${e.hint})` : '') + (e?.code ? ` [${e.code}]` : ''));
     } finally {
       setSaving(false);
     }
