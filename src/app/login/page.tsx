@@ -36,6 +36,7 @@ export default function AdminLoginPage() {
       setSubmitting(false);
       return;
     }
+    router.replace('/admin/dashboard');
   }
 
   if (loading) {

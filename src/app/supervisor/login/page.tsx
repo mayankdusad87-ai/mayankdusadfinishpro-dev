@@ -35,6 +35,7 @@ export default function SupervisorLoginPage() {
       setSubmitting(false);
       return;
     }
+    router.replace('/supervisor/home');
   }
 
   if (loading) {
