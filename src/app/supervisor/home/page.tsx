@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { getProjectData, updateActivityStatus, UploadedActivity, ProjectData } from '@/lib/project-data-store';
+import { getProjects, ManagedProject } from '@/lib/project-store';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -47,6 +48,8 @@ function getGreeting(): string {
 type PriorityView = 'floor' | 'overdue' | 'due_today' | 'starting_today';
 
 export default function SupervisorHomePage() {
+  const [availableProjects, setAvailableProjects] = useState<ManagedProject[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeFloor, setActiveFloor] = useState<number>(0);
@@ -68,14 +71,33 @@ export default function SupervisorHomePage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    getProjectData().then(data => {
+    getProjects().then(projects => {
+      const withTemplate = projects.filter(p => p.hasTemplate);
+      setAvailableProjects(withTemplate);
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('supervisor_selected_project') : null;
+      if (saved && withTemplate.find(p => p.id === saved)) {
+        setSelectedProjectId(saved);
+      } else if (withTemplate.length > 0) {
+        setSelectedProjectId(withTemplate[0].id);
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProjectId) { setProjectData(null); return; }
+    setLoading(true);
+    getProjectData(selectedProjectId).then(data => {
       setProjectData(data);
       if (data && data.floors.length > 0) {
         setActiveFloor(data.floors[0]);
       }
       setLoading(false);
     });
-  }, [refreshKey]);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('supervisor_selected_project', selectedProjectId);
+    }
+  }, [selectedProjectId, refreshKey]);
 
   const allActivities = projectData?.activities || [];
   const floors = projectData?.floors || [];
@@ -174,13 +196,13 @@ export default function SupervisorHomePage() {
     if (action === 'start') {
       updates.actual_start = TODAY;
     }
-    await updateActivityStatus(row.id, newStatus, updates);
+    await updateActivityStatus(selectedProjectId, row.id, newStatus, updates);
     setRefreshKey(k => k + 1);
   }
 
   async function confirmComplete(withPhoto: boolean) {
     if (showPhotoPrompt) {
-      await updateActivityStatus(showPhotoPrompt, 'completed', { actual_end: TODAY });
+      await updateActivityStatus(selectedProjectId, showPhotoPrompt, 'completed', { actual_end: TODAY });
       setRefreshKey(k => k + 1);
       if (withPhoto) {
         const row = allActivities.find(r => r.id === showPhotoPrompt);
@@ -200,7 +222,7 @@ export default function SupervisorHomePage() {
 
   async function saveDetail() {
     if (!selectedDetail) return;
-    await updateActivityStatus(selectedDetail.id, detailStatus, {
+    await updateActivityStatus(selectedProjectId, selectedDetail.id, detailStatus, {
       actual_start: detailActualStart,
       actual_end: detailActualEnd,
       delay_reason: detailReason,
@@ -227,7 +249,7 @@ export default function SupervisorHomePage() {
     );
   }
 
-  if (!projectData) {
+  if (!projectData || availableProjects.length === 0) {
     return (
       <div className="min-h-screen bg-navy-dark flex flex-col items-center justify-center px-6 max-w-md mx-auto">
         <div className="w-20 h-20 rounded-2xl bg-navy-light flex items-center justify-center mb-6">
@@ -237,10 +259,10 @@ export default function SupervisorHomePage() {
         </div>
         <h2 className="text-white text-lg font-bold mb-2 text-center">No Project Data</h2>
         <p className="text-gray-400 text-sm text-center mb-6">
-          Ask your admin to upload the project template from the admin panel to get started.
+          Ask your admin to create a project and upload the template from the admin panel.
         </p>
         <button
-          onClick={() => setRefreshKey(k => k + 1)}
+          onClick={() => window.location.reload()}
           className="px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-xl"
         >
           Refresh
@@ -248,6 +270,8 @@ export default function SupervisorHomePage() {
       </div>
     );
   }
+
+  const selectedProject = availableProjects.find(p => p.id === selectedProjectId);
 
   return (
     <div className="min-h-screen bg-navy-dark flex flex-col max-w-md mx-auto">
@@ -280,17 +304,32 @@ export default function SupervisorHomePage() {
           <div className="text-gray-400 text-xs">{todayFormatted}</div>
         </div>
 
-        {/* Project info */}
-        <div className="flex items-center gap-3 bg-navy-light/50 rounded-xl px-3 py-2.5 mb-3">
-          <div className="w-9 h-9 bg-navy rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3H21m-3.75 3H21" />
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-white font-semibold text-sm">{projectData.name || projectData.fileName}</div>
-            <div className="text-gray-400 text-xs">{floors.length} Floors &bull; {projectData.totalRows.toLocaleString()} Activities</div>
-          </div>
+        {/* Project selector */}
+        <div className="mb-3">
+          {availableProjects.length > 1 ? (
+            <select
+              value={selectedProjectId}
+              onChange={e => setSelectedProjectId(e.target.value)}
+              className="w-full bg-navy-light/50 text-white border border-white/10 rounded-xl px-3 py-2.5 text-sm font-semibold appearance-none focus:ring-2 focus:ring-primary/50"
+              style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%239ca3af\' stroke-width=\'2\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'m19.5 8.25-7.5 7.5-7.5-7.5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px', paddingRight: '36px' }}
+            >
+              {availableProjects.map(p => (
+                <option key={p.id} value={p.id} className="bg-navy text-white">{p.name} - {p.location}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="flex items-center gap-3 bg-navy-light/50 rounded-xl px-3 py-2.5">
+              <div className="w-9 h-9 bg-navy rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3H21m-3.75 3H21" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-white font-semibold text-sm">{selectedProject?.name || projectData.fileName}</div>
+                <div className="text-gray-400 text-xs">{selectedProject?.location} &bull; {floors.length} Floors</div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Today&apos;s Priority Summary */}
@@ -608,7 +647,7 @@ export default function SupervisorHomePage() {
               <button
                 onClick={async () => {
                   for (const id of selectedIds) {
-                    await updateActivityStatus(id, 'in_progress', { actual_start: TODAY });
+                    await updateActivityStatus(selectedProjectId, id, 'in_progress', { actual_start: TODAY });
                   }
                   setBulkMode(false);
                   setSelectedIds(new Set());

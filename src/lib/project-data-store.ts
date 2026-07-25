@@ -30,6 +30,7 @@ export interface UploadedActivity {
 }
 
 export interface ProjectData {
+  projectId: string;
   name: string;
   uploadedAt: string;
   fileName: string;
@@ -44,12 +45,11 @@ export interface ProjectData {
   statuses: string[];
 }
 
-// ---- IndexedDB storage (replaces localStorage to handle large datasets) ----
+// ---- IndexedDB storage keyed by project ID ----
 
 const DB_NAME = 'finishing_pro_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'project_data';
-const DATA_KEY = 'current_project';
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -61,28 +61,31 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
       }
+      if (!db.objectStoreNames.contains('projects')) {
+        db.createObjectStore('projects', { keyPath: 'id' });
+      }
     };
   });
 }
 
-export async function saveProjectData(data: ProjectData): Promise<void> {
+export async function saveProjectData(projectId: string, data: ProjectData): Promise<void> {
   if (typeof window === 'undefined') return;
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(data, DATA_KEY);
+    tx.objectStore(STORE_NAME).put(data, `project_${projectId}`);
     tx.oncomplete = () => { db.close(); resolve(); };
     tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
-export async function getProjectData(): Promise<ProjectData | null> {
+export async function getProjectData(projectId: string): Promise<ProjectData | null> {
   if (typeof window === 'undefined') return null;
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
-      const request = tx.objectStore(STORE_NAME).get(DATA_KEY);
+      const request = tx.objectStore(STORE_NAME).get(`project_${projectId}`);
       request.onsuccess = () => { db.close(); resolve(request.result || null); };
       request.onerror = () => { db.close(); reject(request.error); };
     });
@@ -91,27 +94,36 @@ export async function getProjectData(): Promise<ProjectData | null> {
   }
 }
 
-export async function clearProjectData(): Promise<void> {
+export async function clearProjectData(projectId: string): Promise<void> {
   if (typeof window === 'undefined') return;
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).delete(DATA_KEY);
+    tx.objectStore(STORE_NAME).delete(`project_${projectId}`);
     tx.oncomplete = () => { db.close(); resolve(); };
     tx.onerror = () => { db.close(); reject(tx.error); };
   });
 }
 
-export async function updateActivityStatus(id: string, status: string, updates?: Partial<UploadedActivity>): Promise<void> {
-  const data = await getProjectData();
+export async function updateActivityStatus(projectId: string, activityId: string, status: string, updates?: Partial<UploadedActivity>): Promise<void> {
+  const data = await getProjectData(projectId);
   if (!data) return;
-  const idx = data.activities.findIndex(a => a.id === id);
+  const idx = data.activities.findIndex(a => a.id === activityId);
   if (idx === -1) return;
   data.activities[idx] = { ...data.activities[idx], status, ...updates };
-  await saveProjectData(data);
+  await saveProjectData(projectId, data);
 }
 
-// ---- Excel parsing (unchanged) ----
+export async function updateActivity(projectId: string, activityId: string, updates: Partial<UploadedActivity>): Promise<void> {
+  const data = await getProjectData(projectId);
+  if (!data) return;
+  const idx = data.activities.findIndex(a => a.id === activityId);
+  if (idx === -1) return;
+  data.activities[idx] = { ...data.activities[idx], ...updates };
+  await saveProjectData(projectId, data);
+}
+
+// ---- Excel parsing ----
 
 function excelDateToString(serial: number | string): string {
   if (!serial || serial === '') return '';
@@ -144,7 +156,7 @@ const ROOM_COLS = [
   { idx: 24, name: 'Kitchen' },
 ];
 
-export function parseExcelFile(buffer: ArrayBuffer): ProjectData {
+export function parseExcelFile(buffer: ArrayBuffer, projectId: string): ProjectData {
   const wb = XLSX.read(buffer, { type: 'array' });
   const ws = wb.Sheets['Sale Unit wise status'];
   if (!ws) {
@@ -236,6 +248,7 @@ export function parseExcelFile(buffer: ArrayBuffer): ProjectData {
   const floors = [...floorsSet].sort((a, b) => a - b);
 
   return {
+    projectId,
     name: 'Uploaded Project',
     uploadedAt: new Date().toISOString(),
     fileName: '',
