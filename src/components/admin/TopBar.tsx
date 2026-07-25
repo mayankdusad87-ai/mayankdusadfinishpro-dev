@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useProject } from '@/lib/project-context';
+import { useAuth } from '@/lib/auth-context';
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -12,6 +13,10 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { projects, currentProject, setCurrentProjectId } = useProject();
+  const { profile } = useAuth();
+
+  const displayName = profile?.full_name || 'Admin';
+  const initials = displayName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -122,10 +127,10 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
 
         <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
           <div className="w-8 h-8 rounded-full bg-navy text-white flex items-center justify-center text-xs font-semibold flex-shrink-0">
-            AD
+            {initials}
           </div>
           <div className="hidden sm:block min-w-0">
-            <div className="text-sm font-medium text-gray-800 truncate leading-tight">Admin</div>
+            <div className="text-sm font-medium text-gray-800 truncate leading-tight">{displayName}</div>
             <div className="text-[11px] text-gray-400 leading-tight">Head Office</div>
           </div>
         </div>

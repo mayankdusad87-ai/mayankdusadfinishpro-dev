@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getProjects, saveProject, deleteProject, generateProjectId, ManagedProject } from '@/lib/project-store';
+import { ManagedProject, generateProjectId } from '@/lib/project-store';
 import { useProject } from '@/lib/project-context';
+import { getProjectsFromSupabase, saveProjectToSupabase, deleteProjectFromSupabase } from '@/lib/supabase-data';
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -27,8 +28,12 @@ export default function ProjectList() {
   const { refreshProjects } = useProject();
 
   async function loadProjects() {
-    const list = await getProjects();
-    setProjects(list);
+    try {
+      const list = await getProjectsFromSupabase();
+      setProjects(list);
+    } catch {
+      setProjects([]);
+    }
   }
 
   useEffect(() => { loadProjects(); }, []);
@@ -64,7 +69,8 @@ export default function ProjectList() {
       createdAt: editProject?.createdAt || new Date().toISOString(),
       hasTemplate: editProject?.hasTemplate || false,
     };
-    await saveProject(project);
+    const savedId = await saveProjectToSupabase(project);
+    project.id = savedId;
     await loadProjects();
     await refreshProjects();
     setShowForm(false);
@@ -73,7 +79,7 @@ export default function ProjectList() {
 
   async function handleDelete(p: ManagedProject) {
     if (!confirm(`Delete project "${p.name}"? This will also remove any uploaded template data.`)) return;
-    await deleteProject(p.id);
+    await deleteProjectFromSupabase(p.id);
     await loadProjects();
     await refreshProjects();
   }

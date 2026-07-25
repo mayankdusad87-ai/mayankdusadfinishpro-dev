@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/admin/Sidebar';
 import TopBar from '@/components/admin/TopBar';
 import { ProjectProvider } from '@/lib/project-context';
+import { useAuth } from '@/lib/auth-context';
 
 export default function AdminLayout({
   children,
@@ -11,6 +13,25 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, profile, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+    if (!loading && profile && profile.role !== 'admin') {
+      router.replace('/supervisor/home');
+    }
+  }, [loading, user, profile, router]);
+
+  if (loading || !user || !profile || profile.role !== 'admin') {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <ProjectProvider>

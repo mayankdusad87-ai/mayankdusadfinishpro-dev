@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { getProjectData, updateActivityStatus, UploadedActivity, ProjectData } from '@/lib/project-data-store';
-import { getProjects, ManagedProject } from '@/lib/project-store';
+import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
+import { ManagedProject } from '@/lib/project-store';
+import { getProjectsFromSupabase, getProjectDataFromSupabase, updateActivityInSupabase } from '@/lib/supabase-data';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -71,7 +72,7 @@ export default function SupervisorHomePage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    getProjects().then(projects => {
+    getProjectsFromSupabase().then(projects => {
       const withTemplate = projects.filter(p => p.hasTemplate);
       setAvailableProjects(withTemplate);
       const saved = typeof window !== 'undefined' ? localStorage.getItem('supervisor_selected_project') : null;
@@ -87,7 +88,7 @@ export default function SupervisorHomePage() {
   useEffect(() => {
     if (!selectedProjectId) { setProjectData(null); return; }
     setLoading(true);
-    getProjectData(selectedProjectId).then(data => {
+    getProjectDataFromSupabase(selectedProjectId).then(data => {
       setProjectData(data);
       if (data && data.floors.length > 0) {
         setActiveFloor(data.floors[0]);
@@ -192,17 +193,17 @@ export default function SupervisorHomePage() {
       return;
     }
     const newStatus = action === 'start' ? 'in_progress' : 'delayed';
-    const updates: Partial<UploadedActivity> = {};
+    const updates: Partial<UploadedActivity> = { status: newStatus };
     if (action === 'start') {
       updates.actual_start = TODAY;
     }
-    await updateActivityStatus(selectedProjectId, row.id, newStatus, updates);
+    await updateActivityInSupabase(row.id, updates);
     setRefreshKey(k => k + 1);
   }
 
   async function confirmComplete(withPhoto: boolean) {
     if (showPhotoPrompt) {
-      await updateActivityStatus(selectedProjectId, showPhotoPrompt, 'completed', { actual_end: TODAY });
+      await updateActivityInSupabase(showPhotoPrompt, { status: 'completed', actual_end: TODAY });
       setRefreshKey(k => k + 1);
       if (withPhoto) {
         const row = allActivities.find(r => r.id === showPhotoPrompt);
@@ -222,7 +223,8 @@ export default function SupervisorHomePage() {
 
   async function saveDetail() {
     if (!selectedDetail) return;
-    await updateActivityStatus(selectedProjectId, selectedDetail.id, detailStatus, {
+    await updateActivityInSupabase(selectedDetail.id, {
+      status: detailStatus,
       actual_start: detailActualStart,
       actual_end: detailActualEnd,
       delay_reason: detailReason,
@@ -647,7 +649,7 @@ export default function SupervisorHomePage() {
               <button
                 onClick={async () => {
                   for (const id of selectedIds) {
-                    await updateActivityStatus(selectedProjectId, id, 'in_progress', { actual_start: TODAY });
+                    await updateActivityInSupabase(id, { status: 'in_progress', actual_start: TODAY });
                   }
                   setBulkMode(false);
                   setSelectedIds(new Set());

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Modal from '@/components/shared/Modal';
 import { Supervisor } from '@/lib/types';
-import { getProjects, ManagedProject } from '@/lib/project-store';
+import { ManagedProject } from '@/lib/project-store';
+import { getProjectsFromSupabase } from '@/lib/supabase-data';
 
 interface SupervisorModalProps {
   open: boolean;
@@ -34,7 +35,7 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
 
   useEffect(() => {
     if (open) {
-      getProjects().then(list => {
+      getProjectsFromSupabase().then(list => {
         setRealProjects(list);
         if (!supervisor && list.length > 0 && !project) {
           setProject(list[0].name);

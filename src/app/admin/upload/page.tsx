@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { parseExcelFile, saveProjectData, getProjectData, clearProjectData, updateActivity, ProjectData, UploadedActivity } from '@/lib/project-data-store';
+import { parseExcelFile, ProjectData, UploadedActivity } from '@/lib/project-data-store';
 import { useProject } from '@/lib/project-context';
-import { saveProject } from '@/lib/project-store';
+import { saveProjectToSupabase, saveActivitiesToSupabase, getProjectDataFromSupabase, updateActivityInSupabase, recordUpload } from '@/lib/supabase-data';
+import { useAuth } from '@/lib/auth-context';
 
 type UploadStep = 'pick' | 'preview' | 'saved';
 
 export default function UploadPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const { currentProject, refreshProjects } = useProject();
+  const { user } = useAuth();
   const [step, setStep] = useState<UploadStep>('pick');
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [previewData, setPreviewData] = useState<ProjectData | null>(null);
@@ -26,7 +28,7 @@ export default function UploadPage() {
 
   useEffect(() => {
     if (!currentProject) return;
-    getProjectData(currentProject.id).then(existing => {
+    getProjectDataFromSupabase(currentProject.id).then(existing => {
       if (existing) {
         setProjectData(existing);
         setStep('saved');
@@ -35,6 +37,9 @@ export default function UploadPage() {
         setProjectData(null);
       }
       setPreviewData(null);
+    }).catch(() => {
+      setStep('pick');
+      setProjectData(null);
     });
   }, [currentProject?.id]);
 
@@ -68,8 +73,11 @@ export default function UploadPage() {
     if (!previewData || !currentProject) return;
     setUploading(true);
     try {
-      await saveProjectData(currentProject.id, previewData);
-      await saveProject({ ...currentProject, hasTemplate: true });
+      await saveActivitiesToSupabase(currentProject.id, previewData.activities);
+      await saveProjectToSupabase({ ...currentProject, hasTemplate: true });
+      if (user) {
+        await recordUpload(currentProject.id, previewData.fileName, previewData.totalRows, user.id);
+      }
       await refreshProjects();
       setProjectData(previewData);
       setPreviewData(null);
@@ -90,8 +98,8 @@ export default function UploadPage() {
   async function handleClear() {
     if (!currentProject) return;
     if (!confirm('This will remove the uploaded template for "' + currentProject.name + '". Are you sure?')) return;
-    await clearProjectData(currentProject.id);
-    await saveProject({ ...currentProject, hasTemplate: false });
+    await saveActivitiesToSupabase(currentProject.id, []);
+    await saveProjectToSupabase({ ...currentProject, hasTemplate: false });
     await refreshProjects();
     setProjectData(null);
     setStep('pick');
@@ -118,8 +126,8 @@ export default function UploadPage() {
 
   async function saveEdit() {
     if (!editingRow || !currentProject || !projectData) return;
-    await updateActivity(currentProject.id, editingRow, editValues);
-    const updated = await getProjectData(currentProject.id);
+    await updateActivityInSupabase(editingRow, editValues);
+    const updated = await getProjectDataFromSupabase(currentProject.id);
     if (updated) setProjectData(updated);
     setEditingRow(null);
   }

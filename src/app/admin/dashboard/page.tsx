@@ -6,7 +6,8 @@ import FilterBar, { Filters } from '@/components/admin/FilterBar';
 import StatusPill from '@/components/shared/StatusPill';
 import FloorHeatmap from '@/components/admin/FloorHeatmap';
 import { useProject } from '@/lib/project-context';
-import { getProjectData, ProjectData } from '@/lib/project-data-store';
+import { ProjectData } from '@/lib/project-data-store';
+import { getProjectDataFromSupabase } from '@/lib/supabase-data';
 import { computeHeatmap } from '@/lib/floor-rollup';
 import { ActivityStatus } from '@/lib/types';
 
@@ -38,8 +39,12 @@ export default function DashboardPage() {
     async function load() {
       setLoading(true);
       if (currentProject?.hasTemplate) {
-        const data = await getProjectData(currentProject.id);
-        setProjectData(data);
+        try {
+          const data = await getProjectDataFromSupabase(currentProject.id);
+          setProjectData(data);
+        } catch {
+          setProjectData(null);
+        }
       } else {
         setProjectData(null);
       }

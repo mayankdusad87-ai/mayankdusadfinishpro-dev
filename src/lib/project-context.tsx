@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { getProjects, ManagedProject } from './project-store';
+import { getProjectsFromSupabase } from './supabase-data';
+import type { ManagedProject } from './project-store';
 
 interface ProjectContextType {
   projects: ManagedProject[];
@@ -28,14 +29,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [currentId, setCurrentId] = useState<string>('');
 
   const refreshProjects = useCallback(async () => {
-    const list = await getProjects();
-    setProjects(list);
-    return list;
+    try {
+      const list = await getProjectsFromSupabase();
+      setProjects(list);
+      return list;
+    } catch {
+      setProjects([]);
+      return [];
+    }
   }, []);
 
   useEffect(() => {
     refreshProjects().then(list => {
-      const saved = localStorage.getItem(SELECTED_KEY);
+      const saved = typeof window !== 'undefined' ? localStorage.getItem(SELECTED_KEY) : null;
       if (saved && list.find(p => p.id === saved)) {
         setCurrentId(saved);
       } else if (list.length > 0) {
