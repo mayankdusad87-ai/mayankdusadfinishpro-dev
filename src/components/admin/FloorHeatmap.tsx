@@ -40,7 +40,7 @@ function cellText(cell: RollupCell): string {
   if (cell.total === 0) return '-';
   switch (cell.label) {
     case 'completed': return `Completed (${cell.completed}/${cell.total})`;
-    case 'running': return `Running (${cell.completed}/${cell.total})`;
+    case 'running': return `Running (${cell.running}/${cell.total})`;
     case 'yet_to_start': return `Yet to Start (0/${cell.total})`;
   }
 }

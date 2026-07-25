@@ -3,6 +3,7 @@ import { UploadedActivity } from './project-data-store';
 export interface RollupCell {
   label: 'completed' | 'running' | 'yet_to_start';
   completed: number;
+  running: number;
   total: number;
 }
 
@@ -34,10 +35,11 @@ function isApplicable(s: string): boolean {
 }
 
 function rollup(completed: number, yetToStart: number, total: number): RollupCell {
-  if (total === 0) return { label: 'yet_to_start', completed: 0, total: 0 };
-  if (completed === total) return { label: 'completed', completed: total, total };
-  if (yetToStart === total) return { label: 'yet_to_start', completed: 0, total };
-  return { label: 'running', completed, total };
+  const running = total - completed - yetToStart;
+  if (total === 0) return { label: 'yet_to_start', completed: 0, running: 0, total: 0 };
+  if (completed === total) return { label: 'completed', completed: total, running: 0, total };
+  if (yetToStart === total) return { label: 'yet_to_start', completed: 0, running: 0, total };
+  return { label: 'running', completed, running, total };
 }
 
 export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
@@ -111,7 +113,7 @@ export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
       if (entry) {
         stageStatuses[stage] = rollup(entry.c, entry.y, entry.t);
       } else {
-        stageStatuses[stage] = { label: 'yet_to_start', completed: 0, total: 0 };
+        stageStatuses[stage] = { label: 'yet_to_start', completed: 0, running: 0, total: 0 };
       }
       if (stageStatuses[stage].label !== 'completed') allCompleted = false;
       if (stageStatuses[stage].label !== 'yet_to_start') anyStarted = true;
