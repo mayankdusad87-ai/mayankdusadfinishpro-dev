@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ManagedProject, generateProjectId } from '@/lib/project-store';
 import { useProject } from '@/lib/project-context';
 import { getProjectsFromSupabase, saveProjectToSupabase, deleteProjectFromSupabase } from '@/lib/supabase-data';
+import { useAuth } from '@/lib/auth-context';
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -25,7 +26,9 @@ export default function ProjectList() {
   const [totalFloors, setTotalFloors] = useState('');
   const [totalFlats, setTotalFlats] = useState('');
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
   const { refreshProjects } = useProject();
+  const { user } = useAuth();
 
   async function loadProjects() {
     try {
@@ -59,22 +62,29 @@ export default function ProjectList() {
   async function handleSave() {
     if (!name.trim() || !location.trim()) return;
     setSaving(true);
-    const project: ManagedProject = {
-      id: editProject?.id || generateProjectId(),
-      name: name.trim(),
-      location: location.trim(),
-      status: editProject?.status || 'active',
-      totalFloors: parseInt(totalFloors) || 0,
-      totalFlats: parseInt(totalFlats) || 0,
-      createdAt: editProject?.createdAt || new Date().toISOString(),
-      hasTemplate: editProject?.hasTemplate || false,
-    };
-    const savedId = await saveProjectToSupabase(project);
-    project.id = savedId;
-    await loadProjects();
-    await refreshProjects();
-    setShowForm(false);
-    setSaving(false);
+    setFormError('');
+    try {
+      const project: ManagedProject = {
+        id: editProject?.id || generateProjectId(),
+        name: name.trim(),
+        location: location.trim(),
+        status: editProject?.status || 'active',
+        totalFloors: parseInt(totalFloors) || 0,
+        totalFlats: parseInt(totalFlats) || 0,
+        createdAt: editProject?.createdAt || new Date().toISOString(),
+        hasTemplate: editProject?.hasTemplate || false,
+      };
+      const savedId = await saveProjectToSupabase(project, user?.id);
+      project.id = savedId;
+      await loadProjects();
+      await refreshProjects();
+      setShowForm(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to save project';
+      setFormError(msg);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete(p: ManagedProject) {
@@ -200,6 +210,11 @@ export default function ProjectList() {
             <h2 className="text-lg font-bold text-gray-900 mb-5">
               {editProject ? 'Edit Project' : 'Create New Project'}
             </h2>
+            {formError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {formError}
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Project Name *</label>

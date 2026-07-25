@@ -45,9 +45,9 @@ export async function getProjectFromSupabase(id: string): Promise<ManagedProject
   };
 }
 
-export async function saveProjectToSupabase(project: ManagedProject): Promise<string> {
-  const row = {
-    id: project.id.startsWith('proj_') ? undefined : project.id,
+export async function saveProjectToSupabase(project: ManagedProject, createdBy?: string): Promise<string> {
+  const isNew = project.id.startsWith('proj_');
+  const row: Record<string, unknown> = {
     name: project.name,
     location: project.location,
     status: project.status,
@@ -56,7 +56,8 @@ export async function saveProjectToSupabase(project: ManagedProject): Promise<st
     has_template: project.hasTemplate,
   };
 
-  if (project.id.startsWith('proj_')) {
+  if (isNew) {
+    if (createdBy) row.created_by = createdBy;
     const { data, error } = await supabase
       .from('projects')
       .insert(row)
