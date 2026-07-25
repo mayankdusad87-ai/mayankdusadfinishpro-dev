@@ -68,12 +68,13 @@ export default function SupervisorHomePage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    const data = getProjectData();
-    setProjectData(data);
-    if (data && data.floors.length > 0) {
-      setActiveFloor(data.floors[0]);
-    }
-    setLoading(false);
+    getProjectData().then(data => {
+      setProjectData(data);
+      if (data && data.floors.length > 0) {
+        setActiveFloor(data.floors[0]);
+      }
+      setLoading(false);
+    });
   }, [refreshKey]);
 
   const allActivities = projectData?.activities || [];
@@ -163,7 +164,7 @@ export default function SupervisorHomePage() {
     setSearch('');
   }
 
-  function handleQuickAction(row: UploadedActivity, action: 'start' | 'complete' | 'delay') {
+  async function handleQuickAction(row: UploadedActivity, action: 'start' | 'complete' | 'delay') {
     if (action === 'complete') {
       setShowPhotoPrompt(row.id);
       return;
@@ -173,13 +174,13 @@ export default function SupervisorHomePage() {
     if (action === 'start') {
       updates.actual_start = TODAY;
     }
-    updateActivityStatus(row.id, newStatus, updates);
+    await updateActivityStatus(row.id, newStatus, updates);
     setRefreshKey(k => k + 1);
   }
 
-  function confirmComplete(withPhoto: boolean) {
+  async function confirmComplete(withPhoto: boolean) {
     if (showPhotoPrompt) {
-      updateActivityStatus(showPhotoPrompt, 'completed', { actual_end: TODAY });
+      await updateActivityStatus(showPhotoPrompt, 'completed', { actual_end: TODAY });
       setRefreshKey(k => k + 1);
       if (withPhoto) {
         const row = allActivities.find(r => r.id === showPhotoPrompt);
@@ -197,9 +198,9 @@ export default function SupervisorHomePage() {
     setDetailReason(row.delay_reason || '');
   }
 
-  function saveDetail() {
+  async function saveDetail() {
     if (!selectedDetail) return;
-    updateActivityStatus(selectedDetail.id, detailStatus, {
+    await updateActivityStatus(selectedDetail.id, detailStatus, {
       actual_start: detailActualStart,
       actual_end: detailActualEnd,
       delay_reason: detailReason,
@@ -605,9 +606,9 @@ export default function SupervisorHomePage() {
             <div className="flex items-center justify-between">
               <span className="text-white text-sm font-medium">{selectedIds.size} selected</span>
               <button
-                onClick={() => {
+                onClick={async () => {
                   for (const id of selectedIds) {
-                    updateActivityStatus(id, 'in_progress', { actual_start: TODAY });
+                    await updateActivityStatus(id, 'in_progress', { actual_start: TODAY });
                   }
                   setBulkMode(false);
                   setSelectedIds(new Set());

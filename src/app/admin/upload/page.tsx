@@ -11,8 +11,9 @@ export default function UploadPage() {
   const [fileName, setFileName] = useState('');
 
   useEffect(() => {
-    const existing = getProjectData();
-    if (existing) setProjectData(existing);
+    getProjectData().then(existing => {
+      if (existing) setProjectData(existing);
+    });
   }, []);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -24,12 +25,12 @@ export default function UploadPage() {
     setFileName(file.name);
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
         const buffer = evt.target?.result as ArrayBuffer;
         const data = parseExcelFile(buffer);
         data.fileName = file.name;
-        saveProjectData(data);
+        await saveProjectData(data);
         setProjectData(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to parse Excel file');
@@ -40,9 +41,9 @@ export default function UploadPage() {
     reader.readAsArrayBuffer(file);
   }
 
-  function handleClear() {
+  async function handleClear() {
     if (!confirm('This will remove all uploaded data. Are you sure?')) return;
-    clearProjectData();
+    await clearProjectData();
     setProjectData(null);
     setFileName('');
     if (fileRef.current) fileRef.current.value = '';

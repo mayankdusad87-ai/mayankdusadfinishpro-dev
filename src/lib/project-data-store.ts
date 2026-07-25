@@ -44,7 +44,74 @@ export interface ProjectData {
   statuses: string[];
 }
 
-const STORAGE_KEY = 'finishing_pro_project_data';
+// ---- IndexedDB storage (replaces localStorage to handle large datasets) ----
+
+const DB_NAME = 'finishing_pro_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'project_data';
+const DATA_KEY = 'current_project';
+
+function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+  });
+}
+
+export async function saveProjectData(data: ProjectData): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(data, DATA_KEY);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+export async function getProjectData(): Promise<ProjectData | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const request = tx.objectStore(STORE_NAME).get(DATA_KEY);
+      request.onsuccess = () => { db.close(); resolve(request.result || null); };
+      request.onerror = () => { db.close(); reject(request.error); };
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function clearProjectData(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(DATA_KEY);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+export async function updateActivityStatus(id: string, status: string, updates?: Partial<UploadedActivity>): Promise<void> {
+  const data = await getProjectData();
+  if (!data) return;
+  const idx = data.activities.findIndex(a => a.id === id);
+  if (idx === -1) return;
+  data.activities[idx] = { ...data.activities[idx], status, ...updates };
+  await saveProjectData(data);
+}
+
+// ---- Excel parsing (unchanged) ----
 
 function excelDateToString(serial: number | string): string {
   if (!serial || serial === '') return '';
@@ -186,57 +253,4 @@ export function parseExcelFile(buffer: ArrayBuffer): ProjectData {
     configurations: [...configsSet].filter(Boolean),
     statuses: [...statusesSet],
   };
-}
-
-export function saveProjectData(data: ProjectData): void {
-  if (typeof window === 'undefined') return;
-  const meta = { ...data, activities: [] };
-  localStorage.setItem(STORAGE_KEY + '_meta', JSON.stringify(meta));
-
-  const chunkSize = 2000;
-  const chunks = Math.ceil(data.activities.length / chunkSize);
-  localStorage.setItem(STORAGE_KEY + '_chunks', String(chunks));
-  for (let i = 0; i < chunks; i++) {
-    const slice = data.activities.slice(i * chunkSize, (i + 1) * chunkSize);
-    localStorage.setItem(STORAGE_KEY + '_chunk_' + i, JSON.stringify(slice));
-  }
-}
-
-export function getProjectData(): ProjectData | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const metaRaw = localStorage.getItem(STORAGE_KEY + '_meta');
-    if (!metaRaw) return null;
-    const meta = JSON.parse(metaRaw) as ProjectData;
-
-    const chunks = parseInt(localStorage.getItem(STORAGE_KEY + '_chunks') || '0', 10);
-    const activities: UploadedActivity[] = [];
-    for (let i = 0; i < chunks; i++) {
-      const chunk = localStorage.getItem(STORAGE_KEY + '_chunk_' + i);
-      if (chunk) activities.push(...JSON.parse(chunk));
-    }
-    meta.activities = activities;
-    return meta;
-  } catch {
-    return null;
-  }
-}
-
-export function clearProjectData(): void {
-  if (typeof window === 'undefined') return;
-  const chunks = parseInt(localStorage.getItem(STORAGE_KEY + '_chunks') || '0', 10);
-  for (let i = 0; i < chunks; i++) {
-    localStorage.removeItem(STORAGE_KEY + '_chunk_' + i);
-  }
-  localStorage.removeItem(STORAGE_KEY + '_chunks');
-  localStorage.removeItem(STORAGE_KEY + '_meta');
-}
-
-export function updateActivityStatus(id: string, status: string, updates?: Partial<UploadedActivity>): void {
-  const data = getProjectData();
-  if (!data) return;
-  const idx = data.activities.findIndex(a => a.id === id);
-  if (idx === -1) return;
-  data.activities[idx] = { ...data.activities[idx], status, ...updates };
-  saveProjectData(data);
 }
