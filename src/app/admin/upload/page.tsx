@@ -5,6 +5,7 @@ import { parseExcelFile, ProjectData, UploadedActivity } from '@/lib/project-dat
 import { useProject } from '@/lib/project-context';
 import { saveProjectToSupabase, saveActivitiesToSupabase, getProjectDataFromSupabase, updateActivityInSupabase, recordUpload } from '@/lib/supabase-data';
 import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase';
 
 type UploadStep = 'pick' | 'preview' | 'saved';
 
@@ -72,7 +73,9 @@ export default function UploadPage() {
   async function confirmSave() {
     if (!previewData || !currentProject) return;
     setUploading(true);
+    setError('');
     try {
+      await supabase.auth.refreshSession();
       await saveActivitiesToSupabase(currentProject.id, previewData.activities);
       await saveProjectToSupabase({ ...currentProject, hasTemplate: true });
       if (user) {

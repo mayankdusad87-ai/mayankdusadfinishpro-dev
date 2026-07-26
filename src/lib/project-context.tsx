@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { getProjectsFromSupabase } from './supabase-data';
+import { useAuth } from './auth-context';
 import type { ManagedProject } from './project-store';
 
 interface ProjectContextType {
@@ -27,8 +28,13 @@ const SELECTED_KEY = 'finishing_pro_selected_project';
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<ManagedProject[]>([]);
   const [currentId, setCurrentId] = useState<string>('');
+  const { user } = useAuth();
 
   const refreshProjects = useCallback(async () => {
+    if (!user) {
+      setProjects([]);
+      return [];
+    }
     try {
       const list = await getProjectsFromSupabase();
       setProjects(list);
@@ -37,7 +43,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       setProjects([]);
       return [];
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     refreshProjects().then(list => {

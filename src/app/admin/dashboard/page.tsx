@@ -37,15 +37,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
+      if (!currentProject) {
+        setProjectData(null);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
-      if (currentProject?.hasTemplate) {
-        try {
-          const data = await getProjectDataFromSupabase(currentProject.id);
-          setProjectData(data);
-        } catch {
-          setProjectData(null);
-        }
-      } else {
+      try {
+        const data = await getProjectDataFromSupabase(currentProject.id);
+        setProjectData(data);
+      } catch {
         setProjectData(null);
       }
       setLoading(false);
