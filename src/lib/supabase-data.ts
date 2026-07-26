@@ -83,41 +83,52 @@ export async function deleteProjectFromSupabase(id: string): Promise<void> {
 // ---- Activities ----
 
 export async function getActivitiesFromSupabase(projectId: string): Promise<UploadedActivity[]> {
-  const { data, error } = await supabase
-    .from('activities')
-    .select('*')
-    .eq('project_id', projectId)
-    .order('sort_order', { ascending: true });
+  const PAGE = 1000;
+  const allRows: Record<string, unknown>[] = [];
+  let from = 0;
 
-  if (error) throw error;
+  while (true) {
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('sort_order', { ascending: true })
+      .range(from, from + PAGE - 1);
 
-  return (data || []).map(row => ({
-    id: row.id,
-    series: row.series || '',
-    floor: row.floor,
-    flat_number: row.flat_number,
-    configuration: row.configuration || '',
-    stage: row.stage,
-    stage_gate: row.stage_gate || '',
-    activity: row.activity,
-    vendor: row.vendor || '',
-    applicable: row.applicable ?? true,
-    expected_start: row.expected_start || '',
-    expected_end: row.expected_end || '',
-    actual_start: row.actual_start || '',
-    actual_end: row.actual_end || '',
-    status: row.status || 'not_started',
-    delay_days: row.delay_days || 0,
-    delay_reason: row.delay_reason || '',
-    remarks: row.remarks || '',
-    rooms: row.rooms || {},
-    sort_order: row.sort_order || 0,
-    sub_stage_status: row.sub_stage_status || '',
-    flat_status: row.flat_status || '',
-    floor_status: row.floor_status || '',
-    risk_status: row.risk_status || '',
-    revised_start: row.revised_start || '',
-    revised_end: row.revised_end || '',
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allRows.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return allRows.map(row => ({
+    id: row.id as string,
+    series: (row.series as string) || '',
+    floor: row.floor as number,
+    flat_number: row.flat_number as number,
+    configuration: (row.configuration as string) || '',
+    stage: row.stage as string,
+    stage_gate: (row.stage_gate as string) || '',
+    activity: row.activity as string,
+    vendor: (row.vendor as string) || '',
+    applicable: (row.applicable as boolean) ?? true,
+    expected_start: (row.expected_start as string) || '',
+    expected_end: (row.expected_end as string) || '',
+    actual_start: (row.actual_start as string) || '',
+    actual_end: (row.actual_end as string) || '',
+    status: (row.status as string) || 'not_started',
+    delay_days: (row.delay_days as number) || 0,
+    delay_reason: (row.delay_reason as string) || '',
+    remarks: (row.remarks as string) || '',
+    rooms: (row.rooms as Record<string, string>) || {},
+    sort_order: (row.sort_order as number) || 0,
+    sub_stage_status: (row.sub_stage_status as string) || '',
+    flat_status: (row.flat_status as string) || '',
+    floor_status: (row.floor_status as string) || '',
+    risk_status: (row.risk_status as string) || '',
+    revised_start: (row.revised_start as string) || '',
+    revised_end: (row.revised_end as string) || '',
   }));
 }
 
