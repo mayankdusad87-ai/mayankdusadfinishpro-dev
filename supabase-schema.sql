@@ -102,6 +102,17 @@ ALTER TABLE uploads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE supervisor_assignments ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
+-- HELPER FUNCTION: bypasses RLS to check admin role (avoids infinite recursion)
+-- ============================================
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = '';
+
+-- ============================================
 -- RLS POLICIES
 -- ============================================
 
@@ -112,34 +123,24 @@ CREATE POLICY "Users can view own profile"
 
 CREATE POLICY "Admins can view all profiles"
   ON profiles FOR SELECT
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 CREATE POLICY "Admins can insert profiles"
   ON profiles FOR INSERT
-  WITH CHECK (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  WITH CHECK (public.is_admin());
 
 CREATE POLICY "Admins can update profiles"
   ON profiles FOR UPDATE
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 CREATE POLICY "Admins can delete profiles"
   ON profiles FOR DELETE
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 -- PROJECTS: Admins can do everything. Supervisors can read assigned projects.
 CREATE POLICY "Admins full access to projects"
   ON projects FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 CREATE POLICY "Supervisors can view assigned projects"
   ON projects FOR SELECT
@@ -153,9 +154,7 @@ CREATE POLICY "Supervisors can view assigned projects"
 -- ACTIVITIES: Admins can do everything. Supervisors can read/update assigned project activities.
 CREATE POLICY "Admins full access to activities"
   ON activities FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 CREATE POLICY "Supervisors can view assigned project activities"
   ON activities FOR SELECT
@@ -178,9 +177,7 @@ CREATE POLICY "Supervisors can update assigned project activities"
 -- UPLOADS: Admins can do everything. Supervisors can view.
 CREATE POLICY "Admins full access to uploads"
   ON uploads FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 CREATE POLICY "Supervisors can view uploads"
   ON uploads FOR SELECT
@@ -194,9 +191,7 @@ CREATE POLICY "Supervisors can view uploads"
 -- SUPERVISOR_ASSIGNMENTS: Admins can manage. Supervisors can view own.
 CREATE POLICY "Admins full access to assignments"
   ON supervisor_assignments FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 CREATE POLICY "Supervisors can view own assignments"
   ON supervisor_assignments FOR SELECT
