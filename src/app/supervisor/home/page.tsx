@@ -3,7 +3,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
-import { getProjectsFromSupabase, getProjectDataFromSupabase, updateActivityInSupabase, getActiveReasons, Reason } from '@/lib/supabase-data';
+import { getProjectsFromSupabase, getProjectDataFromSupabase, updateActivityInSupabase, getActiveReasons, Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto } from '@/lib/supabase-data';
+import { compressImage, generatePhotoPath } from '@/lib/image-compress';
+import { useAuth } from '@/lib/auth-context';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -49,6 +51,7 @@ function getGreeting(): string {
 type PriorityView = 'floor' | 'overdue' | 'due_today' | 'starting_today';
 
 export default function SupervisorHomePage() {
+  const { user } = useAuth();
   const [availableProjects, setAvailableProjects] = useState<ManagedProject[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
@@ -72,6 +75,9 @@ export default function SupervisorHomePage() {
   const [detailRemarks, setDetailRemarks] = useState('');
   const [detailError, setDetailError] = useState('');
   const [reasons, setReasons] = useState<Reason[]>([]);
+  const [detailPhotos, setDetailPhotos] = useState<ActivityPhoto[]>([]);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -223,6 +229,8 @@ export default function SupervisorHomePage() {
     setDetailActualStart(row.actual_start || '');
     setDetailActualEnd(row.actual_end || '');
     setDetailError('');
+    setPhotoError('');
+    setDetailPhotos([]);
     const existingReason = row.delay_reason || '';
     const isPresetReason = reasons.some(r => r.label === existingReason);
     if (existingReason && !isPresetReason) {
@@ -231,6 +239,62 @@ export default function SupervisorHomePage() {
     } else {
       setDetailReason(existingReason);
       setDetailRemarks(row.remarks || '');
+    }
+    getPhotosForActivity(row.id).then(setDetailPhotos);
+  }
+
+  async function handlePhotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files || !selectedDetail || !user) return;
+    const files = Array.from(e.target.files);
+    if (detailPhotos.length + files.length > 3) {
+      setPhotoError('Maximum 3 photos per activity.');
+      e.target.value = '';
+      return;
+    }
+
+    setPhotoUploading(true);
+    setPhotoError('');
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const compressed = await compressImage(file);
+        const path = generatePhotoPath(selectedProjectId, selectedDetail.id, detailPhotos.length + i);
+        const result = await uploadActivityPhoto(compressed, path, {
+          activityId: selectedDetail.id,
+          projectId: selectedProjectId,
+          fileName: file.name,
+          floor: selectedDetail.floor,
+          stage: selectedDetail.stage,
+          stageGate: selectedDetail.stage_gate,
+          activityName: selectedDetail.activity,
+          flatNumber: selectedDetail.flat_number,
+          uploadedBy: user.id,
+        });
+        if (result.error) {
+          setPhotoError(result.error);
+          break;
+        }
+      } catch {
+        setPhotoError('Failed to upload photo. Please try again.');
+        break;
+      }
+    }
+
+    const updated = await getPhotosForActivity(selectedDetail.id);
+    setDetailPhotos(updated);
+    setPhotoUploading(false);
+    e.target.value = '';
+  }
+
+  async function handleDeletePhoto(photo: ActivityPhoto) {
+    if (!confirm('Delete this photo?')) return;
+    const result = await deleteActivityPhoto(photo.id, photo.storage_path);
+    if (result.error) {
+      setPhotoError(result.error);
+    } else if (selectedDetail) {
+      const updated = await getPhotosForActivity(selectedDetail.id);
+      setDetailPhotos(updated);
     }
   }
 
@@ -879,14 +943,67 @@ export default function SupervisorHomePage() {
                 )}
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Photo Evidence <span className="text-gray-400 font-normal">(optional)</span></label>
-                  <button className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-primary hover:text-primary transition-colors">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
-                    </svg>
-                    Tap to take photo or upload
-                  </button>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">
+                    Photo Evidence <span className="text-gray-400 font-normal">({detailPhotos.length}/3)</span>
+                  </label>
+
+                  {photoError && (
+                    <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 mb-2">
+                      {photoError}
+                    </div>
+                  )}
+
+                  {/* Photo thumbnails */}
+                  {detailPhotos.length > 0 && (
+                    <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+                      {detailPhotos.map(photo => (
+                        <div key={photo.id} className="relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
+                          <img
+                            src={photo.url}
+                            alt={photo.file_name}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            onClick={() => handleDeletePhoto(photo)}
+                            className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Upload button */}
+                  {detailPhotos.length < 3 && (
+                    <label className={`w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed rounded-lg text-sm transition-colors cursor-pointer ${
+                      photoUploading ? 'border-gray-200 text-gray-400 pointer-events-none' : 'border-gray-300 text-gray-500 hover:border-primary hover:text-primary'
+                    }`}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        multiple
+                        onChange={handlePhotoCapture}
+                        disabled={photoUploading}
+                        className="hidden"
+                      />
+                      {photoUploading ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          Compressing & uploading...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+                          </svg>
+                          Tap to take photo or upload
+                        </>
+                      )}
+                    </label>
+                  )}
                 </div>
               </div>
             </div>

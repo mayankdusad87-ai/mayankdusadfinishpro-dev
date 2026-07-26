@@ -381,3 +381,120 @@ export async function deleteReason(id: string): Promise<{ error: string | null }
   if (error) return { error: error.message };
   return { error: null };
 }
+
+// ---- Activity Photos ----
+
+export interface ActivityPhoto {
+  id: string;
+  activity_id: string;
+  project_id: string;
+  storage_path: string;
+  file_name: string;
+  file_size: number;
+  uploaded_by: string | null;
+  floor: number | null;
+  stage: string | null;
+  stage_gate: string | null;
+  activity_name: string | null;
+  flat_number: number | null;
+  created_at: string;
+  url?: string;
+}
+
+const PHOTO_BUCKET = 'activity-photos';
+const MAX_PHOTOS_PER_ACTIVITY = 3;
+
+export async function uploadActivityPhoto(
+  file: Blob,
+  storagePath: string,
+  metadata: {
+    activityId: string;
+    projectId: string;
+    fileName: string;
+    floor: number;
+    stage: string;
+    stageGate: string;
+    activityName: string;
+    flatNumber: number;
+    uploadedBy: string;
+  }
+): Promise<{ error: string | null }> {
+  const existing = await supabase
+    .from('activity_photos')
+    .select('id', { count: 'exact' })
+    .eq('activity_id', metadata.activityId);
+
+  if ((existing.count ?? 0) >= MAX_PHOTOS_PER_ACTIVITY) {
+    return { error: `Maximum ${MAX_PHOTOS_PER_ACTIVITY} photos per activity reached.` };
+  }
+
+  const { error: uploadError } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(storagePath, file, { contentType: 'image/jpeg', upsert: false });
+
+  if (uploadError) return { error: uploadError.message };
+
+  const { error: dbError } = await supabase.from('activity_photos').insert({
+    activity_id: metadata.activityId,
+    project_id: metadata.projectId,
+    storage_path: storagePath,
+    file_name: metadata.fileName,
+    file_size: file.size,
+    uploaded_by: metadata.uploadedBy,
+    floor: metadata.floor,
+    stage: metadata.stage,
+    stage_gate: metadata.stageGate,
+    activity_name: metadata.activityName,
+    flat_number: metadata.flatNumber,
+  });
+
+  if (dbError) return { error: dbError.message };
+  return { error: null };
+}
+
+export async function getPhotosForActivity(activityId: string): Promise<ActivityPhoto[]> {
+  const { data, error } = await supabase
+    .from('activity_photos')
+    .select('*')
+    .eq('activity_id', activityId)
+    .order('created_at', { ascending: true });
+
+  if (error) return [];
+
+  return (data || []).map(photo => {
+    const { data: urlData } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(photo.storage_path);
+    return { ...photo, url: urlData.publicUrl };
+  });
+}
+
+export async function getPhotosForProject(
+  projectId: string,
+  filters?: { floor?: number; stage?: string; stageGate?: string }
+): Promise<ActivityPhoto[]> {
+  let query = supabase
+    .from('activity_photos')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false });
+
+  if (filters?.floor) query = query.eq('floor', filters.floor);
+  if (filters?.stage) query = query.eq('stage', filters.stage);
+  if (filters?.stageGate) query = query.eq('stage_gate', filters.stageGate);
+
+  const { data, error } = await query;
+  if (error) return [];
+
+  return (data || []).map(photo => {
+    const { data: urlData } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(photo.storage_path);
+    return { ...photo, url: urlData.publicUrl };
+  });
+}
+
+export async function deleteActivityPhoto(photoId: string, storagePath: string): Promise<{ error: string | null }> {
+  const { error: storageErr } = await supabase.storage.from(PHOTO_BUCKET).remove([storagePath]);
+  if (storageErr) return { error: storageErr.message };
+
+  const { error: dbErr } = await supabase.from('activity_photos').delete().eq('id', photoId);
+  if (dbErr) return { error: dbErr.message };
+  return { error: null };
+}

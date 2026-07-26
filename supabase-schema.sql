@@ -102,6 +102,51 @@ CREATE POLICY "Supervisors can view active reasons"
   ON reasons FOR SELECT
   USING (is_active = true);
 
+-- 7. ACTIVITY PHOTOS TABLE
+CREATE TABLE IF NOT EXISTS activity_photos (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  activity_id UUID REFERENCES activities(id) ON DELETE CASCADE NOT NULL,
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE NOT NULL,
+  storage_path TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  file_size INTEGER DEFAULT 0,
+  uploaded_by UUID REFERENCES auth.users(id),
+  floor INTEGER,
+  stage TEXT,
+  stage_gate TEXT,
+  activity_name TEXT,
+  flat_number INTEGER,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE activity_photos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins full access to activity_photos"
+  ON activity_photos FOR ALL
+  USING (public.is_admin());
+
+CREATE POLICY "Supervisors can insert photos for assigned projects"
+  ON activity_photos FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM supervisor_assignments
+      WHERE supervisor_id = auth.uid() AND project_id = activity_photos.project_id
+    )
+  );
+
+CREATE POLICY "Supervisors can view photos for assigned projects"
+  ON activity_photos FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM supervisor_assignments
+      WHERE supervisor_id = auth.uid() AND project_id = activity_photos.project_id
+    )
+  );
+
+CREATE INDEX IF NOT EXISTS idx_activity_photos_activity ON activity_photos(activity_id);
+CREATE INDEX IF NOT EXISTS idx_activity_photos_project ON activity_photos(project_id);
+CREATE INDEX IF NOT EXISTS idx_activity_photos_floor ON activity_photos(project_id, floor);
+
 -- ============================================
 -- INDEXES for performance
 -- ============================================
