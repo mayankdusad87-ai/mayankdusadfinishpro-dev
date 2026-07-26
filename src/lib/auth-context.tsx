@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
@@ -70,10 +70,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setProfile(null);
       }
+      if (event === 'SIGNED_OUT') {
+        setProfile(null);
+      }
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.getSession().then(({ data: { session: s } }) => {
+          if (!s) {
+            setUser(null);
+            setProfile(null);
+            setSession(null);
+          }
+        });
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
