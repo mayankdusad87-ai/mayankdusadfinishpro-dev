@@ -274,31 +274,35 @@ export async function createSupervisor(
   fullName: string,
   phone?: string
 ): Promise<{ error: string | null; userId?: string }> {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { role: 'supervisor', full_name: fullName },
-    },
+  const res = await fetch('/api/admin/create-supervisor', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, fullName, phone }),
   });
-
-  if (error) return { error: error.message };
-
-  if (data.user && phone) {
-    await supabase
-      .from('profiles')
-      .update({ phone })
-      .eq('id', data.user.id);
-  }
-
-  return { error: null, userId: data.user?.id };
+  const json = await res.json();
+  if (!res.ok) return { error: json.error || 'Failed to create supervisor' };
+  return { error: null, userId: json.userId };
 }
 
 export async function resetUserPassword(userId: string, newPassword: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.auth.admin.updateUserById(userId, {
-    password: newPassword,
+  const res = await fetch('/api/admin/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, newPassword }),
   });
-  if (error) return { error: error.message };
+  const json = await res.json();
+  if (!res.ok) return { error: json.error || 'Failed to reset password' };
+  return { error: null };
+}
+
+export async function deactivateSupervisor(userId: string, isActive: boolean): Promise<{ error: string | null }> {
+  const res = await fetch('/api/admin/deactivate-supervisor', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, isActive }),
+  });
+  const json = await res.json();
+  if (!res.ok) return { error: json.error || 'Failed to update supervisor status' };
   return { error: null };
 }
 

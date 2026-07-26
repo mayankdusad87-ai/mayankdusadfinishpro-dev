@@ -1,110 +1,312 @@
 'use client';
 
-import { useState } from 'react';
-import SupervisorTable from '@/components/admin/SupervisorTable';
+import { useState, useEffect, useCallback } from 'react';
 import SupervisorModal, { SupervisorFormData } from '@/components/admin/SupervisorModal';
-import { supervisors as initialSupervisors, floorCoverage } from '@/lib/mock-data';
-import { Supervisor } from '@/lib/types';
+import {
+  getSupervisors,
+  createSupervisor,
+  deactivateSupervisor,
+  resetUserPassword,
+  assignSupervisorToProject,
+} from '@/lib/supabase-data';
+
+interface SupervisorRow {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  is_active: boolean;
+}
 
 export default function SupervisorsPage() {
-  const [supervisors] = useState<Supervisor[]>(initialSupervisors);
+  const [supervisors, setSupervisors] = useState<SupervisorRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingSupervisor, setEditingSupervisor] = useState<Supervisor | null>(null);
+  const [editingSupervisor, setEditingSupervisor] = useState<SupervisorRow | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetTarget, setResetTarget] = useState<SupervisorRow | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetSuccess, setResetSuccess] = useState('');
+
+  const loadSupervisors = useCallback(async () => {
+    try {
+      const list = await getSupervisors();
+      setSupervisors(list);
+    } catch {
+      setError('Failed to load supervisors');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSupervisors();
+  }, [loadSupervisors]);
 
   function handleAdd() {
     setEditingSupervisor(null);
+    setError('');
     setModalOpen(true);
   }
 
-  function handleEdit(supervisor: Supervisor) {
-    setEditingSupervisor(supervisor);
+  function handleEdit(sup: SupervisorRow) {
+    setEditingSupervisor(sup);
+    setError('');
     setModalOpen(true);
   }
 
-  function handleDelete(supervisor: Supervisor) {
-    alert(`Delete supervisor: ${supervisor.full_name} (demo only)`);
+  async function handleSave(data: SupervisorFormData) {
+    setSaving(true);
+    setError('');
+    try {
+      if (editingSupervisor) {
+        if (data.project_id && data.assigned_floors.length > 0) {
+          await assignSupervisorToProject(editingSupervisor.id, data.project_id, data.assigned_floors);
+        }
+      } else {
+        const result = await createSupervisor(data.email, data.password!, data.full_name, data.phone);
+        if (result.error) {
+          setError(result.error);
+          setSaving(false);
+          return;
+        }
+        if (result.userId && data.project_id && data.assigned_floors.length > 0) {
+          await assignSupervisorToProject(result.userId, data.project_id, data.assigned_floors);
+        }
+      }
+      setModalOpen(false);
+      await loadSupervisors();
+    } catch (err) {
+      const e = err as { message?: string };
+      setError(e?.message || 'Failed to save supervisor');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleSave(data: SupervisorFormData) {
-    alert(`Saved supervisor: ${data.full_name} (demo only)`);
-    setModalOpen(false);
+  async function handleToggleActive(sup: SupervisorRow) {
+    const action = sup.is_active ? 'deactivate' : 'reactivate';
+    if (!confirm(`Are you sure you want to ${action} ${sup.full_name}?`)) return;
+    const result = await deactivateSupervisor(sup.id, !sup.is_active);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      await loadSupervisors();
+    }
+  }
+
+  function openResetPassword(sup: SupervisorRow) {
+    setResetTarget(sup);
+    setNewPassword('');
+    setResetError('');
+    setResetSuccess('');
+    setResetModalOpen(true);
+  }
+
+  async function handleResetPassword() {
+    if (!resetTarget || newPassword.length < 6) {
+      setResetError('Password must be at least 6 characters');
+      return;
+    }
+    const result = await resetUserPassword(resetTarget.id, newPassword);
+    if (result.error) {
+      setResetError(result.error);
+    } else {
+      setResetSuccess(`Password reset for ${resetTarget.full_name}`);
+      setTimeout(() => setResetModalOpen(false), 1500);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Manage Supervisors</h1>
-        <p className="mt-1 text-sm text-gray-500">Assign supervisors to projects and floors.</p>
-      </div>
-
-      <SupervisorTable
-        supervisors={supervisors}
-        onAdd={handleAdd}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
-
-      {/* Floor Coverage Grid */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Floor Coverage <span className="text-sm font-normal text-gray-500">(3rd – 18th Floor)</span>
-          </h2>
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Assigned
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Multiple
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Unassigned
-            </span>
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Manage Supervisors</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Create supervisor accounts, assign to projects & floors.
+          </p>
         </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {floorCoverage.map((floor) => (
-            <div
-              key={floor.floor_number}
-              className="border border-gray-200 rounded-lg p-3 text-center"
-            >
-              <div className="text-sm font-semibold text-gray-900 mb-2">{floor.floor_label}</div>
-              <div className="flex flex-wrap justify-center gap-1">
-                {floor.supervisors.map((sup) => (
-                  <span
-                    key={sup.name}
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
-                    style={{ backgroundColor: sup.color }}
-                  >
-                    {sup.name.split(' ')[0]}
-                  </span>
-                ))}
-                {floor.supervisors.length > 1 && (
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">
-                    +{floor.supervisors.length - 1}
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Unassigned warning */}
-        <div className="mt-4 flex items-center gap-2 text-sm text-orange-600">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+        <button
+          onClick={handleAdd}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          2 floors unassigned (1st, 2nd)
+          Add Supervisor
+        </button>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Name</th>
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Email</th>
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Phone</th>
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {supervisors.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-10 text-center text-gray-400">
+                    No supervisors yet. Click &ldquo;Add Supervisor&rdquo; to create one.
+                  </td>
+                </tr>
+              )}
+              {supervisors.map((sup) => (
+                <tr key={sup.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-gray-900">{sup.full_name}</td>
+                  <td className="px-5 py-3.5 text-gray-600">{sup.email || '-'}</td>
+                  <td className="px-5 py-3.5 text-gray-600">{sup.phone || '-'}</td>
+                  <td className="px-5 py-3.5">
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        sup.is_active
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {sup.is_active ? 'Active' : 'Deactivated'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleEdit(sup)}
+                        className="p-1.5 text-gray-400 hover:text-primary hover:bg-orange-50 rounded-lg transition-colors"
+                        title="Edit / Assign floors"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => openResetPassword(sup)}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Reset password"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleToggleActive(sup)}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          sup.is_active
+                            ? 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                            : 'text-gray-400 hover:text-green-600 hover:bg-green-50'
+                        }`}
+                        title={sup.is_active ? 'Deactivate' : 'Reactivate'}
+                      >
+                        {sup.is_active ? (
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
+      {/* Supervisor Modal */}
       <SupervisorModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        supervisor={editingSupervisor}
+        onClose={() => { setModalOpen(false); setError(''); }}
+        supervisor={editingSupervisor ? {
+          id: editingSupervisor.id,
+          tenant_id: '',
+          role: 'supervisor',
+          full_name: editingSupervisor.full_name,
+          email: editingSupervisor.email || undefined,
+          phone: editingSupervisor.phone || undefined,
+          is_active: editingSupervisor.is_active,
+          assigned_projects: [],
+          assigned_floors: [],
+        } : null}
         onSave={handleSave}
       />
+      {saving && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-xl flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-gray-700">Saving supervisor...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {resetModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Reset Password</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Set a new password for {resetTarget?.full_name}
+            </p>
+            {resetError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-2 text-xs text-red-700 mb-3">
+                {resetError}
+              </div>
+            )}
+            {resetSuccess && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-xs text-green-700 mb-3">
+                {resetSuccess}
+              </div>
+            )}
+            <input
+              type="text"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="New password (min 6 chars)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary mb-4"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setResetModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetPassword}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-dark"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

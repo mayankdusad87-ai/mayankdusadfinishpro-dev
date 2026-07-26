@@ -17,7 +17,8 @@ export interface SupervisorFormData {
   full_name: string;
   phone: string;
   email: string;
-  project: string;
+  password?: string;
+  project_id: string;
   assigned_floors: number[];
   allow_vendor_reassignment: boolean;
 }
@@ -28,17 +29,19 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [project, setProject] = useState('');
+  const [password, setPassword] = useState('');
+  const [projectId, setProjectId] = useState('');
   const [selectedFloors, setSelectedFloors] = useState<number[]>([]);
   const [allowReassignment, setAllowReassignment] = useState(false);
   const [realProjects, setRealProjects] = useState<ManagedProject[]>([]);
+  const isEditing = !!supervisor;
 
   useEffect(() => {
     if (open) {
       getProjectsFromSupabase().then(list => {
         setRealProjects(list);
-        if (!supervisor && list.length > 0 && !project) {
-          setProject(list[0].name);
+        if (!supervisor && list.length > 0 && !projectId) {
+          setProjectId(list[0].id);
         }
       });
     }
@@ -49,14 +52,16 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
       setName(supervisor.full_name);
       setPhone(supervisor.phone || '');
       setEmail(supervisor.email || '');
-      setProject(supervisor.project_name || '');
+      setPassword('');
+      setProjectId('');
       setSelectedFloors([...supervisor.assigned_floors]);
       setAllowReassignment(false);
     } else {
       setName('');
       setPhone('');
       setEmail('');
-      setProject(realProjects.length > 0 ? realProjects[0].name : '');
+      setPassword('');
+      setProjectId(realProjects.length > 0 ? realProjects[0].id : '');
       setSelectedFloors([]);
       setAllowReassignment(false);
     }
@@ -74,7 +79,8 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
       full_name: name,
       phone,
       email,
-      project,
+      password: isEditing ? undefined : password,
+      project_id: projectId,
       assigned_floors: selectedFloors.sort((a, b) => a - b),
       allow_vendor_reassignment: allowReassignment,
     });
@@ -122,23 +128,41 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="email@example.com"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                disabled={isEditing}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </div>
+            {!isEditing && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Temporary Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required={!isEditing}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Min 6 characters"
+                  minLength={6}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                />
+                <p className="text-xs text-gray-500 mt-1">Supervisor will use this to log in</p>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Project <span className="text-red-500">*</span>
               </label>
               <select
-                value={project}
-                onChange={(e) => setProject(e.target.value)}
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white"
               >
                 {realProjects.length === 0 && (
                   <option value="">No projects — create one first</option>
                 )}
                 {realProjects.map((p) => (
-                  <option key={p.id} value={p.name}>
+                  <option key={p.id} value={p.id}>
                     {p.name} — {p.location}
                   </option>
                 ))}

@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 
 export default function SupervisorLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -15,7 +15,10 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
     if (!loading && !user && !isLoginPage) {
       router.replace('/supervisor/login');
     }
-  }, [loading, user, isLoginPage, router]);
+    if (!loading && profile && profile.role === 'admin') {
+      router.replace('/admin/dashboard');
+    }
+  }, [loading, user, profile, isLoginPage, router]);
 
   if (!isLoginPage && (loading || !user)) {
     return (
@@ -23,6 +26,10 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  if (!isLoginPage && profile && profile.role === 'admin') {
+    return null;
   }
 
   return (
