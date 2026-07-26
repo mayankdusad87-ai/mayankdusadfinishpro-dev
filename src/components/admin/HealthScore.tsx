@@ -38,7 +38,6 @@ const STATUS_CHIPS: { key: ActivityStatus; label: string; dot: string }[] = [
   { key: 'not_started', label: 'Not Started', dot: 'bg-gray-400' },
   { key: 'in_progress', label: 'In Progress', dot: 'bg-blue-500' },
   { key: 'completed', label: 'Completed', dot: 'bg-green-500' },
-  { key: 'delayed', label: 'Delayed', dot: 'bg-red-500' },
   { key: 'on_hold', label: 'On Hold', dot: 'bg-orange-500' },
 ];
 
@@ -54,7 +53,6 @@ export default function HealthScore(props: HealthScoreProps) {
     if (key === 'not_started') return notStarted;
     if (key === 'in_progress') return inProgress + inProgressDelayed;
     if (key === 'completed') return completed + completedDelayed;
-    if (key === 'delayed') return inProgressDelayed + completedDelayed;
     if (key === 'on_hold') return onHold;
     return 0;
   }
@@ -109,7 +107,7 @@ export default function HealthScore(props: HealthScoreProps) {
         </div>
 
         {/* Status chips for filtering */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 content-start">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 content-start">
           {STATUS_CHIPS.map(chip => {
             const count = getCount(chip.key);
             const pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
