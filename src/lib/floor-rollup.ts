@@ -55,7 +55,7 @@ export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
     stagesSet.add(a.stage);
     floorsSet.add(a.floor);
   }
-  const stages = [...stagesSet];
+  const stages = sortStages([...stagesSet]);
   const floorNumbers = [...floorsSet].sort((a, b) => a - b);
 
   // Level 1: Activities → Substage (per flat, per stage, per stage_gate)
@@ -169,12 +169,35 @@ export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
   };
 }
 
+const STAGE_ORDER: string[] = [
+  'Pre-Tiling',
+  'Tiling',
+  'Post Tiling',
+  'Pre Paint Activities',
+  '1st coat paint',
+  'Post First Coat Paint',
+  'Second Coat Paint',
+  'Post Second Coat Paint',
+  'Lobby Flooring',
+];
+
+function sortStages(stages: string[]): string[] {
+  return [...stages].sort((a, b) => {
+    const ai = STAGE_ORDER.findIndex(s => s.toLowerCase() === a.toLowerCase());
+    const bi = STAGE_ORDER.findIndex(s => s.toLowerCase() === b.toLowerCase());
+    const aIdx = ai === -1 ? STAGE_ORDER.length : ai;
+    const bIdx = bi === -1 ? STAGE_ORDER.length : bi;
+    return aIdx - bIdx;
+  });
+}
+
 export function computeHeatmapFromRollup(rollupData: SubstageRollup[], stagesList: string[]): HeatmapData {
   if (rollupData.length === 0) {
     return { stages: [], floors: [], stageCompletionFloors: {}, stageCompletionUnits: {}, floorsFullyReady: 0, floorsInProgress: 0 };
   }
 
-  const stages = stagesList.length > 0 ? stagesList : [...new Set(rollupData.map(r => r.stage))];
+  const rawStages = stagesList.length > 0 ? stagesList : [...new Set(rollupData.map(r => r.stage))];
+  const stages = sortStages(rawStages);
   const floorNumbers = [...new Set(rollupData.map(r => r.floor))].sort((a, b) => a - b);
 
   const substageMap = new Map<string, { c: number; y: number; t: number }>();
