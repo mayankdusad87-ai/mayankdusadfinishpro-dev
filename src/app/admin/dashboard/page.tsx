@@ -96,11 +96,12 @@ export default function DashboardPage() {
     return computeHeatmapFromRollup(dashData.heatmap, dashData.stages);
   }, [dashData]);
 
-  // Health counts from stats
+  // Health counts from stats — exclude not_applicable from total
   const healthCounts = useMemo(() => {
     const s = dashData?.stats || {};
+    const notApplicable = s['not_applicable'] || 0;
     return {
-      total: Object.values(s).reduce((a, b) => a + b, 0),
+      total: Object.values(s).reduce((a, b) => a + b, 0) - notApplicable,
       completed: (s['completed'] || 0),
       completedDelayed: (s['completed_delayed'] || 0),
       inProgress: (s['in_progress'] || 0),
