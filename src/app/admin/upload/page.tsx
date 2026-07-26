@@ -82,8 +82,9 @@ export default function UploadPage() {
       setProjectData(previewData);
       setPreviewData(null);
       setStep('saved');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save data');
+    } catch (err: unknown) {
+      const e = err as { message?: string; details?: string; code?: string };
+      setError(e?.message || e?.details || 'Failed to save data');
     } finally {
       setUploading(false);
     }
@@ -98,13 +99,18 @@ export default function UploadPage() {
   async function handleClear() {
     if (!currentProject) return;
     if (!confirm('This will remove the uploaded template for "' + currentProject.name + '". Are you sure?')) return;
-    await saveActivitiesToSupabase(currentProject.id, []);
-    await saveProjectToSupabase({ ...currentProject, hasTemplate: false });
-    await refreshProjects();
-    setProjectData(null);
-    setStep('pick');
-    setFileName('');
-    if (fileRef.current) fileRef.current.value = '';
+    try {
+      await saveActivitiesToSupabase(currentProject.id, []);
+      await saveProjectToSupabase({ ...currentProject, hasTemplate: false });
+      await refreshProjects();
+      setProjectData(null);
+      setStep('pick');
+      setFileName('');
+      if (fileRef.current) fileRef.current.value = '';
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e?.message || 'Failed to clear template');
+    }
   }
 
   function startReupload() {
@@ -126,10 +132,15 @@ export default function UploadPage() {
 
   async function saveEdit() {
     if (!editingRow || !currentProject || !projectData) return;
-    await updateActivityInSupabase(editingRow, editValues);
-    const updated = await getProjectDataFromSupabase(currentProject.id);
-    if (updated) setProjectData(updated);
-    setEditingRow(null);
+    try {
+      await updateActivityInSupabase(editingRow, editValues);
+      const updated = await getProjectDataFromSupabase(currentProject.id);
+      if (updated) setProjectData(updated);
+      setEditingRow(null);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e?.message || 'Failed to save edit');
+    }
   }
 
   const displayData = step === 'preview' ? previewData : projectData;
