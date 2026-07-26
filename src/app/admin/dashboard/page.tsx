@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import StatusCards from '@/components/admin/StatusCards';
+import HealthScore from '@/components/admin/HealthScore';
 import FilterBar, { Filters } from '@/components/admin/FilterBar';
 import StatusPill from '@/components/shared/StatusPill';
 import FloorHeatmap from '@/components/admin/FloorHeatmap';
@@ -55,14 +55,18 @@ export default function DashboardPage() {
 
   const activities = projectData?.activities || [];
 
-  const statusCounts = useMemo(() => {
-    const counts = { total: 0, not_started: 0, in_progress: 0, completed: 0, delayed: 0, on_hold: 0 };
+  const healthCounts = useMemo(() => {
+    const c = { total: 0, completed: 0, completedDelayed: 0, inProgress: 0, inProgressDelayed: 0, onHold: 0, notStarted: 0 };
     for (const a of activities) {
-      const ns = normalizeStatus(a.status);
-      counts.total++;
-      counts[ns]++;
+      c.total++;
+      if (a.status === 'completed') c.completed++;
+      else if (a.status === 'completed_delayed') c.completedDelayed++;
+      else if (a.status === 'in_progress') c.inProgress++;
+      else if (a.status === 'in_progress_delayed') c.inProgressDelayed++;
+      else if (a.status === 'on_hold') c.onHold++;
+      else c.notStarted++;
     }
-    return counts;
+    return c;
   }, [activities]);
 
   const heatmapData = useMemo(() => computeHeatmap(activities), [activities]);
@@ -185,8 +189,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      {/* Status Summary Cards */}
-      <StatusCards counts={statusCounts} activeFilter={statusFilter} onFilterChange={(s) => { setStatusFilter(s); setCurrentPage(1); }} />
+      {/* Health Score + Status Chips */}
+      <HealthScore {...healthCounts} activeFilter={statusFilter} onFilterChange={(s) => { setStatusFilter(s); setCurrentPage(1); }} />
 
       {/* View Toggle */}
       <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">

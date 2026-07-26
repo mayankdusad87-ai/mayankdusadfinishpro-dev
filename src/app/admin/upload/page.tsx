@@ -97,8 +97,18 @@ export default function UploadPage() {
   }
 
   async function handleClear() {
-    if (!currentProject) return;
-    if (!confirm('This will remove the uploaded template for "' + currentProject.name + '". Are you sure?')) return;
+    if (!currentProject || !projectData) return;
+
+    const modified = projectData.activities.filter(
+      a => a.status !== 'not_started' || a.actual_start || a.actual_end
+    );
+
+    let msg = `This will remove the uploaded template for "${currentProject.name}". Are you sure?`;
+    if (modified.length > 0) {
+      msg = `WARNING: ${modified.length} activities have been updated by supervisors (status changes, actual dates). Deleting will lose those changes.\n\nAre you sure you want to delete?`;
+    }
+    if (!confirm(msg)) return;
+
     try {
       await saveActivitiesToSupabase(currentProject.id, []);
       await saveProjectToSupabase({ ...currentProject, hasTemplate: false });
