@@ -565,3 +565,89 @@ export async function getAuditLog(
   }));
 }
 
+// ---- Dashboard Aggregation ----
+
+export interface SubstageRollup {
+  flat_number: number;
+  stage: string;
+  stage_gate: string;
+  floor: number;
+  completed: number;
+  yet_to_start: number;
+  total: number;
+}
+
+export interface DashboardData {
+  stats: Record<string, number>;
+  heatmap: SubstageRollup[];
+  stages: string[];
+  vendors: string[];
+}
+
+export async function getDashboardData(projectId: string): Promise<DashboardData | null> {
+  const { data, error } = await supabase.rpc('get_dashboard_data', { p_project_id: projectId });
+  if (error || !data) return null;
+  return {
+    stats: data.stats || {},
+    heatmap: data.heatmap || [],
+    stages: (data.stages || []).filter(Boolean),
+    vendors: (data.vendors || []).filter(Boolean).sort(),
+  };
+}
+
+export interface ActivitiesPage {
+  rows: Array<Record<string, unknown>>;
+  totalCount: number;
+}
+
+export async function getActivitiesPage(
+  projectId: string,
+  filters: { floor?: string; stage?: string; stageGate?: string; vendor?: string; status?: string },
+  page: number,
+  perPage: number
+): Promise<ActivitiesPage> {
+  let query = supabase
+    .from('activities')
+    .select('*', { count: 'exact' })
+    .eq('project_id', projectId)
+    .order('sort_order', { ascending: true });
+
+  if (filters.floor) {
+    const floorNum = parseInt(filters.floor.replace('Floor ', ''), 10);
+    if (!isNaN(floorNum)) query = query.eq('floor', floorNum);
+  }
+  if (filters.stage) query = query.eq('stage', filters.stage);
+  if (filters.stageGate) query = query.eq('stage_gate', filters.stageGate);
+  if (filters.vendor) query = query.eq('vendor', filters.vendor);
+  if (filters.status) {
+    if (filters.status === 'in_progress') {
+      query = query.in('status', ['in_progress', 'in_progress_delayed']);
+    } else if (filters.status === 'completed') {
+      query = query.in('status', ['completed', 'completed_delayed']);
+    } else {
+      query = query.eq('status', filters.status);
+    }
+  }
+
+  const from = (page - 1) * perPage;
+  const to = from + perPage - 1;
+  query = query.range(from, to);
+
+  const { data, count, error } = await query;
+  if (error) return { rows: [], totalCount: 0 };
+  return { rows: data || [], totalCount: count || 0 };
+}
+
+export async function getCriticalDelays(projectId: string, limit = 5): Promise<Array<Record<string, unknown>>> {
+  const { data, error } = await supabase
+    .from('activities')
+    .select('id, floor, flat_number, stage, stage_gate, activity, vendor, delay_days')
+    .eq('project_id', projectId)
+    .gt('delay_days', 0)
+    .order('delay_days', { ascending: false })
+    .limit(limit);
+
+  if (error) return [];
+  return data || [];
+}
+

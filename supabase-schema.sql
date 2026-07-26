@@ -366,3 +366,53 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 CREATE TRIGGER activities_status_audit
   AFTER UPDATE ON activities
   FOR EACH ROW EXECUTE FUNCTION log_activity_status_change();
+
+-- ============================================
+-- 9. DASHBOARD AGGREGATION FUNCTION
+-- Returns all dashboard data in one call (stats + heatmap rollup + filter options)
+-- Replaces loading all 8,880+ individual rows to the browser
+-- ============================================
+CREATE OR REPLACE FUNCTION get_dashboard_data(p_project_id UUID)
+RETURNS JSON AS $$
+DECLARE
+  result JSON;
+BEGIN
+  SELECT json_build_object(
+    'stats', (
+      SELECT COALESCE(json_object_agg(status, cnt), '{}'::json)
+      FROM (
+        SELECT COALESCE(status, 'not_started') as status, COUNT(*) as cnt
+        FROM public.activities
+        WHERE project_id = p_project_id
+        GROUP BY status
+      ) s
+    ),
+    'heatmap', (
+      SELECT COALESCE(json_agg(row_to_json(h)), '[]'::json)
+      FROM (
+        SELECT flat_number, stage, stage_gate, floor,
+          COUNT(*) FILTER (WHERE status IN ('completed', 'completed_delayed')) as completed,
+          COUNT(*) FILTER (WHERE status = 'not_started') as yet_to_start,
+          COUNT(*) as total
+        FROM public.activities
+        WHERE project_id = p_project_id
+          AND status IS DISTINCT FROM 'not_applicable'
+        GROUP BY flat_number, stage, stage_gate, floor
+      ) h
+    ),
+    'stages', (
+      SELECT COALESCE(json_agg(DISTINCT stage), '[]'::json)
+      FROM public.activities
+      WHERE project_id = p_project_id
+    ),
+    'vendors', (
+      SELECT COALESCE(json_agg(DISTINCT vendor), '[]'::json)
+      FROM public.activities
+      WHERE project_id = p_project_id
+      AND vendor IS NOT NULL AND vendor != ''
+    )
+  ) INTO result;
+
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
