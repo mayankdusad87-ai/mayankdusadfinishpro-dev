@@ -83,6 +83,25 @@ CREATE TABLE IF NOT EXISTS uploads (
   uploaded_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 6. REASONS TABLE (global delay/on-hold reasons configured by admin)
+CREATE TABLE IF NOT EXISTS reasons (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  label TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE reasons ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins full access to reasons"
+  ON reasons FOR ALL
+  USING (public.is_admin());
+
+CREATE POLICY "Supervisors can view active reasons"
+  ON reasons FOR SELECT
+  USING (is_active = true);
+
 -- ============================================
 -- INDEXES for performance
 -- ============================================

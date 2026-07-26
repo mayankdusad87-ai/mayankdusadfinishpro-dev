@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
-import { getProjectsFromSupabase, getProjectDataFromSupabase, updateActivityInSupabase } from '@/lib/supabase-data';
+import { getProjectsFromSupabase, getProjectDataFromSupabase, updateActivityInSupabase, getActiveReasons, Reason } from '@/lib/supabase-data';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -69,6 +69,9 @@ export default function SupervisorHomePage() {
   const [detailActualStart, setDetailActualStart] = useState('');
   const [detailActualEnd, setDetailActualEnd] = useState('');
   const [detailReason, setDetailReason] = useState('');
+  const [detailRemarks, setDetailRemarks] = useState('');
+  const [detailError, setDetailError] = useState('');
+  const [reasons, setReasons] = useState<Reason[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -83,6 +86,7 @@ export default function SupervisorHomePage() {
       }
       setLoading(false);
     });
+    getActiveReasons().then(setReasons).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -218,16 +222,47 @@ export default function SupervisorHomePage() {
     setDetailStatus(normalizeStatus(row.status));
     setDetailActualStart(row.actual_start || '');
     setDetailActualEnd(row.actual_end || '');
-    setDetailReason(row.delay_reason || '');
+    setDetailError('');
+    const existingReason = row.delay_reason || '';
+    const isPresetReason = reasons.some(r => r.label === existingReason);
+    if (existingReason && !isPresetReason) {
+      setDetailReason('__other__');
+      setDetailRemarks(existingReason);
+    } else {
+      setDetailReason(existingReason);
+      setDetailRemarks(row.remarks || '');
+    }
   }
 
   async function saveDetail() {
     if (!selectedDetail) return;
+    setDetailError('');
+
+    if (detailActualStart && detailActualStart > TODAY) {
+      setDetailError('Actual start date cannot be a future date.');
+      return;
+    }
+    if (detailActualEnd && detailActualStart && detailActualEnd < detailActualStart) {
+      setDetailError('Actual end date cannot be earlier than actual start date.');
+      return;
+    }
+    if ((detailStatus === 'on_hold' || detailStatus === 'delayed') && !detailReason) {
+      setDetailError(`Reason is mandatory when status is ${detailStatus === 'on_hold' ? 'On Hold' : 'Delayed'}.`);
+      return;
+    }
+    if (detailReason === '__other__' && !detailRemarks.trim()) {
+      setDetailError('Please provide remarks when selecting "Other" as reason.');
+      return;
+    }
+
+    const reasonValue = detailReason === '__other__' ? detailRemarks.trim() : detailReason;
+
     await updateActivityInSupabase(selectedDetail.id, {
       status: detailStatus,
       actual_start: detailActualStart,
       actual_end: detailActualEnd,
-      delay_reason: detailReason,
+      delay_reason: reasonValue,
+      remarks: detailReason === '__other__' ? detailRemarks.trim() : '',
     });
     setSelectedDetail(null);
     setRefreshKey(k => k + 1);
@@ -754,6 +789,15 @@ export default function SupervisorHomePage() {
                 </div>
               </div>
 
+              {detailError && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+                  <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                  </svg>
+                  <span className="text-xs font-medium text-red-700">{detailError}</span>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -761,7 +805,8 @@ export default function SupervisorHomePage() {
                     <input
                       type="date"
                       value={detailActualStart}
-                      onChange={(e) => setDetailActualStart(e.target.value)}
+                      max={TODAY}
+                      onChange={(e) => { setDetailActualStart(e.target.value); setDetailError(''); }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     />
                   </div>
@@ -770,7 +815,8 @@ export default function SupervisorHomePage() {
                     <input
                       type="date"
                       value={detailActualEnd}
-                      onChange={(e) => setDetailActualEnd(e.target.value)}
+                      min={detailActualStart || undefined}
+                      onChange={(e) => { setDetailActualEnd(e.target.value); setDetailError(''); }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
                     />
                   </div>
@@ -780,7 +826,7 @@ export default function SupervisorHomePage() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
                   <select
                     value={detailStatus}
-                    onChange={(e) => setDetailStatus(e.target.value)}
+                    onChange={(e) => { setDetailStatus(e.target.value); setDetailError(''); }}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/30 focus:border-primary"
                   >
                     <option value="not_started">Not Started</option>
@@ -796,16 +842,41 @@ export default function SupervisorHomePage() {
                   <input type="text" defaultValue={selectedDetail.vendor} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50" readOnly />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Delay / Hold Reason</label>
-                  <textarea
-                    rows={2}
-                    value={detailReason}
-                    onChange={(e) => setDetailReason(e.target.value)}
-                    placeholder="Add reason if delayed or on hold..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
-                  />
-                </div>
+                {/* Reason dropdown - shown for delayed/on_hold, optional for others */}
+                {(detailStatus === 'delayed' || detailStatus === 'on_hold') && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Reason <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={detailReason}
+                      onChange={(e) => { setDetailReason(e.target.value); setDetailError(''); if (e.target.value !== '__other__') setDetailRemarks(''); }}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    >
+                      <option value="">-- Select reason --</option>
+                      {reasons.map(r => (
+                        <option key={r.id} value={r.label}>{r.label}</option>
+                      ))}
+                      <option value="__other__">Other (specify in remarks)</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Remarks field - enabled when "Other" is selected */}
+                {detailReason === '__other__' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Remarks <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={detailRemarks}
+                      onChange={(e) => { setDetailRemarks(e.target.value); setDetailError(''); }}
+                      placeholder="Describe the reason..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-2">Photo Evidence <span className="text-gray-400 font-normal">(optional)</span></label>

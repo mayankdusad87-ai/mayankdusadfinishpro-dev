@@ -335,3 +335,49 @@ export async function assignSupervisorToProject(
   }, { onConflict: 'supervisor_id,project_id' });
   if (error) throw error;
 }
+
+// ---- Reasons management ----
+
+export interface Reason {
+  id: string;
+  label: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export async function getReasons(): Promise<Reason[]> {
+  const { data, error } = await supabase
+    .from('reasons')
+    .select('*')
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getActiveReasons(): Promise<Reason[]> {
+  const { data, error } = await supabase
+    .from('reasons')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createReason(label: string, sortOrder: number): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('reasons').insert({ label, sort_order: sortOrder });
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+export async function updateReason(id: string, updates: { label?: string; is_active?: boolean; sort_order?: number }): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('reasons').update(updates).eq('id', id);
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+export async function deleteReason(id: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('reasons').delete().eq('id', id);
+  if (error) return { error: error.message };
+  return { error: null };
+}
