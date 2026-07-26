@@ -108,6 +108,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const IDLE_TIMEOUT = 60 * 60 * 1000;
+    let timer: ReturnType<typeof setTimeout>;
+
+    function resetTimer() {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        signOut();
+        window.location.href = '/login';
+      }, IDLE_TIMEOUT);
+    }
+
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timer);
+      events.forEach(e => window.removeEventListener(e, resetTimer));
+    };
+  }, [user, signOut]);
+
   return (
     <AuthContext.Provider value={{ user, profile, session, loading, signIn, signOut }}>
       {children}

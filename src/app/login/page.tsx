@@ -19,8 +19,6 @@ export default function AdminLoginPage() {
     if (!loading && user && profile) {
       if (profile.role === 'admin') {
         router.replace('/admin/dashboard');
-      } else {
-        router.replace('/supervisor/home');
       }
     }
   }, [loading, user, profile, router]);

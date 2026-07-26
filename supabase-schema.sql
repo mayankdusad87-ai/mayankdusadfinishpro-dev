@@ -304,3 +304,65 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- ============================================
+-- 8. AUDIT LOG TABLE (status changes only)
+-- ============================================
+CREATE TABLE IF NOT EXISTS audit_log (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  activity_id UUID REFERENCES activities(id) ON DELETE SET NULL,
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE NOT NULL,
+  changed_by UUID REFERENCES auth.users(id),
+  old_status TEXT NOT NULL,
+  new_status TEXT NOT NULL,
+  floor INTEGER,
+  flat_number INTEGER,
+  stage TEXT,
+  stage_gate TEXT,
+  activity_name TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins full access to audit_log"
+  ON audit_log FOR ALL
+  USING (public.is_admin());
+
+CREATE POLICY "Supervisors can view audit_log for assigned projects"
+  ON audit_log FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM supervisor_assignments
+      WHERE supervisor_id = auth.uid() AND project_id = audit_log.project_id
+    )
+  );
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_project ON audit_log(project_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_project_date ON audit_log(project_id, created_at DESC);
+
+-- ============================================
+-- TRIGGER: Log status changes to audit_log
+-- ============================================
+CREATE OR REPLACE FUNCTION log_activity_status_change()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.status IS DISTINCT FROM NEW.status THEN
+    INSERT INTO audit_log (
+      activity_id, project_id, changed_by,
+      old_status, new_status,
+      floor, flat_number, stage, stage_gate, activity_name
+    ) VALUES (
+      NEW.id, NEW.project_id, auth.uid(),
+      COALESCE(OLD.status, 'not_started'), NEW.status,
+      NEW.floor, NEW.flat_number, NEW.stage, NEW.stage_gate, NEW.activity
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
+
+CREATE TRIGGER activities_status_audit
+  AFTER UPDATE ON activities
+  FOR EACH ROW EXECUTE FUNCTION log_activity_status_change();

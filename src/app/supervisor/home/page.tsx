@@ -6,6 +6,7 @@ import { ManagedProject } from '@/lib/project-store';
 import { getProjectsFromSupabase, getProjectDataFromSupabase, updateActivityInSupabase, getActiveReasons, Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto } from '@/lib/supabase-data';
 import { compressImage, generatePhotoPath } from '@/lib/image-compress';
 import { useAuth } from '@/lib/auth-context';
+import { useRouter } from 'next/navigation';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -51,7 +52,8 @@ function getGreeting(): string {
 type PriorityView = 'floor' | 'overdue' | 'due_today' | 'starting_today';
 
 export default function SupervisorHomePage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const router = useRouter();
   const [availableProjects, setAvailableProjects] = useState<ManagedProject[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
@@ -387,16 +389,26 @@ export default function SupervisorHomePage() {
             </svg>
             <span className="text-lg font-bold text-white">Finishing <span className="text-primary">Pro</span></span>
           </div>
-          <button className="relative p-2">
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-            </svg>
-            {priorities.overdue.length > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                {priorities.overdue.length > 9 ? '9+' : priorities.overdue.length}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-1">
+            <button className="relative p-2">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+              </svg>
+              {priorities.overdue.length > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {priorities.overdue.length > 9 ? '9+' : priorities.overdue.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={async () => { await signOut(); router.replace('/supervisor/login'); }}
+              className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Greeting + Date */}
