@@ -651,3 +651,13 @@ export async function getCriticalDelays(projectId: string, limit = 5): Promise<A
   return data || [];
 }
 
+export async function getProjectFloors(projectId: string): Promise<number[]> {
+  const { data, error } = await supabase
+    .from('activities')
+    .select('floor')
+    .eq('project_id', projectId);
+  if (error || !data) return [];
+  const set = new Set(data.map((r: { floor: number }) => r.floor));
+  return [...set].sort((a, b) => a - b);
+}
+

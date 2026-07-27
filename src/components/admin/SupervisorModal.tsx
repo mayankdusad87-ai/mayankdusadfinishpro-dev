@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Modal from '@/components/shared/Modal';
 import { Supervisor } from '@/lib/types';
 import { ManagedProject } from '@/lib/project-store';
-import { getProjectsFromSupabase } from '@/lib/supabase-data';
+import { getProjectsFromSupabase, getProjectFloors } from '@/lib/supabase-data';
 
 interface SupervisorModalProps {
   open: boolean;
@@ -23,8 +23,6 @@ export interface SupervisorFormData {
   allow_vendor_reassignment: boolean;
 }
 
-const FLOORS = Array.from({ length: 18 }, (_, i) => i + 1);
-
 export default function SupervisorModal({ open, onClose, supervisor, onSave }: SupervisorModalProps) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -34,6 +32,7 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
   const [selectedFloors, setSelectedFloors] = useState<number[]>([]);
   const [allowReassignment, setAllowReassignment] = useState(false);
   const [realProjects, setRealProjects] = useState<ManagedProject[]>([]);
+  const [availableFloors, setAvailableFloors] = useState<number[]>([]);
   const isEditing = !!supervisor;
 
   useEffect(() => {
@@ -46,6 +45,14 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
       });
     }
   }, [open]);
+
+  useEffect(() => {
+    if (projectId) {
+      getProjectFloors(projectId).then(setAvailableFloors);
+    } else {
+      setAvailableFloors([]);
+    }
+  }, [projectId]);
 
   useEffect(() => {
     if (supervisor) {
@@ -177,7 +184,10 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
                 Floors (Select one or more) <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-3 gap-2 max-h-[260px] overflow-y-auto pr-1">
-                {FLOORS.map((floor) => {
+                {availableFloors.length === 0 && (
+                  <p className="col-span-3 text-sm text-gray-400 py-4 text-center">Upload a template for this project first</p>
+                )}
+                {availableFloors.map((floor) => {
                   const checked = selectedFloors.includes(floor);
                   return (
                     <label
