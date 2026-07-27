@@ -323,6 +323,15 @@ export async function getSupervisors(): Promise<Array<{
   return data || [];
 }
 
+export async function getSupervisorAssignments(supervisorId: string): Promise<Array<{ project_id: string; assigned_floors: number[] }>> {
+  const { data, error } = await supabase
+    .from('supervisor_assignments')
+    .select('project_id, assigned_floors')
+    .eq('supervisor_id', supervisorId);
+  if (error || !data) return [];
+  return data;
+}
+
 export async function assignSupervisorToProject(
   supervisorId: string,
   projectId: string,

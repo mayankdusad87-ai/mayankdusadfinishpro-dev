@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Modal from '@/components/shared/Modal';
 import { Supervisor } from '@/lib/types';
 import { ManagedProject } from '@/lib/project-store';
-import { getProjectsFromSupabase, getProjectFloors } from '@/lib/supabase-data';
+import { getProjectsFromSupabase, getProjectFloors, getSupervisorAssignments } from '@/lib/supabase-data';
 
 interface SupervisorModalProps {
   open: boolean;
@@ -36,15 +36,34 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
   const isEditing = !!supervisor;
 
   useEffect(() => {
-    if (open) {
-      getProjectsFromSupabase().then(list => {
-        setRealProjects(list);
-        if (!supervisor && list.length > 0 && !projectId) {
+    if (!open) return;
+    getProjectsFromSupabase().then(async (list) => {
+      setRealProjects(list);
+      if (supervisor) {
+        setName(supervisor.full_name);
+        setPhone(supervisor.phone || '');
+        setEmail(supervisor.email || '');
+        setPassword('');
+        setAllowReassignment(false);
+        const assignments = await getSupervisorAssignments(supervisor.id || '');
+        if (assignments.length > 0) {
+          setProjectId(assignments[0].project_id);
+          setSelectedFloors(assignments[0].assigned_floors || []);
+        } else if (list.length > 0) {
           setProjectId(list[0].id);
+          setSelectedFloors([]);
         }
-      });
-    }
-  }, [open]);
+      } else {
+        setName('');
+        setPhone('');
+        setEmail('');
+        setPassword('');
+        setProjectId(list.length > 0 ? list[0].id : '');
+        setSelectedFloors([]);
+        setAllowReassignment(false);
+      }
+    });
+  }, [supervisor, open]);
 
   useEffect(() => {
     if (projectId) {
@@ -53,26 +72,6 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
       setAvailableFloors([]);
     }
   }, [projectId]);
-
-  useEffect(() => {
-    if (supervisor) {
-      setName(supervisor.full_name);
-      setPhone(supervisor.phone || '');
-      setEmail(supervisor.email || '');
-      setPassword('');
-      setProjectId('');
-      setSelectedFloors([...supervisor.assigned_floors]);
-      setAllowReassignment(false);
-    } else {
-      setName('');
-      setPhone('');
-      setEmail('');
-      setPassword('');
-      setProjectId(realProjects.length > 0 ? realProjects[0].id : '');
-      setSelectedFloors([]);
-      setAllowReassignment(false);
-    }
-  }, [supervisor, open]);
 
   function toggleFloor(floor: number) {
     setSelectedFloors((prev) =>
