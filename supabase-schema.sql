@@ -349,7 +349,7 @@ CREATE OR REPLACE FUNCTION log_activity_status_change()
 RETURNS TRIGGER AS $$
 BEGIN
   IF OLD.status IS DISTINCT FROM NEW.status THEN
-    INSERT INTO audit_log (
+    INSERT INTO public.audit_log (
       activity_id, project_id, changed_by,
       old_status, new_status,
       floor, flat_number, stage, stage_gate, activity_name

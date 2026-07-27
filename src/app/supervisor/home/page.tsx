@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
-import { getProjectsFromSupabase, getProjectDataFromSupabase, updateActivityInSupabase, getActiveReasons, Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto } from '@/lib/supabase-data';
+import { getProjectsFromSupabase, getProjectDataFromSupabase, updateActivityInSupabase, getActiveReasons, Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto, updateActivityWithAudit, getAdminEmails } from '@/lib/supabase-data';
 import { compressImage, generatePhotoPath } from '@/lib/image-compress';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -321,15 +321,74 @@ export default function SupervisorHomePage() {
       return;
     }
 
+    // Photo requirement for completion
+    if (detailStatus === 'completed' && detailPhotos.length === 0) {
+      setDetailError('At least one photo is required before marking as completed.');
+      return;
+    }
+
     const reasonValue = detailReason === '__other__' ? detailRemarks.trim() : detailReason;
 
-    await updateActivityInSupabase(selectedDetail.id, {
-      status: detailStatus,
-      actual_start: detailActualStart,
-      actual_end: detailActualEnd,
-      delay_reason: reasonValue,
-      remarks: detailReason === '__other__' ? detailRemarks.trim() : '',
-    });
+    // Auto-populate actual_end on completion
+    const actualEnd = detailStatus === 'completed' && !detailActualEnd ? TODAY : detailActualEnd;
+
+    const oldStatus = selectedDetail.status;
+    const statusChanged = oldStatus !== detailStatus;
+
+    const result = await updateActivityWithAudit(
+      selectedDetail.id,
+      {
+        status: detailStatus,
+        actual_start: detailActualStart,
+        actual_end: actualEnd,
+        delay_reason: reasonValue,
+        remarks: detailReason === '__other__' ? detailRemarks.trim() : '',
+      },
+      {
+        projectId: selectedProjectId,
+        changedBy: user?.id || '',
+        oldStatus: statusChanged ? oldStatus : undefined,
+        newStatus: statusChanged ? detailStatus : undefined,
+        floor: selectedDetail.floor,
+        flatNumber: selectedDetail.flat_number,
+        stage: selectedDetail.stage,
+        stageGate: selectedDetail.stage_gate,
+        activityName: selectedDetail.activity,
+      }
+    );
+
+    if (result.error) {
+      setDetailError(result.error);
+      return;
+    }
+
+    // Status reversal notification (completed → lower status)
+    if (statusChanged) {
+      const RANK: Record<string, number> = { not_started: 0, in_progress: 1, in_progress_delayed: 1, completed: 2, completed_delayed: 2, on_hold: -1 };
+      const oldRank = RANK[oldStatus] ?? 0;
+      const newRank = RANK[detailStatus] ?? 0;
+      if (oldRank > newRank && oldRank !== -1 && newRank !== -1) {
+        getAdminEmails().then(emails => {
+          if (emails.length === 0) return;
+          fetch('/api/admin/notify-reversal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adminEmails: emails,
+              projectName: availableProjects.find(p => p.id === selectedProjectId)?.name || '',
+              floor: selectedDetail.floor,
+              flatNumber: selectedDetail.flat_number,
+              activity: selectedDetail.activity,
+              stage: selectedDetail.stage,
+              stageGate: selectedDetail.stage_gate,
+              oldStatus,
+              newStatus: detailStatus,
+            }),
+          }).catch(() => {});
+        });
+      }
+    }
+
     setSelectedDetail(null);
     setRefreshKey(k => k + 1);
   }

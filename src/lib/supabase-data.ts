@@ -661,3 +661,94 @@ export async function getProjectFloors(projectId: string): Promise<number[]> {
   return [...set].sort((a, b) => a - b);
 }
 
+// ---- Admin Activity Updates ----
+
+export async function updateActivityWithAudit(
+  activityId: string,
+  updates: Record<string, unknown>,
+  _auditInfo: {
+    projectId: string;
+    changedBy: string;
+    oldStatus?: string;
+    newStatus?: string;
+    floor?: number;
+    flatNumber?: number;
+    stage?: string;
+    stageGate?: string;
+    activityName?: string;
+  }
+): Promise<{ error: string | null }> {
+  // Audit logging is handled by the PostgreSQL trigger `activities_status_audit`
+  // which fires on UPDATE and inserts into audit_log automatically.
+  const { error } = await supabase.from('activities').update(updates).eq('id', activityId);
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+export async function bulkUpdateActivities(
+  activityIds: string[],
+  updates: Record<string, unknown>
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('activities').update(updates).in('id', activityIds);
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+export async function getPhotoCount(activityId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('activity_photos')
+    .select('id', { count: 'exact', head: true })
+    .eq('activity_id', activityId);
+  if (error) return 0;
+  return count ?? 0;
+}
+
+export async function getAllFilteredActivities(
+  projectId: string,
+  filters: { floor?: string; stage?: string; stageGate?: string; vendor?: string; status?: string }
+): Promise<Array<Record<string, unknown>>> {
+  let query = supabase
+    .from('activities')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('sort_order', { ascending: true });
+
+  if (filters.floor) {
+    const floorNum = parseInt(filters.floor.replace('Floor ', ''), 10);
+    if (!isNaN(floorNum)) query = query.eq('floor', floorNum);
+  }
+  if (filters.stage) query = query.eq('stage', filters.stage);
+  if (filters.stageGate) query = query.eq('stage_gate', filters.stageGate);
+  if (filters.vendor) query = query.eq('vendor', filters.vendor);
+  if (filters.status) {
+    if (filters.status === 'in_progress') {
+      query = query.in('status', ['in_progress', 'in_progress_delayed']);
+    } else if (filters.status === 'completed') {
+      query = query.in('status', ['completed', 'completed_delayed']);
+    } else {
+      query = query.eq('status', filters.status);
+    }
+  }
+
+  const allRows: Record<string, unknown>[] = [];
+  let from = 0;
+  const PAGE = 1000;
+  while (true) {
+    const { data, error } = await query.range(from, from + PAGE - 1);
+    if (error || !data || data.length === 0) break;
+    allRows.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return allRows;
+}
+
+export async function getAdminEmails(): Promise<string[]> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('role', 'admin');
+  if (!data) return [];
+  return data.map(r => r.email).filter(Boolean);
+}
+
