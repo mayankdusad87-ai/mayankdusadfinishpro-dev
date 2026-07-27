@@ -60,18 +60,20 @@ export default function UploadPage() {
 
     const reader = new FileReader();
     reader.onload = (evt) => {
-      try {
-        const buffer = evt.target?.result as ArrayBuffer;
-        const data = parseExcelFile(buffer, currentProject.id);
-        data.fileName = file.name;
-        data.name = currentProject.name;
-        setPreviewData(data);
-        setStep('preview');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to parse Excel file');
-      } finally {
-        setUploading(false);
-      }
+      const buffer = evt.target?.result as ArrayBuffer;
+      setTimeout(() => {
+        try {
+          const data = parseExcelFile(buffer, currentProject.id);
+          data.fileName = file.name;
+          data.name = currentProject.name;
+          setPreviewData(data);
+          setStep('preview');
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to parse Excel file');
+        } finally {
+          setUploading(false);
+        }
+      }, 50);
     };
     reader.readAsArrayBuffer(file);
   }
