@@ -73,9 +73,6 @@ export default function SupervisorHomePage() {
   const [detailStatus, setDetailStatus] = useState('');
   const [detailActualStart, setDetailActualStart] = useState('');
   const [detailActualEnd, setDetailActualEnd] = useState('');
-  const [detailExpectedStart, setDetailExpectedStart] = useState('');
-  const [detailExpectedEnd, setDetailExpectedEnd] = useState('');
-  const [detailVendor, setDetailVendor] = useState('');
   const [detailReason, setDetailReason] = useState('');
   const [detailRemarks, setDetailRemarks] = useState('');
   const [detailError, setDetailError] = useState('');
@@ -233,9 +230,6 @@ export default function SupervisorHomePage() {
     setDetailStatus(normalizeStatus(row.status));
     setDetailActualStart(row.actual_start || '');
     setDetailActualEnd(row.actual_end || '');
-    setDetailExpectedStart(row.expected_start || '');
-    setDetailExpectedEnd(row.expected_end || '');
-    setDetailVendor(row.vendor || '');
     setDetailError('');
     setPhotoError('');
     setDetailPhotos([]);
@@ -333,9 +327,6 @@ export default function SupervisorHomePage() {
       status: detailStatus,
       actual_start: detailActualStart,
       actual_end: detailActualEnd,
-      expected_start: detailExpectedStart,
-      expected_end: detailExpectedEnd,
-      vendor: detailVendor,
       delay_reason: reasonValue,
       remarks: detailReason === '__other__' ? detailRemarks.trim() : '',
     });
@@ -864,24 +855,13 @@ export default function SupervisorHomePage() {
               )}
 
               <div className="grid grid-cols-2 gap-3 mb-5">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Expected Start</label>
-                  <input
-                    type="date"
-                    value={detailExpectedStart}
-                    onChange={(e) => { setDetailExpectedStart(e.target.value); setDetailError(''); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  />
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-[11px] text-gray-500 uppercase tracking-wide">Expected Start</div>
+                  <div className="text-sm font-medium text-gray-900 mt-1">{selectedDetail.expected_start || '-'}</div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Expected End</label>
-                  <input
-                    type="date"
-                    value={detailExpectedEnd}
-                    min={detailExpectedStart || undefined}
-                    onChange={(e) => { setDetailExpectedEnd(e.target.value); setDetailError(''); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  />
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-[11px] text-gray-500 uppercase tracking-wide">Expected End</div>
+                  <div className="text-sm font-medium text-gray-900 mt-1">{selectedDetail.expected_end || '-'}</div>
                 </div>
               </div>
 
@@ -935,13 +915,7 @@ export default function SupervisorHomePage() {
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Vendor</label>
-                  <input
-                    type="text"
-                    value={detailVendor}
-                    onChange={(e) => { setDetailVendor(e.target.value); setDetailError(''); }}
-                    placeholder="Enter vendor name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  />
+                  <input type="text" defaultValue={selectedDetail.vendor} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50" readOnly />
                 </div>
 
                 {/* Reason dropdown - shown for delayed/on_hold, optional for others */}
