@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import HealthScore from '@/components/admin/HealthScore';
 import FilterBar, { Filters } from '@/components/admin/FilterBar';
 import StatusPill from '@/components/shared/StatusPill';
@@ -40,11 +40,19 @@ export default function DashboardPage() {
   const [tableLoading, setTableLoading] = useState(false);
   const [criticalDelays, setCriticalDelays] = useState<Array<Record<string, unknown>>>([]);
 
-  // Load dashboard summary (stats + heatmap) — fast, one RPC call
+  // Reset all state when project changes
   useEffect(() => {
+    setDashData(null);
+    setTableRows([]);
+    setTableTotal(0);
+    setCriticalDelays([]);
+    setCurrentPage(1);
+    setSelectedRows(new Set());
+    setFilters({ project: '', floor: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '' });
+    setStatusFilter(null);
+
     async function load() {
       if (!currentProject) {
-        setDashData(null);
         setLoading(false);
         return;
       }
@@ -73,22 +81,24 @@ export default function DashboardPage() {
   }, [filters, statusFilter]);
 
   // Load table data only when table view is active
-  const loadTableData = useCallback(async () => {
-    if (!currentProject || view !== 'table') return;
-    setTableLoading(true);
-    const [pageResult, delays] = await Promise.all([
-      getActivitiesPage(currentProject.id, activeFilters, currentPage, PER_PAGE),
-      criticalDelays.length > 0 ? Promise.resolve(criticalDelays) : getCriticalDelays(currentProject.id),
-    ]);
-    setTableRows(pageResult.rows);
-    setTableTotal(pageResult.totalCount);
-    if (criticalDelays.length === 0) setCriticalDelays(delays as Array<Record<string, unknown>>);
-    setTableLoading(false);
-  }, [currentProject, view, activeFilters, currentPage, criticalDelays]);
-
   useEffect(() => {
-    if (view === 'table') loadTableData();
-  }, [view, loadTableData]);
+    if (!currentProject || view !== 'table') return;
+    let cancelled = false;
+    async function load() {
+      setTableLoading(true);
+      const [pageResult, delays] = await Promise.all([
+        getActivitiesPage(currentProject!.id, activeFilters, currentPage, PER_PAGE),
+        getCriticalDelays(currentProject!.id),
+      ]);
+      if (cancelled) return;
+      setTableRows(pageResult.rows);
+      setTableTotal(pageResult.totalCount);
+      setCriticalDelays(delays);
+      setTableLoading(false);
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [currentProject, view, activeFilters, currentPage]);
 
   // Compute heatmap from rollup data
   const heatmapData: HeatmapData = useMemo(() => {

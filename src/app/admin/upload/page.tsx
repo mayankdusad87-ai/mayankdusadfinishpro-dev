@@ -28,6 +28,13 @@ export default function UploadPage() {
   const PAGE_SIZE = 20;
 
   useEffect(() => {
+    setProjectData(null);
+    setPreviewData(null);
+    setStep('pick');
+    setError('');
+    setFileName('');
+    setPage(0);
+
     if (!currentProject) return;
     getProjectDataFromSupabase(currentProject.id).then(existing => {
       if (existing) {
@@ -37,7 +44,6 @@ export default function UploadPage() {
         setStep('pick');
         setProjectData(null);
       }
-      setPreviewData(null);
     }).catch(() => {
       setStep('pick');
       setProjectData(null);
