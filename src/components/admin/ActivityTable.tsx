@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import StatusPill from '@/components/shared/StatusPill';
 import Modal from '@/components/shared/Modal';
 import { ActivityStatus } from '@/lib/types';
@@ -14,7 +14,6 @@ import {
   getAdminEmails,
 } from '@/lib/supabase-data';
 import { supabase } from '@/lib/supabase';
-import * as XLSX from 'xlsx';
 
 const PER_PAGE = 25;
 
@@ -102,24 +101,26 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setEditingCell(null);
   }, [projectId, activeFilters]);
 
-  // Load table data
+  // Load table data (debounced 300ms on filter changes)
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
-    async function load() {
-      setTableLoading(true);
-      const [pageResult, delays] = await Promise.all([
-        getActivitiesPage(projectId, activeFilters, currentPage, PER_PAGE),
-        getCriticalDelays(projectId),
-      ]);
-      if (cancelled) return;
-      setTableRows(pageResult.rows);
-      setTableTotal(pageResult.totalCount);
-      setCriticalDelays(delays);
-      setTableLoading(false);
-    }
-    load();
-    return () => { cancelled = true; };
+    const timer = setTimeout(() => {
+      async function load() {
+        setTableLoading(true);
+        const [pageResult, delays] = await Promise.all([
+          getActivitiesPage(projectId, activeFilters, currentPage, PER_PAGE),
+          getCriticalDelays(projectId),
+        ]);
+        if (cancelled) return;
+        setTableRows(pageResult.rows);
+        setTableTotal(pageResult.totalCount);
+        setCriticalDelays(delays);
+        setTableLoading(false);
+      }
+      load();
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [projectId, activeFilters, currentPage]);
 
   // Auto-dismiss toast
@@ -135,13 +136,13 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   const refugeFloorSet = useMemo(() => new Set(refugeFloors), [refugeFloors]);
   const refugeUnitSet = useMemo(() => new Set(refugeUnits), [refugeUnits]);
 
-  function toggleRow(id: string) {
+  const toggleRow = useCallback((id: string) => {
     setSelectedRows(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  }
+  }, []);
 
   function toggleAll() {
     if (selectedRows.size === tableRows.length) {
@@ -165,11 +166,10 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     return pages;
   }
 
-  // Start inline edit
-  function startEdit(rowId: string, field: EditingCell['field'], currentValue: string) {
+  const startEdit = useCallback((rowId: string, field: EditingCell['field'], currentValue: string) => {
     setEditingCell({ rowId, field });
     setEditValue(currentValue || '');
-  }
+  }, []);
 
   // Get current user ID
   async function getCurrentUserId(): Promise<string> {
@@ -335,7 +335,10 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   async function exportExcel() {
     setExporting(true);
     try {
-      const rows = await getAllFilteredActivities(projectId, activeFilters);
+      const [XLSX, rows] = await Promise.all([
+        import('xlsx'),
+        getAllFilteredActivities(projectId, activeFilters),
+      ]);
       const wsData = [
         ['Floor', 'Flat No.', 'Config', 'Stage', 'Stage Gate', 'Activity', 'Vendor', 'Exp. Start', 'Exp. End', 'Act. Start', 'Act. End', 'Status', 'Delay Days', 'Delay Reason', 'Remarks'],
         ...rows.map(r => [

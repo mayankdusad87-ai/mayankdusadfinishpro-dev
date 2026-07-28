@@ -7,7 +7,7 @@ import type { UploadedActivity, ProjectData } from './project-data-store';
 export async function getProjectsFromSupabase(): Promise<ManagedProject[]> {
   const { data, error } = await supabase
     .from('projects')
-    .select('*')
+    .select('id, name, location, status, total_floors, total_flats, created_at, has_template')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -27,7 +27,7 @@ export async function getProjectsFromSupabase(): Promise<ManagedProject[]> {
 export async function getProjectFromSupabase(id: string): Promise<ManagedProject | null> {
   const { data, error } = await supabase
     .from('projects')
-    .select('*')
+    .select('id, name, location, status, total_floors, total_flats, created_at, has_template')
     .eq('id', id)
     .single();
 
@@ -382,7 +382,7 @@ export interface Reason {
 export async function getReasons(): Promise<Reason[]> {
   const { data, error } = await supabase
     .from('reasons')
-    .select('*')
+    .select('id, label, is_active, sort_order')
     .order('sort_order', { ascending: true });
   if (error) throw error;
   return data || [];
@@ -391,7 +391,7 @@ export async function getReasons(): Promise<Reason[]> {
 export async function getActiveReasons(): Promise<Reason[]> {
   const { data, error } = await supabase
     .from('reasons')
-    .select('*')
+    .select('id, label, is_active, sort_order')
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
   if (error) throw error;
@@ -559,7 +559,7 @@ export async function getAuditLog(
 ): Promise<AuditLogRow[]> {
   let query = supabase
     .from('audit_log')
-    .select('*')
+    .select('id, activity_id, project_id, changed_by, old_status, new_status, floor, flat_number, stage, stage_gate, activity_name, created_at')
     .eq('project_id', projectId)
     .order('created_at', { ascending: false });
 
