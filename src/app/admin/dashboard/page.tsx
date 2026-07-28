@@ -6,7 +6,7 @@ import FilterBar, { Filters } from '@/components/admin/FilterBar';
 import FloorHeatmap from '@/components/admin/FloorHeatmap';
 import ActivityTable from '@/components/admin/ActivityTable';
 import { useProject } from '@/lib/project-context';
-import { getDashboardData, DashboardData } from '@/lib/supabase-data';
+import { getDashboardData, DashboardData, getRefugeConfig } from '@/lib/supabase-data';
 import { computeHeatmapFromRollup, HeatmapData } from '@/lib/floor-rollup';
 import { ActivityStatus } from '@/lib/types';
 
@@ -18,6 +18,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<DashboardView>('heatmap');
   const [statusFilter, setStatusFilter] = useState<ActivityStatus | null>(null);
+  const [refugeFloors, setRefugeFloors] = useState<number[]>([]);
+  const [refugeUnits, setRefugeUnits] = useState<number[]>([]);
   const [filters, setFilters] = useState<Filters>({
     project: '', floor: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '',
   });
@@ -25,6 +27,8 @@ export default function DashboardPage() {
   // Reset all state when project changes
   useEffect(() => {
     setDashData(null);
+    setRefugeFloors([]);
+    setRefugeUnits([]);
     setFilters({ project: '', floor: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '' });
     setStatusFilter(null);
 
@@ -35,8 +39,13 @@ export default function DashboardPage() {
       }
       setLoading(true);
       try {
-        const data = await getDashboardData(currentProject.id);
+        const [data, refuge] = await Promise.all([
+          getDashboardData(currentProject.id),
+          getRefugeConfig(currentProject.id),
+        ]);
         setDashData(data);
+        setRefugeFloors(refuge.floors);
+        setRefugeUnits(refuge.units);
       } catch {
         setDashData(null);
       }
@@ -203,6 +212,8 @@ export default function DashboardPage() {
             filters={activeFilters}
             statusFilter={statusFilter}
             projectName={currentProject.name}
+            refugeFloors={refugeFloors}
+            refugeUnits={refugeUnits}
           />
         </div>
       )}

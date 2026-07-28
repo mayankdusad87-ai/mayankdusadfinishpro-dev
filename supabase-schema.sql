@@ -24,10 +24,16 @@ CREATE TABLE IF NOT EXISTS projects (
   total_floors INTEGER DEFAULT 0,
   total_flats INTEGER DEFAULT 0,
   has_template BOOLEAN DEFAULT false,
+  refuge_floors INTEGER[] DEFAULT '{}',
+  refuge_units INTEGER[] DEFAULT '{}',
   created_by UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- NOTE: If projects table already exists, run:
+-- ALTER TABLE projects ADD COLUMN IF NOT EXISTS refuge_floors INTEGER[] DEFAULT '{}';
+-- ALTER TABLE projects ADD COLUMN IF NOT EXISTS refuge_units INTEGER[] DEFAULT '{}';
 
 -- 3. SUPERVISOR-PROJECT ASSIGNMENTS (many-to-many)
 CREATE TABLE IF NOT EXISTS supervisor_assignments (

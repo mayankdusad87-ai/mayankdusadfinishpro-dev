@@ -312,15 +312,40 @@ export async function getSupervisors(): Promise<Array<{
   email: string | null;
   phone: string | null;
   is_active: boolean;
+  project_name: string | null;
+  assigned_floors: number[];
 }>> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select(`
+      *,
+      supervisor_assignments(
+        project_id,
+        assigned_floors,
+        projects(name, location)
+      )
+    `)
     .eq('role', 'supervisor')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map((row: Record<string, unknown>) => {
+    const assignments = (row.supervisor_assignments as Array<{
+      project_id: string;
+      assigned_floors: number[];
+      projects: { name: string; location: string } | null;
+    }>) || [];
+    const first = assignments[0];
+    return {
+      id: row.id as string,
+      full_name: row.full_name as string,
+      email: row.email as string | null,
+      phone: row.phone as string | null,
+      is_active: row.is_active as boolean,
+      project_name: first?.projects ? `${first.projects.name} — ${first.projects.location}` : null,
+      assigned_floors: first?.assigned_floors || [],
+    };
+  });
 }
 
 export async function getSupervisorAssignments(supervisorId: string): Promise<Array<{ project_id: string; assigned_floors: number[] }>> {
@@ -661,13 +686,18 @@ export async function getCriticalDelays(projectId: string, limit = 5): Promise<A
 }
 
 export async function getProjectFloors(projectId: string): Promise<number[]> {
-  const { data, error } = await supabase
-    .from('activities')
-    .select('floor')
-    .eq('project_id', projectId);
-  if (error || !data) return [];
-  const set = new Set(data.map((r: { floor: number }) => r.floor));
-  return [...set].sort((a, b) => a - b);
+  const [activitiesRes, projectRes] = await Promise.all([
+    supabase.from('activities').select('floor').eq('project_id', projectId),
+    supabase.from('projects').select('total_floors').eq('id', projectId).single(),
+  ]);
+  const activityFloors = new Set(
+    (activitiesRes.data || []).map((r: { floor: number }) => r.floor)
+  );
+  const totalFloors = projectRes.data?.total_floors || 0;
+  if (totalFloors > 0) {
+    for (let i = 1; i <= totalFloors; i++) activityFloors.add(i);
+  }
+  return [...activityFloors].sort((a, b) => a - b);
 }
 
 // ---- Admin Activity Updates ----
@@ -759,5 +789,33 @@ export async function getAdminEmails(): Promise<string[]> {
     .eq('role', 'admin');
   if (!data) return [];
   return data.map(r => r.email).filter(Boolean);
+}
+
+// ---- Refuge Config ----
+
+export async function getRefugeConfig(projectId: string): Promise<{ floors: number[]; units: number[] }> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('refuge_floors, refuge_units')
+    .eq('id', projectId)
+    .single();
+  if (error || !data) return { floors: [], units: [] };
+  return {
+    floors: (data.refuge_floors as number[]) || [],
+    units: (data.refuge_units as number[]) || [],
+  };
+}
+
+export async function saveRefugeConfig(
+  projectId: string,
+  refugeFloors: number[],
+  refugeUnits: number[]
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('projects')
+    .update({ refuge_floors: refugeFloors, refuge_units: refugeUnits })
+    .eq('id', projectId);
+  if (error) return { error: error.message };
+  return { error: null };
 }
 

@@ -16,6 +16,8 @@ interface SupervisorRow {
   email: string | null;
   phone: string | null;
   is_active: boolean;
+  project_name: string | null;
+  assigned_floors: number[];
 }
 
 export default function SupervisorsPage() {
@@ -163,6 +165,8 @@ export default function SupervisorsPage() {
                 <th className="text-left px-5 py-3 font-medium text-gray-500">Name</th>
                 <th className="text-left px-5 py-3 font-medium text-gray-500">Email</th>
                 <th className="text-left px-5 py-3 font-medium text-gray-500">Phone</th>
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Project</th>
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Assigned Floors</th>
                 <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
                 <th className="text-left px-5 py-3 font-medium text-gray-500">Actions</th>
               </tr>
@@ -170,7 +174,7 @@ export default function SupervisorsPage() {
             <tbody>
               {supervisors.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-gray-400">
+                  <td colSpan={7} className="px-5 py-10 text-center text-gray-400">
                     No supervisors yet. Click &ldquo;Add Supervisor&rdquo; to create one.
                   </td>
                 </tr>
@@ -180,6 +184,23 @@ export default function SupervisorsPage() {
                   <td className="px-5 py-3.5 font-medium text-gray-900">{sup.full_name}</td>
                   <td className="px-5 py-3.5 text-gray-600">{sup.email || '-'}</td>
                   <td className="px-5 py-3.5 text-gray-600">{sup.phone || '-'}</td>
+                  <td className="px-5 py-3.5 text-gray-600 text-sm">{sup.project_name || <span className="text-gray-400">Not assigned</span>}</td>
+                  <td className="px-5 py-3.5">
+                    {sup.assigned_floors.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {sup.assigned_floors.map((floor) => (
+                          <span
+                            key={floor}
+                            className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-md"
+                          >
+                            {floor}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-sm">-</span>
+                    )}
+                  </td>
                   <td className="px-5 py-3.5">
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

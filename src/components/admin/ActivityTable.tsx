@@ -61,9 +61,11 @@ interface ActivityTableProps {
   filters: { floor?: string; stage?: string; stageGate?: string; vendor?: string; status?: string };
   statusFilter: ActivityStatus | null;
   projectName: string;
+  refugeFloors?: number[];
+  refugeUnits?: number[];
 }
 
-export default function ActivityTable({ projectId, filters, statusFilter, projectName }: ActivityTableProps) {
+export default function ActivityTable({ projectId, filters, statusFilter, projectName, refugeFloors = [], refugeUnits = [] }: ActivityTableProps) {
   const [tableRows, setTableRows] = useState<Array<Record<string, unknown>>>([]);
   const [tableTotal, setTableTotal] = useState(0);
   const [tableLoading, setTableLoading] = useState(false);
@@ -129,6 +131,9 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
 
   const totalPages = Math.max(1, Math.ceil(tableTotal / PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
+
+  const refugeFloorSet = useMemo(() => new Set(refugeFloors), [refugeFloors]);
+  const refugeUnitSet = useMemo(() => new Set(refugeUnits), [refugeUnits]);
 
   function toggleRow(id: string) {
     setSelectedRows(prev => {
@@ -568,13 +573,35 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {tableRows.map(row => (
-                      <tr key={row.id as string} className={`hover:bg-gray-50 transition-colors ${selectedRows.has(row.id as string) ? 'bg-orange-50/50' : ''}`}>
+                    {tableRows.map(row => {
+                      const isRefugeFloor = refugeFloorSet.has(row.floor as number);
+                      const isRefugeUnit = refugeUnitSet.has(row.flat_number as number);
+                      const isRefuge = isRefugeFloor || isRefugeUnit;
+                      return (
+                      <tr key={row.id as string} className={`hover:bg-gray-50 transition-colors ${selectedRows.has(row.id as string) ? 'bg-orange-50/50' : isRefuge ? 'bg-amber-50/60' : ''}`}>
                         <td className="px-3 py-2.5">
                           <input type="checkbox" checked={selectedRows.has(row.id as string)} onChange={() => toggleRow(row.id as string)} className="accent-[#E67E22] w-4 h-4" />
                         </td>
-                        <td className="px-3 py-2.5 text-gray-700">{row.floor as number}</td>
-                        <td className="px-3 py-2.5 font-medium text-gray-900">{row.flat_number as number}</td>
+                        <td className="px-3 py-2.5 text-gray-700">
+                          <span className="flex items-center gap-1.5">
+                            {row.floor as number}
+                            {isRefugeFloor && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200" title="Refuge Floor">
+                                R
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 font-medium text-gray-900">
+                          <span className="flex items-center gap-1.5">
+                            {row.flat_number as number}
+                            {isRefugeUnit && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200" title="Refuge Unit">
+                                R
+                              </span>
+                            )}
+                          </span>
+                        </td>
                         <td className="px-3 py-2.5 text-gray-600">{(row.configuration as string) || ''}</td>
                         <td className="px-3 py-2.5 text-gray-600 max-w-[100px] truncate">{row.stage as string}</td>
                         <td className="px-3 py-2.5 text-gray-600 max-w-[90px] truncate">{(row.stage_gate as string) || ''}</td>
@@ -597,7 +624,8 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                           {(row.delay_days as number) > 0 ? `${row.delay_days}d` : (row.delay_reason as string) || '-'}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                     {tableRows.length === 0 && !tableLoading && (
                       <tr>
                         <td colSpan={14} className="px-3 py-12 text-center text-sm text-gray-400">

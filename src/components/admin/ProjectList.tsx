@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { ManagedProject, generateProjectId } from '@/lib/project-store';
 import { useProject } from '@/lib/project-context';
-import { getProjectsFromSupabase, saveProjectToSupabase, deleteProjectFromSupabase } from '@/lib/supabase-data';
+import { getProjectsFromSupabase, saveProjectToSupabase, deleteProjectFromSupabase, getRefugeConfig, saveRefugeConfig, getProjectFloors } from '@/lib/supabase-data';
 import { useAuth } from '@/lib/auth-context';
+import Modal from '@/components/shared/Modal';
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -29,6 +30,15 @@ export default function ProjectList() {
   const [formError, setFormError] = useState('');
   const { refreshProjects } = useProject();
   const { user } = useAuth();
+
+  // Refuge config state
+  const [refugeProject, setRefugeProject] = useState<ManagedProject | null>(null);
+  const [refugeFloors, setRefugeFloors] = useState<number[]>([]);
+  const [refugeUnits, setRefugeUnits] = useState<number[]>([]);
+  const [refugeUnitInput, setRefugeUnitInput] = useState('');
+  const [availableFloors, setAvailableFloors] = useState<number[]>([]);
+  const [refugeSaving, setRefugeSaving] = useState(false);
+  const [refugeLoading, setRefugeLoading] = useState(false);
 
   async function loadProjects() {
     try {
@@ -93,6 +103,47 @@ export default function ProjectList() {
     await deleteProjectFromSupabase(p.id);
     await loadProjects();
     await refreshProjects();
+  }
+
+  async function openRefugeSettings(p: ManagedProject) {
+    setRefugeProject(p);
+    setRefugeLoading(true);
+    const [config, floors] = await Promise.all([
+      getRefugeConfig(p.id),
+      getProjectFloors(p.id),
+    ]);
+    setRefugeFloors(config.floors);
+    setRefugeUnits(config.units);
+    setAvailableFloors(floors);
+    setRefugeUnitInput('');
+    setRefugeLoading(false);
+  }
+
+  function toggleRefugeFloor(floor: number) {
+    setRefugeFloors(prev =>
+      prev.includes(floor) ? prev.filter(f => f !== floor) : [...prev, floor].sort((a, b) => a - b)
+    );
+  }
+
+  function addRefugeUnit() {
+    const num = parseInt(refugeUnitInput.trim(), 10);
+    if (isNaN(num) || num <= 0) return;
+    if (!refugeUnits.includes(num)) {
+      setRefugeUnits(prev => [...prev, num].sort((a, b) => a - b));
+    }
+    setRefugeUnitInput('');
+  }
+
+  function removeRefugeUnit(unit: number) {
+    setRefugeUnits(prev => prev.filter(u => u !== unit));
+  }
+
+  async function handleSaveRefuge() {
+    if (!refugeProject) return;
+    setRefugeSaving(true);
+    await saveRefugeConfig(refugeProject.id, refugeFloors, refugeUnits);
+    setRefugeSaving(false);
+    setRefugeProject(null);
   }
 
   return (
@@ -184,6 +235,15 @@ export default function ProjectList() {
                             </svg>
                           </button>
                           <button
+                            onClick={() => openRefugeSettings(p)}
+                            className="p-1.5 hover:bg-amber-50 rounded-lg transition-colors text-gray-500 hover:text-amber-600"
+                            title="Refuge Settings"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0-10.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.249-8.25-3.286Zm0 13.036h.008v.008H12v-.008Z" />
+                            </svg>
+                          </button>
+                          <button
                             onClick={() => handleDelete(p)}
                             className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-gray-500 hover:text-red-600"
                             title="Delete"
@@ -202,6 +262,107 @@ export default function ProjectList() {
           </div>
         </div>
       )}
+
+      {/* Refuge Settings Modal */}
+      <Modal open={!!refugeProject} onClose={() => setRefugeProject(null)} title={`Refuge Settings — ${refugeProject?.name || ''}`} maxWidth="max-w-lg">
+        {refugeLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-2">Refuge Floors</label>
+              <p className="text-xs text-gray-500 mb-3">Select floors designated as refuge/safety floors. These will be highlighted in the Activity Table.</p>
+              <div className="grid grid-cols-5 gap-2 max-h-[200px] overflow-y-auto pr-1">
+                {availableFloors.length === 0 && (
+                  <p className="col-span-5 text-sm text-gray-400 py-4 text-center">No floors found for this project</p>
+                )}
+                {availableFloors.map(floor => {
+                  const checked = refugeFloors.includes(floor);
+                  return (
+                    <label
+                      key={floor}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${
+                        checked
+                          ? 'border-amber-400 bg-amber-50 text-amber-800'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleRefugeFloor(floor)}
+                        className="accent-amber-500 w-4 h-4"
+                      />
+                      Floor {floor}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-2">Refuge Units (Flat Numbers)</label>
+              <p className="text-xs text-gray-500 mb-3">Add specific flat numbers designated as refuge units. These will be highlighted in the Activity Table.</p>
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="number"
+                  value={refugeUnitInput}
+                  onChange={e => setRefugeUnitInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addRefugeUnit()}
+                  placeholder="Enter flat number"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400"
+                />
+                <button
+                  onClick={addRefugeUnit}
+                  className="px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+              {refugeUnits.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {refugeUnits.map(unit => (
+                    <span
+                      key={unit}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium rounded-lg"
+                    >
+                      Flat {unit}
+                      <button
+                        onClick={() => removeRefugeUnit(unit)}
+                        className="text-amber-400 hover:text-amber-700 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">No refuge units added</p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setRefugeProject(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveRefuge}
+                disabled={refugeSaving}
+                className="px-5 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50"
+              >
+                {refugeSaving ? 'Saving...' : 'Save Refuge Settings'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Add/Edit Project Form Modal */}
       {showForm && (
