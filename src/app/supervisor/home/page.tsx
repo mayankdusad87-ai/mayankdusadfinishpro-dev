@@ -49,7 +49,7 @@ function getGreeting(): string {
   return 'Good evening';
 }
 
-type PriorityView = 'floor' | 'overdue' | 'due_today' | 'starting_today';
+type PriorityView = 'floor' | 'all' | 'overdue' | 'due_today' | 'starting_today';
 
 export default function SupervisorHomePage() {
   const { user, signOut } = useAuth();
@@ -171,6 +171,40 @@ export default function SupervisorHomePage() {
     }
     return rows;
   }, [allActivities, activeFloor, statusFilter, statusDropdown, stageFilter, subStageFilter, activityFilter, search]);
+
+  const allFloorRows = useMemo(() => {
+    if (activeView !== 'all') return [];
+    const needsFilter = !stageFilter;
+    if (needsFilter) return [];
+    let rows = [...allActivities];
+    if (stageFilter) rows = rows.filter(r => r.stage === stageFilter);
+    if (subStageFilter) rows = rows.filter(r => r.stage_gate === subStageFilter);
+    if (activityFilter) rows = rows.filter(r => r.activity === activityFilter);
+    if (statusDropdown) rows = rows.filter(r => normalizeStatus(r.status) === statusDropdown);
+    if (search) {
+      const q = search.toLowerCase();
+      rows = rows.filter(r =>
+        String(r.flat_number).includes(q) ||
+        r.activity.toLowerCase().includes(q) ||
+        r.vendor.toLowerCase().includes(q)
+      );
+    }
+    return rows;
+  }, [activeView, allActivities, stageFilter, subStageFilter, activityFilter, statusDropdown, search]);
+
+  const allFloorGrouped = useMemo(() => {
+    const groups: { floor: number; rows: UploadedActivity[] }[] = [];
+    const floorMap = new Map<number, UploadedActivity[]>();
+    for (const row of allFloorRows) {
+      if (!floorMap.has(row.floor)) floorMap.set(row.floor, []);
+      floorMap.get(row.floor)!.push(row);
+    }
+    const sortedFloors = [...floorMap.keys()].sort((a, b) => a - b);
+    for (const f of sortedFloors) {
+      groups.push({ floor: f, rows: floorMap.get(f)! });
+    }
+    return groups;
+  }, [allFloorRows]);
 
   const statusCounts = useMemo(() => {
     const rows = allActivities.filter(r => r.floor === activeFloor);
@@ -580,15 +614,25 @@ export default function SupervisorHomePage() {
           </div>
         </div>
 
-        {/* Floor Tabs - only show when in floor view */}
-        {activeView === 'floor' && (
+        {/* Floor Tabs - show when in floor or all view */}
+        {(activeView === 'floor' || activeView === 'all') && (
           <div className="flex gap-2 overflow-x-auto pb-1">
+            <button
+              onClick={() => { setActiveView('all'); clearFilters(); setSelectedIds(new Set()); setBulkMode(false); }}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
+                activeView === 'all'
+                  ? 'bg-primary text-white'
+                  : 'bg-navy-light text-gray-300 hover:bg-navy-light/80'
+              }`}
+            >
+              All
+            </button>
             {floors.map(f => (
               <button
                 key={f}
-                onClick={() => { setActiveFloor(f); clearFilters(); setSelectedIds(new Set()); }}
+                onClick={() => { setActiveView('floor'); setActiveFloor(f); clearFilters(); setSelectedIds(new Set()); setBulkMode(false); }}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
-                  activeFloor === f
+                  activeView === 'floor' && activeFloor === f
                     ? 'bg-primary text-white'
                     : 'bg-navy-light text-gray-300 hover:bg-navy-light/80'
                 }`}
@@ -600,7 +644,7 @@ export default function SupervisorHomePage() {
         )}
 
         {/* Priority view header */}
-        {activeView !== 'floor' && (
+        {(activeView === 'overdue' || activeView === 'due_today' || activeView === 'starting_today') && (
           <div className="flex items-center justify-between">
             <div className="text-white text-sm font-semibold">
               {activeView === 'overdue' && `Overdue Activities (${priorities.overdue.length})`}
@@ -624,7 +668,7 @@ export default function SupervisorHomePage() {
       <div className="flex-1 bg-gray-50 rounded-t-3xl px-4 pt-4 pb-24">
 
         {/* Priority view content */}
-        {activeView !== 'floor' && (
+        {(activeView === 'overdue' || activeView === 'due_today' || activeView === 'starting_today') && (
           <div className="space-y-3">
             {getPriorityRows().length === 0 ? (
               <div className="text-center py-12">
@@ -649,6 +693,178 @@ export default function SupervisorHomePage() {
               ))
             )}
           </div>
+        )}
+
+        {/* All floors view content */}
+        {activeView === 'all' && (
+          <>
+            {/* Filters - required before showing activities */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <select
+                value={stageFilter}
+                onChange={(e) => { setStageFilter(e.target.value); setSubStageFilter(''); setActivityFilter(''); setSelectedIds(new Set()); }}
+                className="h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700"
+              >
+                <option value="">Stage</option>
+                {(projectData?.stages || []).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+
+              <select
+                value={subStageFilter}
+                onChange={(e) => { setSubStageFilter(e.target.value); setActivityFilter(''); setSelectedIds(new Set()); }}
+                disabled={!stageFilter}
+                className="h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 disabled:opacity-50 disabled:bg-gray-100"
+              >
+                <option value="">Sub Stage</option>
+                {subStageOptions.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+
+              <select
+                value={activityFilter}
+                onChange={(e) => { setActivityFilter(e.target.value); setSelectedIds(new Set()); }}
+                disabled={!subStageFilter}
+                className="h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 disabled:opacity-50 disabled:bg-gray-100"
+              >
+                <option value="">Activities</option>
+                {activityOptions.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+
+              <select
+                value={statusDropdown}
+                onChange={(e) => { setStatusDropdown(e.target.value); setSelectedIds(new Set()); }}
+                className="h-10 px-3 rounded-lg border border-gray-200 bg-white text-sm text-gray-700"
+              >
+                {STATUS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {hasFilters && (
+              <button onClick={() => { clearFilters(); setSelectedIds(new Set()); }} className="text-xs text-primary font-medium mb-3 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+                Clear all filters
+              </button>
+            )}
+
+            {/* Search */}
+            {stageFilter && (
+              <div className="relative mb-4">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="m21 21-4.35-4.35" />
+                </svg>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by Flat No., Activity or Vendor"
+                  className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+            )}
+
+            {!stageFilter ? (
+              <div className="text-center py-16">
+                <svg className="w-14 h-14 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+                </svg>
+                <h3 className="text-lg font-semibold text-gray-900">Select filters to view activities</h3>
+                <p className="text-sm text-gray-500 mt-1">Choose at least a Stage to see activities across all floors.</p>
+              </div>
+            ) : allFloorRows.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-4xl mb-3">🏗️</div>
+                <h3 className="text-lg font-semibold text-gray-900">No activities found</h3>
+                <p className="text-sm text-gray-500 mt-1">Try changing the filters or search keyword.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-xs text-gray-500 mb-2">{allFloorRows.length} activities across {allFloorGrouped.length} floors</div>
+                {allFloorGrouped.map(group => (
+                  <div key={group.floor}>
+                    <div className="flex items-center gap-2 py-2">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Floor {group.floor}</span>
+                      <div className="flex-1 h-px bg-gray-200" />
+                      <span className="text-xs text-gray-400">{group.rows.length}</span>
+                    </div>
+                    <div className="space-y-3 mb-4">
+                      {group.rows.map(row => {
+                        const status = normalizeStatus(row.status);
+                        const sc = STATUS_CONFIG[status];
+                        const isCompleted = status === 'completed';
+                        const overdueDays = !isCompleted && row.expected_end && row.expected_end < TODAY
+                          ? daysOverdue(row.expected_end) : 0;
+
+                        return (
+                          <div key={row.id} className="bg-white rounded-xl border border-gray-200 p-4 transition-colors">
+                            <div className="flex items-start justify-between mb-1" onClick={() => !bulkMode && openDetail(row)}>
+                              <div className="flex items-start gap-3">
+                                {bulkMode && !isCompleted && (
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedIds.has(row.id)}
+                                    onChange={() => toggleSelection(row.id)}
+                                    className="accent-[#E67E22] w-5 h-5 mt-0.5"
+                                  />
+                                )}
+                                {bulkMode && isCompleted && (
+                                  <input type="checkbox" disabled className="w-5 h-5 mt-0.5 opacity-30" />
+                                )}
+                                <div>
+                                  <div className="text-sm font-bold text-gray-900">
+                                    Flat {row.flat_number} &bull; {row.configuration}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-0.5">{row.stage}</div>
+                                  <div className="text-xs font-semibold text-primary mt-0.5">Sub Stage: {row.stage_gate}</div>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${sc.bg} ${sc.text}`}>
+                                  {sc.label}
+                                </span>
+                                {overdueDays > 0 && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold">
+                                    {overdueDays}d overdue
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-sm font-semibold text-gray-800 mt-1" onClick={() => !bulkMode && openDetail(row)}>{row.activity}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">{row.vendor}</div>
+                            <div className="flex items-center justify-between mt-2">
+                              <span className="text-xs text-gray-400">{row.expected_start} → {row.expected_end}</span>
+                            </div>
+                            {!bulkMode && !isCompleted && (
+                              <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                                {status === 'not_started' && (
+                                  <button onClick={() => handleQuickAction(row, 'start')} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-colors">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+                                    Start
+                                  </button>
+                                )}
+                                <button onClick={() => handleQuickAction(row, 'complete')} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-50 text-green-700 text-xs font-semibold hover:bg-green-100 transition-colors">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                                  Complete
+                                </button>
+                                {status !== 'delayed' && (
+                                  <button onClick={() => handleQuickAction(row, 'delay')} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 transition-colors">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+                                    Delay
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {/* Floor view content */}
@@ -764,13 +980,16 @@ export default function SupervisorHomePage() {
                     >
                       <div className="flex items-start justify-between mb-1" onClick={() => !bulkMode && openDetail(row)}>
                         <div className="flex items-start gap-3">
-                          {bulkMode && (
+                          {bulkMode && status !== 'completed' && (
                             <input
                               type="checkbox"
                               checked={selectedIds.has(row.id)}
                               onChange={() => toggleSelection(row.id)}
                               className="accent-[#E67E22] w-5 h-5 mt-0.5"
                             />
+                          )}
+                          {bulkMode && status === 'completed' && (
+                            <input type="checkbox" disabled className="w-5 h-5 mt-0.5 opacity-30" />
                           )}
                           <div>
                             <div className="text-sm font-bold text-gray-900">
@@ -852,35 +1071,67 @@ export default function SupervisorHomePage() {
       </div>
 
       {/* Bulk Update Toggle Bar */}
-      {activeView === 'floor' && (
+      {(activeView === 'floor' || (activeView === 'all' && stageFilter)) && (
         <div className="fixed bottom-0 left-0 right-0 bg-navy-dark border-t border-white/10 px-4 py-3 max-w-md mx-auto">
           {bulkMode && selectedIds.size > 0 ? (
-            <div className="flex items-center justify-between">
-              <span className="text-white text-sm font-medium">{selectedIds.size} selected</span>
-              <button
-                onClick={async () => {
-                  for (const id of selectedIds) {
-                    const row = allActivities.find(r => r.id === id);
-                    await updateActivityWithAudit(id, { status: 'in_progress', actual_start: TODAY }, {
-                      projectId: selectedProjectId,
-                      changedBy: user?.id || '',
-                      oldStatus: row?.status || 'not_started',
-                      newStatus: 'in_progress',
-                      floor: row?.floor,
-                      flatNumber: row?.flat_number,
-                      stage: row?.stage,
-                      stageGate: row?.stage_gate,
-                      activityName: row?.activity,
-                    });
-                  }
-                  setBulkMode(false);
-                  setSelectedIds(new Set());
-                  setRefreshKey(k => k + 1);
-                }}
-                className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg"
-              >
-                Start Selected
-              </button>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-white text-sm font-medium flex-shrink-0">
+                {selectedIds.size} selected{activeView === 'all' ? ` (${allFloorGrouped.filter(g => g.rows.some(r => selectedIds.has(r.id) && normalizeStatus(r.status) !== 'completed')).length} floors)` : ''}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    for (const id of selectedIds) {
+                      const row = allActivities.find(r => r.id === id);
+                      if (!row || normalizeStatus(row.status) === 'completed') continue;
+                      await updateActivityWithAudit(id, { status: 'in_progress', actual_start: TODAY }, {
+                        projectId: selectedProjectId,
+                        changedBy: user?.id || '',
+                        oldStatus: row.status,
+                        newStatus: 'in_progress',
+                        floor: row.floor,
+                        flatNumber: row.flat_number,
+                        stage: row.stage,
+                        stageGate: row.stage_gate,
+                        activityName: row.activity,
+                      });
+                    }
+                    setBulkMode(false);
+                    setSelectedIds(new Set());
+                    setRefreshKey(k => k + 1);
+                  }}
+                  className="px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-lg"
+                >
+                  Start
+                </button>
+                <button
+                  onClick={async () => {
+                    for (const id of selectedIds) {
+                      const row = allActivities.find(r => r.id === id);
+                      if (!row || normalizeStatus(row.status) === 'completed') continue;
+                      const updates: Record<string, unknown> = { status: 'completed', actual_end: TODAY };
+                      if (!row.actual_start) updates.actual_start = TODAY;
+                      await updateActivityWithAudit(id, updates, {
+                        projectId: selectedProjectId,
+                        changedBy: user?.id || '',
+                        oldStatus: row.status,
+                        newStatus: 'completed',
+                        floor: row.floor,
+                        flatNumber: row.flat_number,
+                        stage: row.stage,
+                        stageGate: row.stage_gate,
+                        activityName: row.activity,
+                      });
+                    }
+                    setBulkMode(false);
+                    setSelectedIds(new Set());
+                    setRefreshKey(k => k + 1);
+                  }}
+                  className="px-3 py-2 bg-green-500 text-white text-xs font-semibold rounded-lg"
+                >
+                  Complete
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-between">
