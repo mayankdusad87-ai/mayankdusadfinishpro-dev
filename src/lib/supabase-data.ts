@@ -2,6 +2,24 @@ import { supabase } from './supabase';
 import type { ManagedProject } from './project-store';
 import type { UploadedActivity, ProjectData } from './project-data-store';
 
+function friendlyError(raw: string, context: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes('row level security') || lower.includes('rls'))
+    return `Permission denied: unable to ${context}. Please contact admin.`;
+  if (lower.includes('duplicate key') || lower.includes('unique constraint'))
+    return `This ${context} already exists.`;
+  if (lower.includes('network') || lower.includes('fetch'))
+    return `Network error while trying to ${context}. Check your internet connection.`;
+  if (lower.includes('storage') && lower.includes('not found'))
+    return `File not found. It may have been deleted already.`;
+  if (lower.includes('payload too large') || lower.includes('too large'))
+    return `File is too large to upload. Please reduce the file size.`;
+  if (lower.includes('jwt') || lower.includes('token') || lower.includes('auth'))
+    return `Session expired. Please log in again.`;
+  console.error(`[${context}]`, raw);
+  return `Something went wrong while trying to ${context}. Please try again.`;
+}
+
 // ---- Projects ----
 
 export async function getProjectsFromSupabase(): Promise<ManagedProject[]> {
@@ -400,19 +418,19 @@ export async function getActiveReasons(): Promise<Reason[]> {
 
 export async function createReason(label: string, sortOrder: number): Promise<{ error: string | null }> {
   const { error } = await supabase.from('reasons').insert({ label, sort_order: sortOrder });
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message, 'create reason') };
   return { error: null };
 }
 
 export async function updateReason(id: string, updates: { label?: string; is_active?: boolean; sort_order?: number }): Promise<{ error: string | null }> {
   const { error } = await supabase.from('reasons').update(updates).eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message, 'update reason') };
   return { error: null };
 }
 
 export async function deleteReason(id: string): Promise<{ error: string | null }> {
   const { error } = await supabase.from('reasons').delete().eq('id', id);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message, 'delete reason') };
   return { error: null };
 }
 
@@ -466,7 +484,7 @@ export async function uploadActivityPhoto(
     .from(PHOTO_BUCKET)
     .upload(storagePath, file, { contentType: 'image/jpeg', upsert: false });
 
-  if (uploadError) return { error: uploadError.message };
+  if (uploadError) return { error: friendlyError(uploadError.message, 'upload photo') };
 
   const { error: dbError } = await supabase.from('activity_photos').insert({
     activity_id: metadata.activityId,
@@ -482,7 +500,7 @@ export async function uploadActivityPhoto(
     flat_number: metadata.flatNumber,
   });
 
-  if (dbError) return { error: dbError.message };
+  if (dbError) return { error: friendlyError(dbError.message, 'save photo record') };
   return { error: null };
 }
 
@@ -526,10 +544,10 @@ export async function getPhotosForProject(
 
 export async function deleteActivityPhoto(photoId: string, storagePath: string): Promise<{ error: string | null }> {
   const { error: storageErr } = await supabase.storage.from(PHOTO_BUCKET).remove([storagePath]);
-  if (storageErr) return { error: storageErr.message };
+  if (storageErr) return { error: friendlyError(storageErr.message, 'delete photo file') };
 
   const { error: dbErr } = await supabase.from('activity_photos').delete().eq('id', photoId);
-  if (dbErr) return { error: dbErr.message };
+  if (dbErr) return { error: friendlyError(dbErr.message, 'delete photo record') };
   return { error: null };
 }
 
@@ -718,7 +736,7 @@ export async function updateActivityWithAudit(
   }
 ): Promise<{ error: string | null }> {
   const { error } = await supabase.from('activities').update(updates).eq('id', activityId);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message, 'update activity status') };
 
   if (auditInfo.oldStatus && auditInfo.newStatus && auditInfo.oldStatus !== auditInfo.newStatus) {
     const { error: auditError } = await supabase.from('audit_log').insert({
@@ -744,7 +762,7 @@ export async function bulkUpdateActivities(
   updates: Record<string, unknown>
 ): Promise<{ error: string | null }> {
   const { error } = await supabase.from('activities').update(updates).in('id', activityIds);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message, 'bulk update activities') };
   return { error: null };
 }
 
@@ -830,7 +848,7 @@ export async function saveRefugeConfig(
     .from('projects')
     .update({ refuge_floors: refugeFloors, refuge_units: refugeUnits })
     .eq('id', projectId);
-  if (error) return { error: error.message };
+  if (error) return { error: friendlyError(error.message, 'update project settings') };
   return { error: null };
 }
 

@@ -274,7 +274,11 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
       const updates: Record<string, unknown> = { [field]: val };
       const { error } = await supabase.from('activities').update(updates).eq('id', row.id as string);
       if (error) {
-        setToast({ message: error.message, type: 'error' });
+        const msg = error.message.toLowerCase().includes('row level security')
+          ? 'Permission denied: unable to update this field. Please contact admin.'
+          : 'Something went wrong while updating. Please try again.';
+        console.error('[update activity field]', error.message);
+        setToast({ message: msg, type: 'error' });
       } else {
         setTableRows(prev => prev.map(r =>
           (r.id as string) === editingCell.rowId ? { ...r, [field]: val } : r
