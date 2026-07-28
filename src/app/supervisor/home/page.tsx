@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
-import { getProjectsFromSupabase, getProjectDataFromSupabase, updateActivityInSupabase, getActiveReasons, Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto, updateActivityWithAudit, getAdminEmails } from '@/lib/supabase-data';
+import { getProjectsFromSupabase, getProjectDataFromSupabase, getActiveReasons, Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto, updateActivityWithAudit, getAdminEmails } from '@/lib/supabase-data';
 import { compressImage, generatePhotoPath } from '@/lib/image-compress';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -201,25 +201,60 @@ export default function SupervisorHomePage() {
 
   async function handleQuickAction(row: UploadedActivity, action: 'start' | 'complete' | 'delay') {
     if (action === 'complete') {
+      if (!row.actual_start) {
+        openDetail(row);
+        setTimeout(() => {
+          setDetailStatus('completed');
+          setDetailError('Please enter the Actual Start date before marking as completed.');
+        }, 100);
+        return;
+      }
       setShowPhotoPrompt(row.id);
       return;
     }
     const newStatus = action === 'start' ? 'in_progress' : 'delayed';
-    const updates: Partial<UploadedActivity> = { status: newStatus };
+    const updates: Record<string, unknown> = { status: newStatus };
     if (action === 'start') {
       updates.actual_start = TODAY;
     }
-    await updateActivityInSupabase(row.id, updates);
+    await updateActivityWithAudit(row.id, updates, {
+      projectId: selectedProjectId,
+      changedBy: user?.id || '',
+      oldStatus: row.status,
+      newStatus,
+      floor: row.floor,
+      flatNumber: row.flat_number,
+      stage: row.stage,
+      stageGate: row.stage_gate,
+      activityName: row.activity,
+    });
     setRefreshKey(k => k + 1);
   }
 
   async function confirmComplete(withPhoto: boolean) {
     if (showPhotoPrompt) {
-      await updateActivityInSupabase(showPhotoPrompt, { status: 'completed', actual_end: TODAY });
+      const row = allActivities.find(r => r.id === showPhotoPrompt);
+      if (!row) { setShowPhotoPrompt(null); return; }
+
+      const updates: Record<string, unknown> = { status: 'completed', actual_end: TODAY };
+      if (!row.actual_start) {
+        updates.actual_start = TODAY;
+      }
+
+      await updateActivityWithAudit(showPhotoPrompt, updates, {
+        projectId: selectedProjectId,
+        changedBy: user?.id || '',
+        oldStatus: row.status,
+        newStatus: 'completed',
+        floor: row.floor,
+        flatNumber: row.flat_number,
+        stage: row.stage,
+        stageGate: row.stage_gate,
+        activityName: row.activity,
+      });
       setRefreshKey(k => k + 1);
       if (withPhoto) {
-        const row = allActivities.find(r => r.id === showPhotoPrompt);
-        if (row) openDetail({ ...row, status: 'completed', actual_end: TODAY });
+        openDetail({ ...row, status: 'completed', actual_end: TODAY, actual_start: row.actual_start || TODAY });
       }
     }
     setShowPhotoPrompt(null);
@@ -327,6 +362,12 @@ export default function SupervisorHomePage() {
       return;
     }
 
+    // Auto-populate actual_start if completing without one
+    const actualStart = detailStatus === 'completed' && !detailActualStart ? TODAY : detailActualStart;
+    if (detailStatus === 'completed' && !detailActualStart) {
+      setDetailActualStart(TODAY);
+    }
+
     const reasonValue = detailReason === '__other__' ? detailRemarks.trim() : detailReason;
 
     // Auto-populate actual_end on completion
@@ -339,7 +380,7 @@ export default function SupervisorHomePage() {
       selectedDetail.id,
       {
         status: detailStatus,
-        actual_start: detailActualStart,
+        actual_start: actualStart,
         actual_end: actualEnd,
         delay_reason: reasonValue,
         remarks: detailReason === '__other__' ? detailRemarks.trim() : '',
@@ -819,7 +860,18 @@ export default function SupervisorHomePage() {
               <button
                 onClick={async () => {
                   for (const id of selectedIds) {
-                    await updateActivityInSupabase(id, { status: 'in_progress', actual_start: TODAY });
+                    const row = allActivities.find(r => r.id === id);
+                    await updateActivityWithAudit(id, { status: 'in_progress', actual_start: TODAY }, {
+                      projectId: selectedProjectId,
+                      changedBy: user?.id || '',
+                      oldStatus: row?.status || 'not_started',
+                      newStatus: 'in_progress',
+                      floor: row?.floor,
+                      flatNumber: row?.flat_number,
+                      stage: row?.stage,
+                      stageGate: row?.stage_gate,
+                      activityName: row?.activity,
+                    });
                   }
                   setBulkMode(false);
                   setSelectedIds(new Set());

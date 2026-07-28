@@ -705,7 +705,7 @@ export async function getProjectFloors(projectId: string): Promise<number[]> {
 export async function updateActivityWithAudit(
   activityId: string,
   updates: Record<string, unknown>,
-  _auditInfo: {
+  auditInfo: {
     projectId: string;
     changedBy: string;
     oldStatus?: string;
@@ -717,10 +717,24 @@ export async function updateActivityWithAudit(
     activityName?: string;
   }
 ): Promise<{ error: string | null }> {
-  // Audit logging is handled by the PostgreSQL trigger `activities_status_audit`
-  // which fires on UPDATE and inserts into audit_log automatically.
   const { error } = await supabase.from('activities').update(updates).eq('id', activityId);
   if (error) return { error: error.message };
+
+  if (auditInfo.oldStatus && auditInfo.newStatus && auditInfo.oldStatus !== auditInfo.newStatus) {
+    await supabase.from('audit_log').insert({
+      activity_id: activityId,
+      project_id: auditInfo.projectId,
+      changed_by: auditInfo.changedBy || null,
+      old_status: auditInfo.oldStatus,
+      new_status: auditInfo.newStatus,
+      floor: auditInfo.floor,
+      flat_number: auditInfo.flatNumber,
+      stage: auditInfo.stage,
+      stage_gate: auditInfo.stageGate,
+      activity_name: auditInfo.activityName,
+    });
+  }
+
   return { error: null };
 }
 
