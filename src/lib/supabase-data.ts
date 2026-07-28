@@ -721,7 +721,7 @@ export async function updateActivityWithAudit(
   if (error) return { error: error.message };
 
   if (auditInfo.oldStatus && auditInfo.newStatus && auditInfo.oldStatus !== auditInfo.newStatus) {
-    await supabase.from('audit_log').insert({
+    const { error: auditError } = await supabase.from('audit_log').insert({
       activity_id: activityId,
       project_id: auditInfo.projectId,
       changed_by: auditInfo.changedBy || null,
@@ -733,6 +733,7 @@ export async function updateActivityWithAudit(
       stage_gate: auditInfo.stageGate,
       activity_name: auditInfo.activityName,
     });
+    if (auditError) console.error('Audit log insert failed:', auditError.message);
   }
 
   return { error: null };
