@@ -154,6 +154,33 @@ CREATE INDEX IF NOT EXISTS idx_activity_photos_project ON activity_photos(projec
 CREATE INDEX IF NOT EXISTS idx_activity_photos_floor ON activity_photos(project_id, floor);
 
 -- ============================================
+-- APP ERROR LOG
+-- ============================================
+CREATE TABLE IF NOT EXISTS app_errors (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  user_id UUID REFERENCES auth.users(id),
+  user_email TEXT,
+  action TEXT NOT NULL,
+  raw_error TEXT NOT NULL,
+  friendly_message TEXT NOT NULL,
+  context JSONB,
+  page_url TEXT
+);
+
+ALTER TABLE app_errors ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins full access to app_errors"
+  ON app_errors FOR ALL
+  USING (public.is_admin());
+
+CREATE POLICY "Authenticated users can insert errors"
+  ON app_errors FOR INSERT
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE INDEX IF NOT EXISTS idx_app_errors_created ON app_errors(created_at DESC);
+
+-- ============================================
 -- INDEXES for performance
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_activities_project ON activities(project_id);

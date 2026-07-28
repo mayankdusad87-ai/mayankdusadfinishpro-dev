@@ -2,22 +2,70 @@ import { supabase } from './supabase';
 import type { ManagedProject } from './project-store';
 import type { UploadedActivity, ProjectData } from './project-data-store';
 
-function friendlyError(raw: string, context: string): string {
+function logAppError(action: string, rawError: string, userFriendly: string, extra?: Record<string, unknown>) {
+  console.error(`[${action}]`, rawError);
+  supabase.auth.getUser().then(({ data }) => {
+    supabase.from('app_errors').insert({
+      user_id: data.user?.id || null,
+      user_email: data.user?.email || null,
+      action,
+      raw_error: rawError,
+      friendly_message: userFriendly,
+      context: extra ? JSON.stringify(extra) : null,
+      page_url: typeof window !== 'undefined' ? window.location.pathname : null,
+    }).then(() => {});
+  });
+}
+
+function friendlyError(raw: string, context: string, extra?: Record<string, unknown>): string {
   const lower = raw.toLowerCase();
+  let friendly: string;
   if (lower.includes('row level security') || lower.includes('rls'))
-    return `Permission denied: unable to ${context}. Please contact admin.`;
-  if (lower.includes('duplicate key') || lower.includes('unique constraint'))
-    return `This ${context} already exists.`;
-  if (lower.includes('network') || lower.includes('fetch'))
-    return `Network error while trying to ${context}. Check your internet connection.`;
-  if (lower.includes('storage') && lower.includes('not found'))
-    return `File not found. It may have been deleted already.`;
-  if (lower.includes('payload too large') || lower.includes('too large'))
-    return `File is too large to upload. Please reduce the file size.`;
-  if (lower.includes('jwt') || lower.includes('token') || lower.includes('auth'))
-    return `Session expired. Please log in again.`;
-  console.error(`[${context}]`, raw);
-  return `Something went wrong while trying to ${context}. Please try again.`;
+    friendly = `Permission denied: unable to ${context}. Please contact admin.`;
+  else if (lower.includes('duplicate key') || lower.includes('unique constraint'))
+    friendly = `This ${context} already exists.`;
+  else if (lower.includes('network') || lower.includes('fetch'))
+    friendly = `Network error while trying to ${context}. Check your internet connection.`;
+  else if (lower.includes('storage') && lower.includes('not found'))
+    friendly = `File not found. It may have been deleted already.`;
+  else if (lower.includes('payload too large') || lower.includes('too large'))
+    friendly = `File is too large to upload. Please reduce the file size.`;
+  else if (lower.includes('jwt') || lower.includes('token') || lower.includes('auth'))
+    friendly = `Session expired. Please log in again.`;
+  else
+    friendly = `Something went wrong while trying to ${context}. Please try again.`;
+  logAppError(context, raw, friendly, extra);
+  return friendly;
+}
+
+// ---- Error Log ----
+
+export interface AppError {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  user_email: string | null;
+  action: string;
+  raw_error: string;
+  friendly_message: string;
+  context: string | null;
+  page_url: string | null;
+}
+
+export async function getAppErrors(filters?: { startDate?: string; endDate?: string; action?: string }): Promise<AppError[]> {
+  let query = supabase
+    .from('app_errors')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (filters?.startDate) query = query.gte('created_at', filters.startDate);
+  if (filters?.endDate) query = query.lte('created_at', filters.endDate + 'T23:59:59');
+  if (filters?.action) query = query.ilike('action', `%${filters.action}%`);
+
+  const { data, error } = await query;
+  if (error) return [];
+  return data || [];
 }
 
 // ---- Projects ----
@@ -484,7 +532,9 @@ export async function uploadActivityPhoto(
     .from(PHOTO_BUCKET)
     .upload(storagePath, file, { contentType: 'image/jpeg', upsert: false });
 
-  if (uploadError) return { error: friendlyError(uploadError.message, 'upload photo') };
+  const photoCtx = { floor: metadata.floor, flat: metadata.flatNumber, activity: metadata.activityName, stage: metadata.stage };
+
+  if (uploadError) return { error: friendlyError(uploadError.message, 'upload photo', photoCtx) };
 
   const { error: dbError } = await supabase.from('activity_photos').insert({
     activity_id: metadata.activityId,
@@ -500,7 +550,7 @@ export async function uploadActivityPhoto(
     flat_number: metadata.flatNumber,
   });
 
-  if (dbError) return { error: friendlyError(dbError.message, 'save photo record') };
+  if (dbError) return { error: friendlyError(dbError.message, 'save photo record', photoCtx) };
   return { error: null };
 }
 
@@ -735,8 +785,9 @@ export async function updateActivityWithAudit(
     activityName?: string;
   }
 ): Promise<{ error: string | null }> {
+  const actCtx = { floor: auditInfo.floor, flat: auditInfo.flatNumber, activity: auditInfo.activityName, stage: auditInfo.stage, oldStatus: auditInfo.oldStatus, newStatus: auditInfo.newStatus };
   const { error } = await supabase.from('activities').update(updates).eq('id', activityId);
-  if (error) return { error: friendlyError(error.message, 'update activity status') };
+  if (error) return { error: friendlyError(error.message, 'update activity status', actCtx) };
 
   if (auditInfo.oldStatus && auditInfo.newStatus && auditInfo.oldStatus !== auditInfo.newStatus) {
     const { error: auditError } = await supabase.from('audit_log').insert({
