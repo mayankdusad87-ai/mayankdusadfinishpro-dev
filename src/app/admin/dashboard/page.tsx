@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import HealthScore from '@/components/admin/HealthScore';
 import FilterBar, { Filters } from '@/components/admin/FilterBar';
 import FloorHeatmap from '@/components/admin/FloorHeatmap';
@@ -23,6 +23,22 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState<Filters>({
     project: '', floor: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '',
   });
+  const [tableRefreshKey, setTableRefreshKey] = useState(0);
+
+  const refreshDashboard = useCallback(async () => {
+    if (!currentProject) return;
+    try {
+      const [data, refuge] = await Promise.all([
+        getDashboardData(currentProject.id),
+        getRefugeConfig(currentProject.id),
+      ]);
+      setDashData(data);
+      setRefugeFloors(refuge.floors);
+      setRefugeUnits(refuge.units);
+    } catch {
+      setDashData(null);
+    }
+  }, [currentProject]);
 
   // Reset all state when project changes
   useEffect(() => {
@@ -32,27 +48,23 @@ export default function DashboardPage() {
     setFilters({ project: '', floor: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '' });
     setStatusFilter(null);
 
-    async function load() {
-      if (!currentProject) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
-        const [data, refuge] = await Promise.all([
-          getDashboardData(currentProject.id),
-          getRefugeConfig(currentProject.id),
-        ]);
-        setDashData(data);
-        setRefugeFloors(refuge.floors);
-        setRefugeUnits(refuge.units);
-      } catch {
-        setDashData(null);
-      }
+    if (!currentProject) {
       setLoading(false);
+      return;
     }
-    load();
-  }, [currentProject]);
+    setLoading(true);
+    refreshDashboard().then(() => setLoading(false));
+  }, [currentProject, refreshDashboard]);
+
+  // Auto-refresh every 60 seconds
+  useEffect(() => {
+    if (!currentProject) return;
+    const interval = setInterval(() => {
+      refreshDashboard();
+      setTableRefreshKey(k => k + 1);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [currentProject, refreshDashboard]);
 
   // Build active filters for table query
   const activeFilters = useMemo(() => {
@@ -214,6 +226,7 @@ export default function DashboardPage() {
             projectName={currentProject.name}
             refugeFloors={refugeFloors}
             refugeUnits={refugeUnits}
+            refreshKey={tableRefreshKey}
           />
         </div>
       )}

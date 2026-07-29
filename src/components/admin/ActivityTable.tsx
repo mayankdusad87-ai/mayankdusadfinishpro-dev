@@ -62,9 +62,10 @@ interface ActivityTableProps {
   projectName: string;
   refugeFloors?: number[];
   refugeUnits?: number[];
+  refreshKey?: number;
 }
 
-export default function ActivityTable({ projectId, filters, statusFilter, projectName, refugeFloors = [], refugeUnits = [] }: ActivityTableProps) {
+export default function ActivityTable({ projectId, filters, statusFilter, projectName, refugeFloors = [], refugeUnits = [], refreshKey = 0 }: ActivityTableProps) {
   const [tableRows, setTableRows] = useState<Array<Record<string, unknown>>>([]);
   const [tableTotal, setTableTotal] = useState(0);
   const [tableLoading, setTableLoading] = useState(false);
@@ -121,7 +122,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
       load();
     }, 300);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [projectId, activeFilters, currentPage]);
+  }, [projectId, activeFilters, currentPage, refreshKey]);
 
   // Auto-dismiss toast
   useEffect(() => {

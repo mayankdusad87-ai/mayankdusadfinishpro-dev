@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
-import { getProjectsFromSupabase, getProjectDataFromSupabase, getActiveReasons, Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto, updateActivityWithAudit, getAdminEmails } from '@/lib/supabase-data';
+import { getProjectsFromSupabase, getProjectDataFromSupabase, getActiveReasons, Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto, updateActivityWithAudit, getAdminEmails, getSupervisorAssignments } from '@/lib/supabase-data';
 import { compressImage, generatePhotoPath } from '@/lib/image-compress';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
@@ -81,6 +81,7 @@ export default function SupervisorHomePage() {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [assignedFloors, setAssignedFloors] = useState<number[] | null>(null);
 
   useEffect(() => {
     getProjectsFromSupabase().then(projects => {
@@ -98,22 +99,37 @@ export default function SupervisorHomePage() {
   }, []);
 
   useEffect(() => {
-    if (!selectedProjectId) { setProjectData(null); return; }
+    if (!selectedProjectId) { setProjectData(null); setAssignedFloors(null); return; }
     setLoading(true);
-    getProjectDataFromSupabase(selectedProjectId).then(data => {
+    Promise.all([
+      getProjectDataFromSupabase(selectedProjectId),
+      user ? getSupervisorAssignments(user.id) : Promise.resolve([]),
+    ]).then(([data, assignments]) => {
+      const assignment = assignments.find(a => a.project_id === selectedProjectId);
+      const myFloors = assignment?.assigned_floors?.length ? assignment.assigned_floors : null;
+      setAssignedFloors(myFloors);
       setProjectData(data);
       if (data && data.floors.length > 0) {
-        setActiveFloor(data.floors[0]);
+        const visibleFloors = myFloors ? data.floors.filter(f => myFloors.includes(f)) : data.floors;
+        if (visibleFloors.length > 0) setActiveFloor(visibleFloors[0]);
       }
       setLoading(false);
     });
     if (typeof window !== 'undefined') {
       localStorage.setItem('supervisor_selected_project', selectedProjectId);
     }
-  }, [selectedProjectId, refreshKey]);
+  }, [selectedProjectId, refreshKey, user]);
 
-  const allActivities = projectData?.activities || [];
-  const floors = projectData?.floors || [];
+  const allActivities = useMemo(() => {
+    const acts = projectData?.activities || [];
+    if (!assignedFloors) return acts;
+    return acts.filter(a => assignedFloors.includes(a.floor));
+  }, [projectData, assignedFloors]);
+  const floors = useMemo(() => {
+    const allFloors = projectData?.floors || [];
+    if (!assignedFloors) return allFloors;
+    return allFloors.filter(f => assignedFloors.includes(f));
+  }, [projectData, assignedFloors]);
 
   const priorities = useMemo(() => {
     const overdue: UploadedActivity[] = [];

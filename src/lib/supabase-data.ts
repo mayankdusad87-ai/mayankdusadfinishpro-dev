@@ -789,6 +789,21 @@ export async function updateActivityWithAudit(
   const { error } = await supabase.from('activities').update(updates).eq('id', activityId);
   if (error) return { error: friendlyError(error.message, 'update activity status', actCtx) };
 
+  if (auditInfo.oldStatus && auditInfo.newStatus && auditInfo.oldStatus !== auditInfo.newStatus) {
+    await supabase.from('audit_log').insert({
+      activity_id: activityId,
+      project_id: auditInfo.projectId,
+      changed_by: auditInfo.changedBy || null,
+      old_status: auditInfo.oldStatus,
+      new_status: auditInfo.newStatus,
+      floor: auditInfo.floor,
+      flat_number: auditInfo.flatNumber,
+      stage: auditInfo.stage,
+      stage_gate: auditInfo.stageGate,
+      activity_name: auditInfo.activityName,
+    });
+  }
+
   return { error: null };
 }
 
