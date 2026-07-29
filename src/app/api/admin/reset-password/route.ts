@@ -1,17 +1,21 @@
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { verifyAdmin } from '@/lib/auth-guard';
+import { resetPasswordSchema } from '@/lib/validations';
 
 export async function POST(req: NextRequest) {
-  const { userId, newPassword } = await req.json();
+  const auth = await verifyAdmin(req);
+  if (auth.error) return auth.error;
 
-  if (!userId || !newPassword) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  let body: unknown;
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ error: 'Invalid request body' }, { status: 400 }); }
+
+  const parsed = resetPasswordSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
+  const { userId, newPassword } = parsed.data;
 
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
     password: newPassword,

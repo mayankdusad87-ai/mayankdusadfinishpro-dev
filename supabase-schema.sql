@@ -449,3 +449,19 @@ BEGIN
   RETURN result;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
+
+-- ============================================
+-- 10. GET DISTINCT FLOORS FUNCTION
+-- Returns unique floor numbers for a project efficiently
+-- (avoids Supabase JS client 1000-row default limit)
+-- ============================================
+CREATE OR REPLACE FUNCTION get_distinct_floors(p_project_id UUID)
+RETURNS TABLE(floor INTEGER) AS $$
+BEGIN
+  RETURN QUERY
+    SELECT DISTINCT a.floor
+    FROM public.activities a
+    WHERE a.project_id = p_project_id
+    ORDER BY a.floor;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';

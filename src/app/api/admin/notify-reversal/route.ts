@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyAdmin } from '@/lib/auth-guard';
+import { notifyReversalSchema } from '@/lib/validations';
 
 const STATUS_LABELS: Record<string, string> = {
   not_started: 'Not Started',
@@ -10,12 +12,18 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { adminEmails, projectName, floor, flatNumber, activity, stage, stageGate, oldStatus, newStatus } = body;
+  const auth = await verifyAdmin(req);
+  if (auth.error) return auth.error;
 
-  if (!adminEmails || adminEmails.length === 0) {
-    return NextResponse.json({ error: 'No admin emails' }, { status: 400 });
+  let body: unknown;
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ error: 'Invalid request body' }, { status: 400 }); }
+
+  const parsed = notifyReversalSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
+  const { adminEmails, projectName, floor, flatNumber, activity, stage, stageGate, oldStatus, newStatus } = parsed.data;
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {

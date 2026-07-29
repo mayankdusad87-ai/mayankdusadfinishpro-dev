@@ -755,7 +755,7 @@ export async function getCriticalDelays(projectId: string, limit = 5): Promise<A
 
 export async function getProjectFloors(projectId: string): Promise<number[]> {
   const [activitiesRes, projectRes] = await Promise.all([
-    supabase.from('activities').select('floor').eq('project_id', projectId),
+    supabase.from('activities').select('floor').eq('project_id', projectId).limit(50000),
     supabase.from('projects').select('total_floors').eq('id', projectId).single(),
   ]);
   const activityFloors = new Set(
@@ -788,22 +788,6 @@ export async function updateActivityWithAudit(
   const actCtx = { floor: auditInfo.floor, flat: auditInfo.flatNumber, activity: auditInfo.activityName, stage: auditInfo.stage, oldStatus: auditInfo.oldStatus, newStatus: auditInfo.newStatus };
   const { error } = await supabase.from('activities').update(updates).eq('id', activityId);
   if (error) return { error: friendlyError(error.message, 'update activity status', actCtx) };
-
-  if (auditInfo.oldStatus && auditInfo.newStatus && auditInfo.oldStatus !== auditInfo.newStatus) {
-    const { error: auditError } = await supabase.from('audit_log').insert({
-      activity_id: activityId,
-      project_id: auditInfo.projectId,
-      changed_by: auditInfo.changedBy || null,
-      old_status: auditInfo.oldStatus,
-      new_status: auditInfo.newStatus,
-      floor: auditInfo.floor,
-      flat_number: auditInfo.flatNumber,
-      stage: auditInfo.stage,
-      stage_gate: auditInfo.stageGate,
-      activity_name: auditInfo.activityName,
-    });
-    if (auditError) console.error('Audit log insert failed:', auditError.message);
-  }
 
   return { error: null };
 }
