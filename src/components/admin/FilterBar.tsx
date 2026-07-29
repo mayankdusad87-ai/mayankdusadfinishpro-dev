@@ -23,6 +23,7 @@ interface FilterBarProps {
   stages: string[];
   stageGates: string[];
   vendors: string[];
+  hideProject?: boolean;
 }
 
 const STATUS_OPTIONS: { value: ActivityStatus | ''; label: string }[] = [
@@ -44,6 +45,7 @@ export default function FilterBar({
   stages,
   stageGates,
   vendors,
+  hideProject = false,
 }: FilterBarProps) {
   function update(key: keyof Filters, value: string) {
     onFiltersChange({ ...filters, [key]: value });
@@ -56,19 +58,21 @@ export default function FilterBar({
     <div className="bg-white rounded-lg shadow-sm p-4">
       <div className="flex flex-wrap items-end gap-2 sm:gap-3">
         {/* Project */}
-        <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">
-          <label className="text-xs font-medium text-gray-500">Project</label>
-          <select
-            className={selectClass}
-            value={filters.project}
-            onChange={(e) => update('project', e.target.value)}
-          >
-            <option value="">All Projects</option>
-            {projects.map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </div>
+        {!hideProject && (
+          <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">
+            <label className="text-xs font-medium text-gray-500">Project</label>
+            <select
+              className={selectClass}
+              value={filters.project}
+              onChange={(e) => update('project', e.target.value)}
+            >
+              <option value="">All Projects</option>
+              {projects.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Floor */}
         <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">

@@ -170,6 +170,15 @@ export default function SupervisorHomePage() {
     return projectData.activityNames[key] || [];
   }, [stageFilter, subStageFilter, projectData]);
 
+  const matchesSearch = (r: UploadedActivity, q: string) =>
+    String(r.flat_number).includes(q) ||
+    String(r.floor).includes(q) ||
+    r.stage.toLowerCase().includes(q) ||
+    r.stage_gate.toLowerCase().includes(q) ||
+    r.activity.toLowerCase().includes(q) ||
+    r.vendor.toLowerCase().includes(q) ||
+    normalizeStatus(r.status).replace('_', ' ').includes(q);
+
   const floorRows = useMemo(() => {
     let rows = allActivities.filter(r => r.floor === activeFloor);
     if (statusFilter) rows = rows.filter(r => normalizeStatus(r.status) === statusFilter);
@@ -179,19 +188,14 @@ export default function SupervisorHomePage() {
     if (activityFilter) rows = rows.filter(r => r.activity === activityFilter);
     if (search) {
       const q = search.toLowerCase();
-      rows = rows.filter(r =>
-        String(r.flat_number).includes(q) ||
-        r.activity.toLowerCase().includes(q) ||
-        r.vendor.toLowerCase().includes(q)
-      );
+      rows = rows.filter(r => matchesSearch(r, q));
     }
     return rows;
   }, [allActivities, activeFloor, statusFilter, statusDropdown, stageFilter, subStageFilter, activityFilter, search]);
 
   const allFloorRows = useMemo(() => {
     if (activeView !== 'all') return [];
-    const needsFilter = !stageFilter;
-    if (needsFilter) return [];
+    if (!stageFilter && !search) return [];
     let rows = [...allActivities];
     if (stageFilter) rows = rows.filter(r => r.stage === stageFilter);
     if (subStageFilter) rows = rows.filter(r => r.stage_gate === subStageFilter);
@@ -199,11 +203,7 @@ export default function SupervisorHomePage() {
     if (statusDropdown) rows = rows.filter(r => normalizeStatus(r.status) === statusDropdown);
     if (search) {
       const q = search.toLowerCase();
-      rows = rows.filter(r =>
-        String(r.flat_number).includes(q) ||
-        r.activity.toLowerCase().includes(q) ||
-        r.vendor.toLowerCase().includes(q)
-      );
+      rows = rows.filter(r => matchesSearch(r, q));
     }
     return rows;
   }, [activeView, allActivities, stageFilter, subStageFilter, activityFilter, statusDropdown, search]);
@@ -714,7 +714,28 @@ export default function SupervisorHomePage() {
         {/* All floors view content */}
         {activeView === 'all' && (
           <>
-            {/* Filters - required before showing activities */}
+            {/* Search - always visible, works instantly */}
+            <div className="relative mb-3">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="m21 21-4.35-4.35" />
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by Flat No., Floor, Stage, Activity, Vendor..."
+                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Filters */}
             <div className="grid grid-cols-2 gap-2 mb-3">
               <select
                 value={stageFilter}
@@ -765,29 +786,13 @@ export default function SupervisorHomePage() {
               </button>
             )}
 
-            {/* Search */}
-            {stageFilter && (
-              <div className="relative mb-4">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="m21 21-4.35-4.35" />
-                </svg>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by Flat No., Activity or Vendor"
-                  className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                />
-              </div>
-            )}
-
-            {!stageFilter ? (
+            {!stageFilter && !search ? (
               <div className="text-center py-16">
                 <svg className="w-14 h-14 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
                 </svg>
-                <h3 className="text-lg font-semibold text-gray-900">Select filters to view activities</h3>
-                <p className="text-sm text-gray-500 mt-1">Choose at least a Stage to see activities across all floors.</p>
+                <h3 className="text-lg font-semibold text-gray-900">Search or filter to view activities</h3>
+                <p className="text-sm text-gray-500 mt-1">Type a flat number, stage name, or use the filters above.</p>
               </div>
             ) : allFloorRows.length === 0 ? (
               <div className="text-center py-12">
@@ -969,9 +974,16 @@ export default function SupervisorHomePage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by Flat No., Activity or Vendor"
+                placeholder="Search by Flat No., Stage, Activity, Vendor..."
                 className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
 
             {/* Activity Cards */}

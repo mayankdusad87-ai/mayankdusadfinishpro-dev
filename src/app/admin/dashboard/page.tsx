@@ -217,6 +217,7 @@ export default function DashboardPage() {
             stages={stages}
             stageGates={stageGates}
             vendors={vendors}
+            hideProject={!!currentProject}
           />
 
           <ActivityTable
