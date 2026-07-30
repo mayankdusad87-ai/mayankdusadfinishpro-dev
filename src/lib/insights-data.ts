@@ -9,6 +9,33 @@ const PIPELINE_STAGES = [
   '1st coat paint',
 ];
 
+// ---- Delay reason mapping: granular → high-level ----
+
+const DELAY_CATEGORY: Record<string, string> = {
+  'Material Not Available': 'Material & Procurement',
+  'Material Procurement Delay': 'Material & Procurement',
+  'Labour Shortage': 'Manpower',
+  'Wrong Measurement': 'Design & Drawings',
+  'Drawing / Design Change': 'Design & Drawings',
+  'Approval Pending': 'Approvals & Decisions',
+  'Management Hold': 'Approvals & Decisions',
+  'Customer Change Request': 'Approvals & Decisions',
+  'Quality Issue / Rework': 'Quality',
+  'Site Not Ready': 'Site & Access',
+  'Access Constraint': 'Site & Access',
+  'Safety Restriction': 'Site & Access',
+  'Equipment / Tools Not Available': 'Equipment & Utilities',
+  'Utility Not Available (Power / Water)': 'Equipment & Utilities',
+  'Weather Impact': 'External / Other',
+  'Coordination Issue': 'External / Other',
+  'Previous Activity Pending': 'External / Other',
+  'Other': 'External / Other',
+};
+
+function mapDelayCategory(reason: string): string {
+  return DELAY_CATEGORY[reason] || 'External / Other';
+}
+
 // ---- Types ----
 
 export interface PipelineStage {
@@ -338,9 +365,10 @@ export function computeOperations(rows: InsightRow[]): OperationsData {
       }
     }
 
-    // Delay reasons
+    // Delay reasons — aggregate by high-level category
     if (r.delay_reason) {
-      reasonMap.set(r.delay_reason, (reasonMap.get(r.delay_reason) || 0) + 1);
+      const category = mapDelayCategory(r.delay_reason);
+      reasonMap.set(category, (reasonMap.get(category) || 0) + 1);
     }
 
     // Floor overdue
