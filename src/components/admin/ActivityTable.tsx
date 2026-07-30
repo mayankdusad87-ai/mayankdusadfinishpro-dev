@@ -229,10 +229,11 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
 
     if (field === 'status') {
       const oldStatus = row.status as string;
-      const newStatus = val;
+      const expectedEnd = row.expected_end as string | null;
+      const overdue = expectedEnd ? expectedEnd < todayISO() : false;
 
       // Photo check for completion
-      if (newStatus === 'completed') {
+      if (val === 'completed') {
         const count = await getPhotoCount(row.id as string);
         if (count === 0) {
           setToast({ message: 'At least one photo is required before marking as completed.', type: 'error' });
@@ -242,8 +243,14 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
         }
       }
 
+      // Auto-detect delayed status
+      let newStatus = val;
+      if (val === 'in_progress' && overdue) newStatus = 'in_progress_delayed';
+      else if (val === 'not_started' && overdue) newStatus = 'delayed';
+      else if (val === 'completed' && overdue) newStatus = 'completed_delayed';
+
       const updates: Record<string, unknown> = { status: newStatus };
-      if (newStatus === 'completed') {
+      if (val === 'completed') {
         updates.actual_end = todayISO();
       }
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { UploadedActivity } from '@/lib/project-data-store';
 import { Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto, updateActivityWithAudit, getAdminEmails } from '@/lib/supabase-data';
 import { compressImage, generatePhotoPath } from '@/lib/image-compress';
-import { normalizeStatus, daysOverdue, TODAY } from './supervisor-utils';
+import { normalizeStatus, daysOverdue, TODAY, SUPERVISOR_STATUS_OPTIONS, resolveStatus, isDelayReasonRequired } from './supervisor-utils';
 
 interface ActivityDetailSheetProps {
   activity: UploadedActivity;
@@ -110,8 +110,10 @@ export default function ActivityDetailSheet({
       setDetailError('Actual end date cannot be earlier than actual start date.');
       return;
     }
-    if ((detailStatus === 'on_hold' || detailStatus === 'delayed') && !detailReason) {
-      setDetailError(`Reason is mandatory when status is ${detailStatus === 'on_hold' ? 'On Hold' : 'Delayed'}.`);
+    const needsReason = isDelayReasonRequired(detailStatus, activity.expected_end);
+    if (needsReason && !detailReason) {
+      const label = detailStatus === 'on_hold' ? 'On Hold' : 'overdue';
+      setDetailError(`Delay reason is mandatory for ${label} activities.`);
       return;
     }
     if (detailReason === '__other__' && !detailRemarks.trim()) {
@@ -127,13 +129,14 @@ export default function ActivityDetailSheet({
     const actualEnd = detailStatus === 'completed' && !detailActualEnd ? TODAY : detailActualEnd;
     const reasonValue = detailReason === '__other__' ? detailRemarks.trim() : detailReason;
 
+    const resolvedStatus = resolveStatus(detailStatus, activity.expected_end);
     const oldStatus = activity.status;
-    const statusChanged = oldStatus !== detailStatus;
+    const statusChanged = oldStatus !== resolvedStatus;
 
     const result = await updateActivityWithAudit(
       activity.id,
       {
-        status: detailStatus,
+        status: resolvedStatus,
         actual_start: actualStart,
         actual_end: actualEnd,
         delay_reason: reasonValue,
@@ -143,7 +146,7 @@ export default function ActivityDetailSheet({
         projectId,
         changedBy: userId,
         oldStatus: statusChanged ? oldStatus : undefined,
-        newStatus: statusChanged ? detailStatus : undefined,
+        newStatus: statusChanged ? resolvedStatus : undefined,
         floor: activity.floor,
         flatNumber: activity.flat_number,
         stage: activity.stage,
@@ -160,7 +163,7 @@ export default function ActivityDetailSheet({
     if (statusChanged) {
       const RANK: Record<string, number> = { not_started: 0, in_progress: 1, in_progress_delayed: 1, completed: 2, completed_delayed: 2, on_hold: -1 };
       const oldRank = RANK[oldStatus] ?? 0;
-      const newRank = RANK[detailStatus] ?? 0;
+      const newRank = RANK[resolvedStatus] ?? 0;
       if (oldRank > newRank && oldRank !== -1 && newRank !== -1) {
         getAdminEmails().then(emails => {
           if (emails.length === 0) return;
@@ -176,7 +179,7 @@ export default function ActivityDetailSheet({
               stage: activity.stage,
               stageGate: activity.stage_gate,
               oldStatus,
-              newStatus: detailStatus,
+              newStatus: resolvedStatus,
             }),
           }).catch(() => {});
         });
@@ -285,11 +288,9 @@ export default function ActivityDetailSheet({
                 onChange={(e) => { setDetailStatus(e.target.value); setDetailError(''); }}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/30 focus:border-primary"
               >
-                <option value="not_started">Not Started</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="delayed">Delayed</option>
-                <option value="on_hold">On Hold</option>
+                {SUPERVISOR_STATUS_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
             </div>
 
@@ -298,10 +299,10 @@ export default function ActivityDetailSheet({
               <input type="text" defaultValue={activity.vendor} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50" readOnly />
             </div>
 
-            {(detailStatus === 'delayed' || detailStatus === 'on_hold') && (
+            {isDelayReasonRequired(detailStatus, activity.expected_end) && (
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Reason <span className="text-red-500">*</span>
+                  Delay Reason <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={detailReason}

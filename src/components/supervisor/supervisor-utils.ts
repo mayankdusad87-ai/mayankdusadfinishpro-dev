@@ -14,6 +14,15 @@ export const STATUS_CONFIG: Record<SupervisorStatus, { label: string; bg: string
   on_hold: { label: 'ON HOLD', bg: 'bg-orange-100', text: 'text-orange-700' },
 };
 
+// Supervisor picks from 4 options; system auto-detects delay
+export const SUPERVISOR_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'not_started', label: 'Not Started' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'on_hold', label: 'On Hold' },
+];
+
+// Filter dropdown still shows all statuses
 export const STATUS_OPTIONS: { value: SupervisorStatus | ''; label: string }[] = [
   { value: '', label: 'All Status' },
   { value: 'not_started', label: 'Not Started' },
@@ -22,6 +31,23 @@ export const STATUS_OPTIONS: { value: SupervisorStatus | ''; label: string }[] =
   { value: 'delayed', label: 'Delayed' },
   { value: 'on_hold', label: 'On Hold' },
 ];
+
+// Auto-detect the actual status to store in DB based on user selection + dates
+export function resolveStatus(userStatus: string, expectedEnd: string | null): string {
+  if (!expectedEnd) return userStatus;
+  const overdue = expectedEnd < TODAY;
+  if (userStatus === 'in_progress' && overdue) return 'in_progress_delayed';
+  if (userStatus === 'not_started' && overdue) return 'delayed';
+  if (userStatus === 'completed' && overdue) return 'completed_delayed';
+  return userStatus;
+}
+
+// Delay reason is mandatory when: on_hold, OR any status when activity is overdue
+export function isDelayReasonRequired(userStatus: string, expectedEnd: string | null): boolean {
+  if (userStatus === 'on_hold') return true;
+  if (!expectedEnd) return false;
+  return expectedEnd < TODAY;
+}
 
 export function normalizeStatus(raw: string): SupervisorStatus {
   if (raw === 'in_progress_delayed') return 'delayed';
