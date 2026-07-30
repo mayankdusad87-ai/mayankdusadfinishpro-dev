@@ -52,7 +52,7 @@ function todayISO(): string {
 
 interface EditingCell {
   rowId: string;
-  field: 'status' | 'vendor' | 'expected_start' | 'expected_end';
+  field: 'status' | 'vendor' | 'expected_start' | 'expected_end' | 'revised_start' | 'revised_end';
 }
 
 interface ActivityTableProps {
@@ -86,6 +86,8 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   const [bulkVendor, setBulkVendor] = useState('');
   const [bulkExpStart, setBulkExpStart] = useState('');
   const [bulkExpEnd, setBulkExpEnd] = useState('');
+  const [bulkRevStart, setBulkRevStart] = useState('');
+  const [bulkRevEnd, setBulkRevEnd] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -317,6 +319,8 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     const updates: Record<string, unknown> = {};
     if (bulkExpStart) updates.expected_start = bulkExpStart;
     if (bulkExpEnd) updates.expected_end = bulkExpEnd;
+    if (bulkRevStart) updates.revised_start = bulkRevStart;
+    if (bulkRevEnd) updates.revised_end = bulkRevEnd;
     if (Object.keys(updates).length === 0) return;
 
     setBulkSaving(true);
@@ -334,6 +338,8 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setShowDatesModal(false);
     setBulkExpStart('');
     setBulkExpEnd('');
+    setBulkRevStart('');
+    setBulkRevEnd('');
   }
 
   // Export: Excel
@@ -345,10 +351,11 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
         getAllFilteredActivities(projectId, activeFilters),
       ]);
       const wsData = [
-        ['Floor', 'Flat No.', 'Config', 'Stage', 'Stage Gate', 'Activity', 'Vendor', 'Exp. Start', 'Exp. End', 'Act. Start', 'Act. End', 'Status', 'Delay Days', 'Delay Reason', 'Remarks'],
+        ['Floor', 'Flat No.', 'Config', 'Stage', 'Stage Gate', 'Activity', 'Vendor', 'Exp. Start', 'Exp. End', 'Rev. Start', 'Rev. End', 'Act. Start', 'Act. End', 'Status', 'Delay Days', 'Delay Reason', 'Remarks'],
         ...rows.map(r => [
           r.floor, r.flat_number, r.configuration || '', r.stage, r.stage_gate || '', r.activity,
           r.vendor || '', formatDate(r.expected_start as string), formatDate(r.expected_end as string),
+          formatDate(r.revised_start as string), formatDate(r.revised_end as string),
           formatDate(r.actual_start as string), formatDate(r.actual_end as string),
           r.status, r.delay_days || 0, r.delay_reason || '', r.remarks || '',
         ]),
@@ -380,10 +387,11 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
 
       autoTable(doc, {
         startY: 26,
-        head: [['Floor', 'Flat', 'Stage', 'Stage Gate', 'Activity', 'Vendor', 'Exp Start', 'Exp End', 'Status', 'Delay']],
+        head: [['Floor', 'Flat', 'Stage', 'Stage Gate', 'Activity', 'Vendor', 'Exp Start', 'Exp End', 'Rev Start', 'Rev End', 'Status', 'Delay']],
         body: rows.map(r => [
           String(r.floor ?? ''), String(r.flat_number ?? ''), String(r.stage ?? ''), String(r.stage_gate || ''), String(r.activity ?? ''),
           String(r.vendor || ''), formatDate(r.expected_start as string), formatDate(r.expected_end as string),
+          formatDate(r.revised_start as string), formatDate(r.revised_end as string),
           String(r.status ?? ''), (r.delay_days as number) > 0 ? `${r.delay_days}d` : '',
         ]),
         styles: { fontSize: 7, cellPadding: 1.5 },
@@ -432,7 +440,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
           </select>
         );
       }
-      if (field === 'expected_start' || field === 'expected_end') {
+      if (field === 'expected_start' || field === 'expected_end' || field === 'revised_start' || field === 'revised_end') {
         return (
           <input
             type="date"
@@ -572,6 +580,12 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                       <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">
                         <span className="flex items-center gap-1">Exp. End <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg></span>
                       </th>
+                      <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">
+                        <span className="flex items-center gap-1">Rev. Start <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg></span>
+                      </th>
+                      <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">
+                        <span className="flex items-center gap-1">Rev. End <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg></span>
+                      </th>
                       <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">Act. Start</th>
                       <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">Act. End</th>
                       <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">
@@ -623,6 +637,12 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs">
                           {renderEditableCell(row, 'expected_end', formatDate(row.expected_end as string), 'text-gray-500')}
                         </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                          {renderEditableCell(row, 'revised_start', formatDate(row.revised_start as string), 'text-indigo-600')}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                          {renderEditableCell(row, 'revised_end', formatDate(row.revised_end as string), 'text-indigo-600')}
+                        </td>
                         <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap text-xs">{formatDate(row.actual_start as string) || '-'}</td>
                         <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap text-xs">{formatDate(row.actual_end as string) || '-'}</td>
                         <td className="px-3 py-2.5">
@@ -636,7 +656,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                     })}
                     {tableRows.length === 0 && !tableLoading && (
                       <tr>
-                        <td colSpan={14} className="px-3 py-12 text-center text-sm text-gray-400">
+                        <td colSpan={16} className="px-3 py-12 text-center text-sm text-gray-400">
                           No activities match the current filters.
                         </td>
                       </tr>
@@ -740,34 +760,56 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
 
       {/* Update Expected Dates Modal */}
       {showDatesModal && (
-        <Modal open={showDatesModal} onClose={() => setShowDatesModal(false)} title="Update Expected Dates" maxWidth="max-w-md">
+        <Modal open={showDatesModal} onClose={() => setShowDatesModal(false)} title="Update Dates" maxWidth="max-w-md">
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              Update expected dates for <strong>{selectedRows.size}</strong> selected activities. Leave a field blank to keep the existing date.
+              Update dates for <strong>{selectedRows.size}</strong> selected activities. Leave a field blank to keep the existing date.
             </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Expected Start</label>
-              <input
-                type="date"
-                value={bulkExpStart}
-                onChange={e => setBulkExpStart(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Expected Start</label>
+                <input
+                  type="date"
+                  value={bulkExpStart}
+                  onChange={e => setBulkExpStart(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Expected End</label>
+                <input
+                  type="date"
+                  value={bulkExpEnd}
+                  onChange={e => setBulkExpEnd(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Expected End</label>
-              <input
-                type="date"
-                value={bulkExpEnd}
-                onChange={e => setBulkExpEnd(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-indigo-700 mb-1">Revised Start</label>
+                <input
+                  type="date"
+                  value={bulkRevStart}
+                  onChange={e => setBulkRevStart(e.target.value)}
+                  className="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-indigo-700 mb-1">Revised End</label>
+                <input
+                  type="date"
+                  value={bulkRevEnd}
+                  onChange={e => setBulkRevEnd(e.target.value)}
+                  className="w-full px-3 py-2 border border-indigo-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-500"
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setShowDatesModal(false)} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
               <button
                 onClick={handleBulkDates}
-                disabled={(!bulkExpStart && !bulkExpEnd) || bulkSaving}
+                disabled={(!bulkExpStart && !bulkExpEnd && !bulkRevStart && !bulkRevEnd) || bulkSaving}
                 className="px-5 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-dark disabled:opacity-50"
               >
                 {bulkSaving ? 'Updating...' : 'Update Dates'}

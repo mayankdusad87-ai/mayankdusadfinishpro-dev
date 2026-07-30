@@ -1,0 +1,410 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { UploadedActivity } from '@/lib/project-data-store';
+import { Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto, updateActivityWithAudit, getAdminEmails } from '@/lib/supabase-data';
+import { compressImage, generatePhotoPath } from '@/lib/image-compress';
+import { normalizeStatus, daysOverdue, TODAY } from './supervisor-utils';
+
+interface ActivityDetailSheetProps {
+  activity: UploadedActivity;
+  reasons: Reason[];
+  userId: string;
+  projectId: string;
+  projectName: string;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+export default function ActivityDetailSheet({
+  activity,
+  reasons,
+  userId,
+  projectId,
+  projectName,
+  onClose,
+  onSaved,
+}: ActivityDetailSheetProps) {
+  const [detailStatus, setDetailStatus] = useState<string>(normalizeStatus(activity.status));
+  const [detailActualStart, setDetailActualStart] = useState(activity.actual_start || '');
+  const [detailActualEnd, setDetailActualEnd] = useState(activity.actual_end || '');
+  const [detailError, setDetailError] = useState('');
+  const [detailPhotos, setDetailPhotos] = useState<ActivityPhoto[]>([]);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+
+  const existingReason = activity.delay_reason || '';
+  const isPresetReason = reasons.some(r => r.label === existingReason);
+  const [detailReason, setDetailReason] = useState(() => {
+    if (existingReason && !isPresetReason) return '__other__';
+    return existingReason;
+  });
+  const [detailRemarks, setDetailRemarks] = useState(() => {
+    if (existingReason && !isPresetReason) return existingReason;
+    return activity.remarks || '';
+  });
+
+  useEffect(() => {
+    getPhotosForActivity(activity.id).then(setDetailPhotos);
+  }, [activity.id]);
+
+  async function handlePhotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    if (detailPhotos.length + files.length > 3) {
+      setPhotoError('Maximum 3 photos per activity.');
+      e.target.value = '';
+      return;
+    }
+
+    setPhotoUploading(true);
+    setPhotoError('');
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const compressed = await compressImage(file);
+        const path = generatePhotoPath(projectId, activity.id, detailPhotos.length + i);
+        const result = await uploadActivityPhoto(compressed, path, {
+          activityId: activity.id,
+          projectId,
+          fileName: file.name || `photo_${detailPhotos.length + i}.jpg`,
+          floor: activity.floor,
+          stage: activity.stage,
+          stageGate: activity.stage_gate,
+          activityName: activity.activity,
+          flatNumber: activity.flat_number,
+          uploadedBy: userId,
+        });
+        if (result.error) {
+          setPhotoError(result.error);
+        }
+      } catch {
+        setPhotoError('Failed to upload photo. Please try again.');
+      }
+    }
+    const updatedPhotos = await getPhotosForActivity(activity.id);
+    setDetailPhotos(updatedPhotos);
+
+    setPhotoUploading(false);
+    e.target.value = '';
+  }
+
+  async function handleDeletePhoto(photo: ActivityPhoto) {
+    const result = await deleteActivityPhoto(photo.id, photo.storage_path);
+    if (!result.error) {
+      setDetailPhotos(prev => prev.filter(p => p.id !== photo.id));
+    } else {
+      setPhotoError(result.error);
+    }
+  }
+
+  async function saveDetail() {
+    setDetailError('');
+
+    if (detailActualStart && detailActualStart > TODAY) {
+      setDetailError('Actual start date cannot be a future date.');
+      return;
+    }
+    if (detailActualEnd && detailActualStart && detailActualEnd < detailActualStart) {
+      setDetailError('Actual end date cannot be earlier than actual start date.');
+      return;
+    }
+    if ((detailStatus === 'on_hold' || detailStatus === 'delayed') && !detailReason) {
+      setDetailError(`Reason is mandatory when status is ${detailStatus === 'on_hold' ? 'On Hold' : 'Delayed'}.`);
+      return;
+    }
+    if (detailReason === '__other__' && !detailRemarks.trim()) {
+      setDetailError('Please provide remarks when selecting "Other" as reason.');
+      return;
+    }
+    if (detailStatus === 'completed' && detailPhotos.length === 0) {
+      setDetailError('At least one photo is required before marking as completed.');
+      return;
+    }
+
+    const actualStart = detailStatus === 'completed' && !detailActualStart ? TODAY : detailActualStart;
+    const actualEnd = detailStatus === 'completed' && !detailActualEnd ? TODAY : detailActualEnd;
+    const reasonValue = detailReason === '__other__' ? detailRemarks.trim() : detailReason;
+
+    const oldStatus = activity.status;
+    const statusChanged = oldStatus !== detailStatus;
+
+    const result = await updateActivityWithAudit(
+      activity.id,
+      {
+        status: detailStatus,
+        actual_start: actualStart,
+        actual_end: actualEnd,
+        delay_reason: reasonValue,
+        remarks: detailReason === '__other__' ? detailRemarks.trim() : '',
+      },
+      {
+        projectId,
+        changedBy: userId,
+        oldStatus: statusChanged ? oldStatus : undefined,
+        newStatus: statusChanged ? detailStatus : undefined,
+        floor: activity.floor,
+        flatNumber: activity.flat_number,
+        stage: activity.stage,
+        stageGate: activity.stage_gate,
+        activityName: activity.activity,
+      }
+    );
+
+    if (result.error) {
+      setDetailError(result.error);
+      return;
+    }
+
+    if (statusChanged) {
+      const RANK: Record<string, number> = { not_started: 0, in_progress: 1, in_progress_delayed: 1, completed: 2, completed_delayed: 2, on_hold: -1 };
+      const oldRank = RANK[oldStatus] ?? 0;
+      const newRank = RANK[detailStatus] ?? 0;
+      if (oldRank > newRank && oldRank !== -1 && newRank !== -1) {
+        getAdminEmails().then(emails => {
+          if (emails.length === 0) return;
+          fetch('/api/admin/notify-reversal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              adminEmails: emails,
+              projectName,
+              floor: activity.floor,
+              flatNumber: activity.flat_number,
+              activity: activity.activity,
+              stage: activity.stage,
+              stageGate: activity.stage_gate,
+              oldStatus,
+              newStatus: detailStatus,
+            }),
+          }).catch(() => {});
+        });
+      }
+    }
+
+    onSaved();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end max-w-md mx-auto">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto">
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
+
+        <div className="px-5 pb-24">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">{activity.activity}</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Floor {activity.floor} &bull; Flat {activity.flat_number} &bull; {activity.stage}
+              </p>
+              <p className="text-xs text-primary font-medium mt-0.5">Sub Stage: {activity.stage_gate}</p>
+            </div>
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
+              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {normalizeStatus(activity.status) !== 'completed' && activity.expected_end && activity.expected_end < TODAY && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+              <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+              <span className="text-sm font-semibold text-red-700">
+                {daysOverdue(activity.expected_end)} days overdue
+              </span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-[11px] text-gray-500 uppercase tracking-wide">Expected Start</div>
+              <div className="text-sm font-medium text-gray-900 mt-1">{activity.expected_start || '-'}</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-[11px] text-gray-500 uppercase tracking-wide">Expected End</div>
+              <div className="text-sm font-medium text-gray-900 mt-1">{activity.expected_end || '-'}</div>
+            </div>
+          </div>
+
+          {(activity.revised_start || activity.revised_end) && (
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
+                <div className="text-[11px] text-indigo-600 uppercase tracking-wide">Revised Start</div>
+                <div className="text-sm font-medium text-indigo-900 mt-1">{activity.revised_start || '-'}</div>
+              </div>
+              <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
+                <div className="text-[11px] text-indigo-600 uppercase tracking-wide">Revised End</div>
+                <div className="text-sm font-medium text-indigo-900 mt-1">{activity.revised_end || '-'}</div>
+              </div>
+            </div>
+          )}
+
+          {detailError && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
+              <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
+              <span className="text-xs font-medium text-red-700">{detailError}</span>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Actual Start</label>
+                <input
+                  type="date"
+                  value={detailActualStart}
+                  max={TODAY}
+                  onChange={(e) => { setDetailActualStart(e.target.value); setDetailError(''); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Actual End</label>
+                <input
+                  type="date"
+                  value={detailActualEnd}
+                  min={detailActualStart || undefined}
+                  onChange={(e) => { setDetailActualEnd(e.target.value); setDetailError(''); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={detailStatus}
+                onChange={(e) => { setDetailStatus(e.target.value); setDetailError(''); }}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              >
+                <option value="not_started">Not Started</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="delayed">Delayed</option>
+                <option value="on_hold">On Hold</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Vendor</label>
+              <input type="text" defaultValue={activity.vendor} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50" readOnly />
+            </div>
+
+            {(detailStatus === 'delayed' || detailStatus === 'on_hold') && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={detailReason}
+                  onChange={(e) => { setDetailReason(e.target.value); setDetailError(''); if (e.target.value !== '__other__') setDetailRemarks(''); }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                >
+                  <option value="">-- Select reason --</option>
+                  {reasons.map(r => (
+                    <option key={r.id} value={r.label}>{r.label}</option>
+                  ))}
+                  <option value="__other__">Other (specify in remarks)</option>
+                </select>
+              </div>
+            )}
+
+            {detailReason === '__other__' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Remarks <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={detailRemarks}
+                  onChange={(e) => { setDetailRemarks(e.target.value); setDetailError(''); }}
+                  placeholder="Describe the reason..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-2">
+                Photo Evidence <span className="text-gray-400 font-normal">({detailPhotos.length}/3)</span>
+              </label>
+
+              {photoError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5 mb-2">
+                  {photoError}
+                </div>
+              )}
+
+              {detailPhotos.length > 0 && (
+                <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+                  {detailPhotos.map(photo => (
+                    <div key={photo.id} className="relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
+                      <img
+                        src={photo.url}
+                        alt={photo.file_name}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => handleDeletePhoto(photo)}
+                        className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {detailPhotos.length < 3 && (
+                <label className={`w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed rounded-lg text-sm transition-colors cursor-pointer ${
+                  photoUploading ? 'border-gray-200 text-gray-400 pointer-events-none' : 'border-gray-300 text-gray-500 hover:border-primary hover:text-primary'
+                }`}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    multiple
+                    onChange={handlePhotoCapture}
+                    disabled={photoUploading}
+                    className="hidden"
+                  />
+                  {photoUploading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      Compressing & uploading...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+                      </svg>
+                      Tap to take photo or upload
+                    </>
+                  )}
+                </label>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-5 py-3">
+          <button
+            onClick={saveDetail}
+            className="w-full py-3 bg-primary hover:bg-primary-dark text-white font-semibold rounded-xl transition-colors"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
