@@ -96,16 +96,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      const msg = error.message.toLowerCase();
-      if (msg.includes('invalid login')) return { error: 'Incorrect email or password.' };
-      if (msg.includes('email not confirmed')) return { error: 'Please verify your email before signing in.' };
-      if (msg.includes('too many requests')) return { error: 'Too many login attempts. Please wait a moment.' };
-      return { error: 'Unable to sign in. Please try again.' };
-    }
-    return { error: null };
-  }, []);
+  console.log("SUPABASE URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  console.log("Login Result:", { data, error });
+
+  if (error) {
+    console.error("Supabase Login Error:", error);
+
+    return {
+      error: `${error.message} (${error.status ?? "no-status"})`,
+    };
+  }
+
+  return { error: null };
+}, []);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
