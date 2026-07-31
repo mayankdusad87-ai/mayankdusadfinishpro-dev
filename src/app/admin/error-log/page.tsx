@@ -2,15 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getAppErrors, AppError } from '@/lib/supabase-data';
-
-const PER_PAGE = 25;
-
-function formatTimestamp(iso: string): { date: string; time: string } {
-  const d = new Date(iso);
-  const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  return { date, time };
-}
+import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
+import { formatTimestamp } from '@/lib/utils';
 
 function parseContext(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
@@ -42,8 +35,8 @@ export default function ErrorLogPage() {
     loadErrors();
   }, [loadErrors]);
 
-  const totalPages = Math.max(1, Math.ceil(entries.length / PER_PAGE));
-  const paginated = entries.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(entries.length / DEFAULT_PAGE_SIZE));
+  const paginated = entries.slice((currentPage - 1) * DEFAULT_PAGE_SIZE, currentPage * DEFAULT_PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -208,7 +201,7 @@ export default function ErrorLogPage() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/50">
                 <div className="text-sm text-gray-500">
-                  Showing {(currentPage - 1) * PER_PAGE + 1} to {Math.min(currentPage * PER_PAGE, entries.length)} of {entries.length}
+                  Showing {(currentPage - 1) * DEFAULT_PAGE_SIZE + 1} to {Math.min(currentPage * DEFAULT_PAGE_SIZE, entries.length)} of {entries.length}
                 </div>
                 <div className="flex items-center gap-1">
                   <button

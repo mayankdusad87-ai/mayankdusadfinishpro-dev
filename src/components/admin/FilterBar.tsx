@@ -1,6 +1,7 @@
 'use client';
 
-import { ActivityStatus } from '@/lib/types';
+import { FILTER_STATUS_OPTIONS } from '@/lib/constants';
+import type { ActivityStatus } from '@/lib/types';
 
 export interface Filters {
   project: string;
@@ -26,14 +27,6 @@ interface FilterBarProps {
   hideProject?: boolean;
 }
 
-const STATUS_OPTIONS: { value: ActivityStatus | ''; label: string }[] = [
-  { value: '', label: 'All Statuses' },
-  { value: 'not_started', label: 'Not Started' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'delayed', label: 'Delayed' },
-  { value: 'on_hold', label: 'On Hold' },
-];
 
 export default function FilterBar({
   filters,
@@ -142,7 +135,7 @@ export default function FilterBar({
             value={filters.status}
             onChange={(e) => update('status', e.target.value)}
           >
-            {STATUS_OPTIONS.map((opt) => (
+            {FILTER_STATUS_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>

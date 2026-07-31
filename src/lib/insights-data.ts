@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { HeatmapData } from './floor-rollup';
+import { todayISO } from '@/lib/utils';
 
 const PIPELINE_STAGES = [
   'Pre-Tiling',
@@ -152,7 +153,7 @@ function isComplete(status: string) {
 
 // ---- Date helpers ----
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = todayISO();
 
 function daysBetween(a: string, b: string): number {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);

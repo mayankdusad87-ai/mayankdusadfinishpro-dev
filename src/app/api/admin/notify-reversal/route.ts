@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/auth-guard';
 import { notifyReversalSchema } from '@/lib/validations';
-
-const STATUS_LABELS: Record<string, string> = {
-  not_started: 'Not Started',
-  in_progress: 'In Progress',
-  in_progress_delayed: 'In Progress (Delayed)',
-  completed: 'Completed',
-  completed_delayed: 'Completed (Delayed)',
-  on_hold: 'On Hold',
-};
+import { STATUS_LABELS } from '@/lib/constants';
 
 export async function POST(req: NextRequest) {
   const auth = await verifyAdmin(req);

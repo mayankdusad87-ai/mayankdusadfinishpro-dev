@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import type { ManagedProject } from './project-store';
 import type { UploadedActivity, ProjectData } from './project-data-store';
 import type { ActivityRow, ActivityUpdate, ProjectRow, AuditLogRow as AuditLogDbRow, ActivityPhotoRow, AppErrorRow, ReasonRow } from '@/types/database.types';
+import { MAX_PHOTO_SIZE, MAX_PHOTOS_PER_ACTIVITY, PHOTO_BUCKET, IMAGE_SIGNATURES } from '@/lib/constants';
 
 function logAppError(action: string, rawError: string, userFriendly: string, extra?: Record<string, unknown>) {
   console.error(`[${action}]`, rawError);
@@ -479,16 +480,6 @@ export async function deleteReason(id: string): Promise<{ error: string | null }
 
 export type ActivityPhoto = ActivityPhotoRow & { url?: string };
 
-const PHOTO_BUCKET = 'activity-photos';
-const MAX_PHOTOS_PER_ACTIVITY = 3;
-const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 MB
-
-const IMAGE_SIGNATURES: Array<{ bytes: number[]; type: string }> = [
-  { bytes: [0xFF, 0xD8, 0xFF], type: 'image/jpeg' },
-  { bytes: [0x89, 0x50, 0x4E, 0x47], type: 'image/png' },
-  { bytes: [0x47, 0x49, 0x46, 0x38], type: 'image/gif' },
-  { bytes: [0x52, 0x49, 0x46, 0x46], type: 'image/webp' },
-];
 
 function detectImageType(header: Uint8Array): string | null {
   for (const sig of IMAGE_SIGNATURES) {

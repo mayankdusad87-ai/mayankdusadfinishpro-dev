@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import StatusPill from '@/components/shared/StatusPill';
 import Modal from '@/components/shared/Modal';
-import { ActivityStatus } from '@/lib/types';
 import {
   getActivitiesPage,
   getCriticalDelays,
@@ -15,41 +14,9 @@ import {
 } from '@/lib/supabase-data';
 import { supabase } from '@/lib/supabase';
 import type { ActivityRow, ActivityUpdate } from '@/types/database.types';
-
-const PER_PAGE = 25;
-
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: 'not_started', label: 'Not Started' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'on_hold', label: 'On Hold' },
-];
-
-const STATUS_RANK: Record<string, number> = {
-  not_started: 0,
-  in_progress: 1,
-  in_progress_delayed: 1,
-  completed: 2,
-  completed_delayed: 2,
-  on_hold: -1,
-};
-
-function normalizeStatus(s: string): ActivityStatus {
-  if (s === 'in_progress' || s === 'in_progress_delayed') return 'in_progress';
-  if (s === 'completed' || s === 'completed_delayed') return 'completed';
-  if (s === 'delayed') return 'delayed';
-  if (s === 'on_hold') return 'on_hold';
-  return 'not_started';
-}
-
-function formatDate(d: string | null): string {
-  if (!d) return '';
-  return d.slice(0, 10);
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import type { ActivityStatus } from '@/lib/types';
+import { ADMIN_STATUS_OPTIONS, DEFAULT_PAGE_SIZE } from '@/lib/constants';
+import { normalizeToBaseStatus, formatDate, todayISO, isStatusReversal } from '@/lib/utils';
 
 interface EditingCell {
   rowId: string;
@@ -113,7 +80,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
       async function load() {
         setTableLoading(true);
         const [pageResult, delays] = await Promise.all([
-          getActivitiesPage(projectId, activeFilters, currentPage, PER_PAGE),
+          getActivitiesPage(projectId, activeFilters, currentPage, DEFAULT_PAGE_SIZE),
           getCriticalDelays(projectId),
         ]);
         if (cancelled) return;
@@ -134,7 +101,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     return () => clearTimeout(t);
   }, [toast]);
 
-  const totalPages = Math.max(1, Math.ceil(tableTotal / PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(tableTotal / DEFAULT_PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
 
   const refugeFloorSet = useMemo(() => new Set(refugeFloors), [refugeFloors]);
@@ -179,14 +146,6 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   async function getCurrentUserId(): Promise<string> {
     const { data } = await supabase.auth.getUser();
     return data?.user?.id || '';
-  }
-
-  // Check if status change is a reversal
-  function isReversal(oldStatus: string, newStatus: string): boolean {
-    const oldRank = STATUS_RANK[oldStatus] ?? 0;
-    const newRank = STATUS_RANK[newStatus] ?? 0;
-    if (oldRank === -1 || newRank === -1) return false;
-    return oldRank > newRank;
   }
 
   // Send reversal notification email
@@ -277,7 +236,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
         ));
         setToast({ message: 'Status updated.', type: 'success' });
 
-        if (isReversal(oldStatus, newStatus)) {
+        if (isStatusReversal(oldStatus, newStatus)) {
           notifyReversal(row, oldStatus, newStatus);
         }
       }
@@ -442,7 +401,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
             disabled={saving}
             className="w-full px-1.5 py-1 text-xs border border-primary rounded bg-white focus:outline-none focus:ring-1 focus:ring-primary"
           >
-            {STATUS_OPTIONS.map(opt => (
+            {ADMIN_STATUS_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
@@ -480,7 +439,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     if (field === 'status') {
       return (
         <button onClick={() => startEdit(rowId, field, row.status || '')} className="cursor-pointer">
-          <StatusPill status={normalizeStatus(row.status || 'not_started')} />
+          <StatusPill status={normalizeToBaseStatus(row.status || 'not_started')} />
         </button>
       );
     }
@@ -676,7 +635,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
               {/* Pagination */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 border-t border-gray-200 bg-gray-50/50">
                 <span className="text-xs sm:text-sm text-gray-500">
-                  Showing {tableTotal === 0 ? 0 : (safePage - 1) * PER_PAGE + 1}-{Math.min(safePage * PER_PAGE, tableTotal)} of {tableTotal.toLocaleString()}
+                  Showing {tableTotal === 0 ? 0 : (safePage - 1) * DEFAULT_PAGE_SIZE + 1}-{Math.min(safePage * DEFAULT_PAGE_SIZE, tableTotal)} of {tableTotal.toLocaleString()}
                 </span>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="px-2 py-1 rounded text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-40">&laquo;</button>

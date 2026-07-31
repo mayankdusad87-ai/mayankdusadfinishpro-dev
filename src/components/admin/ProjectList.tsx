@@ -6,17 +6,13 @@ import { useProject } from '@/lib/project-context';
 import { getProjectsFromSupabase, saveProjectToSupabase, deleteProjectFromSupabase, getRefugeConfig, saveRefugeConfig, getProjectFloors } from '@/lib/supabase-data';
 import { useAuth } from '@/lib/auth-context';
 import Modal from '@/components/shared/Modal';
+import { PROJECT_STATUS_DISPLAY } from '@/lib/constants';
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-const STATUS_CONFIG = {
-  active: { label: 'Active', bg: 'bg-green-100', text: 'text-green-700' },
-  completed: { label: 'Completed', bg: 'bg-blue-100', text: 'text-blue-700' },
-  on_hold: { label: 'On Hold', bg: 'bg-orange-100', text: 'text-orange-700' },
-};
 
 export default function ProjectList() {
   const [projects, setProjects] = useState<ManagedProject[]>([]);
@@ -198,7 +194,7 @@ export default function ProjectList() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {projects.map(p => {
-                  const sc = STATUS_CONFIG[p.status];
+                  const sc = PROJECT_STATUS_DISPLAY[p.status];
                   return (
                     <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-4 font-medium text-gray-900">{p.name}</td>

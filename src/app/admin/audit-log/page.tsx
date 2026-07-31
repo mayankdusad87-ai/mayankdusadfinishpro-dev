@@ -3,14 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useProject } from '@/lib/project-context';
 import { getAuditLog, AuditLogRow } from '@/lib/supabase-data';
-
-const STATUS_LABELS: Record<string, string> = {
-  not_started: 'Not Started',
-  in_progress: 'In Progress',
-  completed: 'Completed',
-  delayed: 'Delayed',
-  on_hold: 'On Hold',
-};
+import { STATUS_LABELS, DEFAULT_PAGE_SIZE } from '@/lib/constants';
+import { formatTimestamp } from '@/lib/utils';
 
 const STATUS_COLORS: Record<string, string> = {
   not_started: 'bg-gray-100 text-gray-700',
@@ -19,15 +13,6 @@ const STATUS_COLORS: Record<string, string> = {
   delayed: 'bg-orange-100 text-orange-700',
   on_hold: 'bg-red-100 text-red-700',
 };
-
-function formatTimestamp(iso: string): { date: string; time: string } {
-  const d = new Date(iso);
-  const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  return { date, time };
-}
-
-const PER_PAGE = 25;
 
 export default function AuditLogPage() {
   const { currentProject } = useProject();
@@ -53,8 +38,8 @@ export default function AuditLogPage() {
     loadAuditLog();
   }, [loadAuditLog]);
 
-  const totalPages = Math.max(1, Math.ceil(entries.length / PER_PAGE));
-  const paginated = entries.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(entries.length / DEFAULT_PAGE_SIZE));
+  const paginated = entries.slice((currentPage - 1) * DEFAULT_PAGE_SIZE, currentPage * DEFAULT_PAGE_SIZE);
 
   if (!currentProject) {
     return (
@@ -201,7 +186,7 @@ export default function AuditLogPage() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/50">
                 <div className="text-sm text-gray-500">
-                  Showing {(currentPage - 1) * PER_PAGE + 1} to {Math.min(currentPage * PER_PAGE, entries.length)} of {entries.length}
+                  Showing {(currentPage - 1) * DEFAULT_PAGE_SIZE + 1} to {Math.min(currentPage * DEFAULT_PAGE_SIZE, entries.length)} of {entries.length}
                 </div>
                 <div className="flex items-center gap-1">
                   <button
