@@ -24,6 +24,9 @@ export interface ValidationError {
 }
 
 export function validateStatusChange(input: StatusChangeInput): ValidationError | null {
+  if (isDelayReasonRequired(input.userStatus, input.expectedEnd) && !input.delayReason) {
+    return { field: 'delay_reason', message: 'Delay reason is required for overdue activities.' };
+  }
   if (input.userStatus === 'completed' && input.photoCount === 0) {
     return { field: 'photos', message: 'At least one photo is required before marking as completed.' };
   }

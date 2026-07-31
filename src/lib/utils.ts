@@ -51,6 +51,7 @@ export function resolveStatus(userStatus: string, expectedEnd: string | null): s
 
 export function isDelayReasonRequired(userStatus: string, expectedEnd: string | null): boolean {
   if (userStatus === 'on_hold') return true;
+  if (userStatus === 'completed') return false;
   if (!expectedEnd) return false;
   return expectedEnd < todayISO();
 }

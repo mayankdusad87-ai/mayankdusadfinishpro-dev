@@ -62,6 +62,7 @@ export const PROJECT_STATUS_DISPLAY: Record<string, { label: string; bg: string;
 
 export const STATUS_RANK: Record<string, number> = {
   not_started: 0,
+  delayed: 0,
   in_progress: 1,
   in_progress_delayed: 1,
   completed: 2,
