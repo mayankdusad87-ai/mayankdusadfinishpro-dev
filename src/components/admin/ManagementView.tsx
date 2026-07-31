@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import type { ManagementData } from '@/lib/insights-data';
 
 interface Props {
@@ -19,7 +20,7 @@ function formatDate(d: string | null): string {
   return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function ManagementView({ data, projectName }: Props) {
+function ManagementView({ data, projectName }: Props) {
   const { kpi, pipeline, floors } = data;
   const sc = spiColor(kpi.projectSpiStatus);
 
@@ -244,3 +245,5 @@ export default function ManagementView({ data, projectName }: Props) {
     </div>
   );
 }
+
+export default memo(ManagementView);

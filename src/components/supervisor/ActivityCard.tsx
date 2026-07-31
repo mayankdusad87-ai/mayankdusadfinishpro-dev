@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { UploadedActivity } from '@/lib/project-data-store';
 import { SupervisorStatus, STATUS_CONFIG, normalizeStatus, daysOverdue, TODAY } from './supervisor-utils';
 
@@ -12,7 +13,7 @@ interface ActivityCardProps {
   onQuickAction: (row: UploadedActivity, action: 'start' | 'complete' | 'delay') => void;
 }
 
-export default function ActivityCard({
+function ActivityCard({
   row,
   bulkMode,
   isSelected,
@@ -108,3 +109,5 @@ export default function ActivityCard({
     </div>
   );
 }
+
+export default memo(ActivityCard);

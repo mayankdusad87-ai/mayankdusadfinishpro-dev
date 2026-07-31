@@ -60,7 +60,7 @@ export default function UploadPage() {
 
     try {
       const buffer = await file.arrayBuffer();
-      const data = parseExcelFile(buffer, currentProject.id);
+      const data = await parseExcelFile(buffer, currentProject.id);
       data.fileName = file.name;
       data.name = currentProject.name;
       setPreviewData(data);

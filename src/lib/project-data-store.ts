@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 
 export interface UploadedActivity {
   id: string;
@@ -78,7 +77,8 @@ const ROOM_COLS = [
   { idx: 24, name: 'Kitchen' },
 ];
 
-export function parseExcelFile(buffer: ArrayBuffer, projectId: string): ProjectData {
+export async function parseExcelFile(buffer: ArrayBuffer, projectId: string): Promise<ProjectData> {
+  const XLSX = await import('xlsx');
   const wb = XLSX.read(buffer, { type: 'array' });
   const ws = wb.Sheets['Sale Unit wise status'];
   if (!ws) {

@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { HeatmapData, RollupCell } from '@/lib/floor-rollup';
 
 interface FloorHeatmapProps {
@@ -61,7 +62,7 @@ function readinessText(r: string): string {
   }
 }
 
-export default function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
+function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
   if (data.stages.length === 0) return null;
 
   return (
@@ -200,3 +201,5 @@ export default function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
     </div>
   );
 }
+
+export default memo(FloorHeatmap);

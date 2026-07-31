@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
 import { parseExcelToConfig, saveActivityConfig, getActivityConfig, ActivityConfig } from '@/lib/activity-config-store';
 
 export default function ExcelUpload() {
@@ -11,28 +10,25 @@ export default function ExcelUpload() {
   const [fileName, setFileName] = useState('');
   const [previewRows, setPreviewRows] = useState<Record<string, string>[]>([]);
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploading(true);
     setFileName(file.name);
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const data = evt.target?.result;
-      const wb = XLSX.read(data, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
+    const XLSX = await import('xlsx');
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: '' });
 
-      setPreviewRows(rows.slice(0, 5));
+    setPreviewRows(rows.slice(0, 5));
 
-      const parsed = parseExcelToConfig(rows);
-      saveActivityConfig(parsed);
-      setConfig(parsed);
-      setUploading(false);
-    };
-    reader.readAsArrayBuffer(file);
+    const parsed = parseExcelToConfig(rows);
+    saveActivityConfig(parsed);
+    setConfig(parsed);
+    setUploading(false);
   }
 
   function clearConfig() {

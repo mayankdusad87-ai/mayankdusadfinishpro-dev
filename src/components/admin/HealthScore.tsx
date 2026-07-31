@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { ActivityStatus } from '@/lib/types';
 
 interface HealthScoreProps {
@@ -41,7 +42,7 @@ const STATUS_CHIPS: { key: ActivityStatus; label: string; dot: string }[] = [
   { key: 'on_hold', label: 'On Hold', dot: 'bg-orange-500' },
 ];
 
-export default function HealthScore(props: HealthScoreProps) {
+function HealthScore(props: HealthScoreProps) {
   const { total, completed, completedDelayed, inProgress, inProgressDelayed, onHold, notStarted, activeFilter, onFilterChange } = props;
   const { score, progress, onTime, risk } = computeHealth(props);
   const colors = getScoreColor(score);
@@ -141,3 +142,5 @@ function totalCompletedLabel(onTime: number, delayed: number): string {
   if (delayed === 0) return `All ${total} on time`;
   return `${delayed} of ${total} were delayed`;
 }
+
+export default memo(HealthScore);

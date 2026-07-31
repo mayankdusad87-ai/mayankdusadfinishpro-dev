@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { ActivityStatus } from '@/lib/types';
 
 const statusConfig: Record<ActivityStatus, { label: string; bg: string; text: string }> = {
@@ -10,7 +11,7 @@ const statusConfig: Record<ActivityStatus, { label: string; bg: string; text: st
   on_hold: { label: 'On Hold', bg: 'bg-orange-100', text: 'text-orange-700' },
 };
 
-export default function StatusPill({ status, size = 'sm' }: { status: ActivityStatus; size?: 'sm' | 'md' }) {
+function StatusPill({ status, size = 'sm' }: { status: ActivityStatus; size?: 'sm' | 'md' }) {
   const config = statusConfig[status];
   const sizeClass = size === 'md' ? 'px-3 py-1.5 text-sm' : 'px-2 py-0.5 text-xs';
   return (
@@ -19,3 +20,5 @@ export default function StatusPill({ status, size = 'sm' }: { status: ActivitySt
     </span>
   );
 }
+
+export default memo(StatusPill);

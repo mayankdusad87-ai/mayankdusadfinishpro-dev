@@ -8,6 +8,7 @@ import { getInsightsData } from '@/lib/insights-data';
 import type { ManagementData, OperationsData } from '@/lib/insights-data';
 import ManagementView from '@/components/admin/ManagementView';
 import OperationsView from '@/components/admin/OperationsView';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 type Tab = 'management' | 'operations';
 
@@ -48,12 +49,7 @@ export default function InsightsPage() {
     loadData();
   }, [loadData]);
 
-  // Auto-refresh every 90 seconds
-  useEffect(() => {
-    if (!currentProject) return;
-    const interval = setInterval(loadData, 90000);
-    return () => clearInterval(interval);
-  }, [currentProject, loadData]);
+  useAutoRefresh(loadData, 90000, !!currentProject);
 
   return (
     <div className="space-y-4 md:space-y-6">

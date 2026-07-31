@@ -1,30 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { getReasons, createReason, updateReason, deleteReason, Reason } from '@/lib/supabase-data';
+import { useDataLoader } from '@/hooks/use-data-loader';
 
 export default function SettingsPage() {
-  const [reasons, setReasons] = useState<Reason[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: reasons, loading, refresh: loadReasons } = useDataLoader(() => getReasons(), [] as Reason[]);
   const [newLabel, setNewLabel] = useState('');
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
-
-  const loadReasons = useCallback(async () => {
-    try {
-      const list = await getReasons();
-      setReasons(list);
-    } catch {
-      setError('Failed to load reasons');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadReasons();
-  }, [loadReasons]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();

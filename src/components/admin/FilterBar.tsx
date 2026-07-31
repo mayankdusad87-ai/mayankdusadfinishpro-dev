@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { FILTER_STATUS_OPTIONS } from '@/lib/constants';
 import type { ActivityStatus } from '@/lib/types';
 
@@ -28,7 +29,7 @@ interface FilterBarProps {
 }
 
 
-export default function FilterBar({
+function FilterBar({
   filters,
   onFiltersChange,
   onApply,
@@ -180,3 +181,5 @@ export default function FilterBar({
     </div>
   );
 }
+
+export default memo(FilterBar);

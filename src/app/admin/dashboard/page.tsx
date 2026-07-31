@@ -9,6 +9,7 @@ import { useProject } from '@/lib/project-context';
 import { getDashboardData, DashboardData, getRefugeConfig } from '@/lib/supabase-data';
 import { computeHeatmapFromRollup, HeatmapData } from '@/lib/floor-rollup';
 import { ActivityStatus } from '@/lib/types';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 type DashboardView = 'heatmap' | 'table';
 
@@ -57,14 +58,11 @@ export default function DashboardPage() {
   }, [currentProject, refreshDashboard]);
 
   // Auto-refresh every 60 seconds
-  useEffect(() => {
-    if (!currentProject) return;
-    const interval = setInterval(() => {
-      refreshDashboard();
-      setTableRefreshKey(k => k + 1);
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [currentProject, refreshDashboard]);
+  const autoRefreshCb = useCallback(() => {
+    refreshDashboard();
+    setTableRefreshKey(k => k + 1);
+  }, [refreshDashboard]);
+  useAutoRefresh(autoRefreshCb, 60000, !!currentProject);
 
   // Build active filters for table query
   const activeFilters = useMemo(() => {

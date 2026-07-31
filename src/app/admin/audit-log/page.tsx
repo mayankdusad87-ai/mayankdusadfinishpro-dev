@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useProject } from '@/lib/project-context';
 import { getAuditLog, AuditLogRow } from '@/lib/supabase-data';
 import { STATUS_LABELS, DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import { formatTimestamp } from '@/lib/utils';
+import { useDataLoader } from '@/hooks/use-data-loader';
 
 const STATUS_COLORS: Record<string, string> = {
   not_started: 'bg-gray-100 text-gray-700',
@@ -16,27 +17,22 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function AuditLogPage() {
   const { currentProject } = useProject();
-  const [entries, setEntries] = useState<AuditLogRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
-  const loadAuditLog = useCallback(async () => {
-    if (!currentProject) return;
-    setLoading(true);
-    const filters: { startDate?: string; endDate?: string } = {};
-    if (dateFrom) filters.startDate = dateFrom;
-    if (dateTo) filters.endDate = dateTo;
-    const data = await getAuditLog(currentProject.id, filters);
-    setEntries(data);
-    setCurrentPage(1);
-    setLoading(false);
-  }, [currentProject, dateFrom, dateTo]);
-
-  useEffect(() => {
-    loadAuditLog();
-  }, [loadAuditLog]);
+  const { data: entries, loading } = useDataLoader(
+    async () => {
+      if (!currentProject) return [];
+      const filters: { startDate?: string; endDate?: string } = {};
+      if (dateFrom) filters.startDate = dateFrom;
+      if (dateTo) filters.endDate = dateTo;
+      setCurrentPage(1);
+      return getAuditLog(currentProject.id, filters);
+    },
+    [] as AuditLogRow[],
+    [currentProject, dateFrom, dateTo],
+  );
 
   const totalPages = Math.max(1, Math.ceil(entries.length / DEFAULT_PAGE_SIZE));
   const paginated = entries.slice((currentPage - 1) * DEFAULT_PAGE_SIZE, currentPage * DEFAULT_PAGE_SIZE);

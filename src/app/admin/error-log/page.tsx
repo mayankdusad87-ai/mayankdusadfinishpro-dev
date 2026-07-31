@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { getAppErrors, AppError } from '@/lib/supabase-data';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import { formatTimestamp } from '@/lib/utils';
+import { useDataLoader } from '@/hooks/use-data-loader';
 
 function parseContext(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
@@ -11,29 +12,24 @@ function parseContext(raw: string | null): Record<string, unknown> | null {
 }
 
 export default function ErrorLogPage() {
-  const [entries, setEntries] = useState<AppError[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [actionFilter, setActionFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const loadErrors = useCallback(async () => {
-    setLoading(true);
-    const filters: { startDate?: string; endDate?: string; action?: string } = {};
-    if (dateFrom) filters.startDate = dateFrom;
-    if (dateTo) filters.endDate = dateTo;
-    if (actionFilter) filters.action = actionFilter;
-    const data = await getAppErrors(filters);
-    setEntries(data);
-    setCurrentPage(1);
-    setLoading(false);
-  }, [dateFrom, dateTo, actionFilter]);
-
-  useEffect(() => {
-    loadErrors();
-  }, [loadErrors]);
+  const { data: entries, loading } = useDataLoader(
+    async () => {
+      const filters: { startDate?: string; endDate?: string; action?: string } = {};
+      if (dateFrom) filters.startDate = dateFrom;
+      if (dateTo) filters.endDate = dateTo;
+      if (actionFilter) filters.action = actionFilter;
+      setCurrentPage(1);
+      return getAppErrors(filters);
+    },
+    [] as AppError[],
+    [dateFrom, dateTo, actionFilter],
+  );
 
   const totalPages = Math.max(1, Math.ceil(entries.length / DEFAULT_PAGE_SIZE));
   const paginated = entries.slice((currentPage - 1) * DEFAULT_PAGE_SIZE, currentPage * DEFAULT_PAGE_SIZE);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import SupervisorModal, { SupervisorFormData } from '@/components/admin/SupervisorModal';
 import {
   getSupervisors,
@@ -9,6 +9,7 @@ import {
   resetUserPassword,
   assignSupervisorToProject,
 } from '@/lib/supabase-data';
+import { useDataLoader } from '@/hooks/use-data-loader';
 
 interface SupervisorRow {
   id: string;
@@ -21,8 +22,10 @@ interface SupervisorRow {
 }
 
 export default function SupervisorsPage() {
-  const [supervisors, setSupervisors] = useState<SupervisorRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: supervisors, loading, refresh: loadSupervisors } = useDataLoader(
+    () => getSupervisors(),
+    [] as SupervisorRow[],
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSupervisor, setEditingSupervisor] = useState<SupervisorRow | null>(null);
   const [saving, setSaving] = useState(false);
@@ -32,21 +35,6 @@ export default function SupervisorsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
-
-  const loadSupervisors = useCallback(async () => {
-    try {
-      const list = await getSupervisors();
-      setSupervisors(list);
-    } catch {
-      setError('Failed to load supervisors');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSupervisors();
-  }, [loadSupervisors]);
 
   function handleAdd() {
     setEditingSupervisor(null);

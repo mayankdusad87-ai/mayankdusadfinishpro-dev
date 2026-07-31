@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { UploadedActivity } from '@/lib/project-data-store';
 import { STATUS_CONFIG, normalizeStatus, daysOverdue, TODAY } from './supervisor-utils';
 
@@ -9,7 +10,7 @@ interface PriorityCardProps {
   onQuickAction: (action: 'start' | 'complete' | 'delay') => void;
 }
 
-export default function PriorityCard({ row, onDetail, onQuickAction }: PriorityCardProps) {
+function PriorityCard({ row, onDetail, onQuickAction }: PriorityCardProps) {
   const status = normalizeStatus(row.status);
   const sc = STATUS_CONFIG[status];
   const overdueDays = row.expected_end && row.expected_end < TODAY ? daysOverdue(row.expected_end) : 0;
@@ -77,3 +78,5 @@ export default function PriorityCard({ row, onDetail, onQuickAction }: PriorityC
     </div>
   );
 }
+
+export default memo(PriorityCard);

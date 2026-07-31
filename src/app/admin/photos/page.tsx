@@ -1,47 +1,50 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useProject } from '@/lib/project-context';
 import { getPhotosForProject, ActivityPhoto, getProjectDataFromSupabase } from '@/lib/supabase-data';
+import { useDataLoader } from '@/hooks/use-data-loader';
+
+interface ProjectMeta {
+  floors: number[];
+  stages: string[];
+  stageGates: Record<string, string[]>;
+}
+
+const EMPTY_META: ProjectMeta = { floors: [], stages: [], stageGates: {} };
 
 export default function PhotoReviewPage() {
   const { currentProject } = useProject();
-  const [photos, setPhotos] = useState<ActivityPhoto[]>([]);
-  const [loading, setLoading] = useState(true);
   const [floorFilter, setFloorFilter] = useState<number | ''>('');
   const [stageFilter, setStageFilter] = useState('');
   const [subStageFilter, setSubStageFilter] = useState('');
-  const [floors, setFloors] = useState<number[]>([]);
-  const [stages, setStages] = useState<string[]>([]);
-  const [stageGates, setStageGates] = useState<Record<string, string[]>>({});
   const [lightboxPhoto, setLightboxPhoto] = useState<ActivityPhoto | null>(null);
 
-  const loadPhotos = useCallback(async () => {
-    if (!currentProject) return;
-    setLoading(true);
-    const filters: { floor?: number; stage?: string; stageGate?: string } = {};
-    if (floorFilter) filters.floor = floorFilter;
-    if (stageFilter) filters.stage = stageFilter;
-    if (subStageFilter) filters.stageGate = subStageFilter;
-    const list = await getPhotosForProject(currentProject.id, filters);
-    setPhotos(list);
-    setLoading(false);
-  }, [currentProject, floorFilter, stageFilter, subStageFilter]);
+  const { data: photos, loading } = useDataLoader(
+    async () => {
+      if (!currentProject) return [];
+      const filters: { floor?: number; stage?: string; stageGate?: string } = {};
+      if (floorFilter) filters.floor = floorFilter;
+      if (stageFilter) filters.stage = stageFilter;
+      if (subStageFilter) filters.stageGate = subStageFilter;
+      return getPhotosForProject(currentProject.id, filters);
+    },
+    [] as ActivityPhoto[],
+    [currentProject, floorFilter, stageFilter, subStageFilter],
+  );
 
-  useEffect(() => {
-    if (!currentProject) return;
-    getProjectDataFromSupabase(currentProject.id).then(data => {
-      if (data) {
-        setFloors(data.floors);
-        setStages(data.stages);
-        setStageGates(data.stageGates);
-      }
-    });
-  }, [currentProject]);
+  const { data: projectMeta } = useDataLoader(
+    async () => {
+      if (!currentProject) return EMPTY_META;
+      const data = await getProjectDataFromSupabase(currentProject.id);
+      if (data) return { floors: data.floors, stages: data.stages, stageGates: data.stageGates };
+      return EMPTY_META;
+    },
+    EMPTY_META,
+    [currentProject],
+  );
 
-  useEffect(() => {
-    loadPhotos();
-  }, [loadPhotos]);
+  const { floors, stages, stageGates } = projectMeta;
 
   const subStageOptions = stageFilter ? (stageGates[stageFilter] || []) : [];
 

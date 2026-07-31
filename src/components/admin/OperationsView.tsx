@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import type { OperationsData } from '@/lib/insights-data';
 
 interface Props {
@@ -12,7 +13,7 @@ function ratingStyle(rating: 'Good' | 'Fair' | 'Poor') {
   return 'bg-red-50 text-red-700 border-red-200';
 }
 
-export default function OperationsView({ data }: Props) {
+function OperationsView({ data }: Props) {
   const { vendors, delayReasons, bottlenecks } = data;
   const maxReasonCount = delayReasons.length > 0 ? delayReasons[0].count : 1;
 
@@ -260,3 +261,5 @@ export default function OperationsView({ data }: Props) {
     </div>
   );
 }
+
+export default memo(OperationsView);

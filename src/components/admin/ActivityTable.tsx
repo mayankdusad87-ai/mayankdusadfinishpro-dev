@@ -13,6 +13,7 @@ import { ADMIN_STATUS_OPTIONS, DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import { normalizeToBaseStatus, formatDate, todayISO } from '@/lib/utils';
 import { updateActivityStatus, updateActivityField, bulkUpdateField } from '@/services/activity-service';
 import { exportToExcel, exportToPDF } from '@/services/export-service';
+import { useToast } from '@/hooks/use-toast';
 
 interface EditingCell {
   rowId: string;
@@ -41,7 +42,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
+  const { toast, showToast } = useToast();
 
   // Bulk action modals
   const [showVendorModal, setShowVendorModal] = useState(false);
@@ -90,12 +91,6 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     return () => { cancelled = true; clearTimeout(timer); };
   }, [projectId, activeFilters, currentPage, refreshKey]);
 
-  // Auto-dismiss toast
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 4000);
-    return () => clearTimeout(t);
-  }, [toast]);
 
   const totalPages = Math.max(1, Math.ceil(tableTotal / DEFAULT_PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
@@ -155,24 +150,24 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
       const result = await updateActivityStatus(row, val, projectId, projectName);
 
       if (result.error) {
-        setToast({ message: result.error, type: 'error' });
+        showToast(result.error, 'error');
       } else {
         setTableRows(prev => prev.map(r =>
           (r.id) === editingCell.rowId
             ? { ...r, ...result.updates }
             : r
         ));
-        setToast({ message: 'Status updated.', type: 'success' });
+        showToast('Status updated.', 'success');
       }
     } else {
       const result = await updateActivityField(row.id, field, val);
       if (result.error) {
-        setToast({ message: result.error, type: 'error' });
+        showToast(result.error, 'error');
       } else {
         setTableRows(prev => prev.map(r =>
           (r.id) === editingCell.rowId ? { ...r, [field]: val } : r
         ));
-        setToast({ message: 'Updated.', type: 'success' });
+        showToast('Updated.', 'success');
       }
     }
 
@@ -185,12 +180,12 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setBulkSaving(true);
     const result = await bulkUpdateField([...selectedRows], { vendor: bulkVendor.trim() });
     if (result.error) {
-      setToast({ message: result.error, type: 'error' });
+      showToast(result.error, 'error');
     } else {
       setTableRows(prev => prev.map(r =>
         selectedRows.has(r.id) ? { ...r, vendor: bulkVendor.trim() } : r
       ));
-      setToast({ message: `Vendor updated for ${selectedRows.size} activities.`, type: 'success' });
+      showToast(`Vendor updated for ${selectedRows.size} activities.`, 'success');
       setSelectedRows(new Set());
     }
     setBulkSaving(false);
@@ -210,12 +205,12 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setBulkSaving(true);
     const result = await bulkUpdateField([...selectedRows], updates);
     if (result.error) {
-      setToast({ message: result.error, type: 'error' });
+      showToast(result.error, 'error');
     } else {
       setTableRows(prev => prev.map(r =>
         selectedRows.has(r.id) ? { ...r, ...updates } : r
       ));
-      setToast({ message: `Dates updated for ${selectedRows.size} activities.`, type: 'success' });
+      showToast(`Dates updated for ${selectedRows.size} activities.`, 'success');
       setSelectedRows(new Set());
     }
     setBulkSaving(false);
@@ -230,9 +225,9 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setExporting(true);
     try {
       const { count } = await exportToExcel(projectId, projectName, activeFilters);
-      setToast({ message: `Exported ${count} activities to Excel.`, type: 'success' });
+      showToast(`Exported ${count} activities to Excel.`, 'success');
     } catch {
-      setToast({ message: 'Export failed.', type: 'error' });
+      showToast('Export failed.', 'error');
     }
     setExporting(false);
     setShowExportMenu(false);
@@ -242,9 +237,9 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setExporting(true);
     try {
       const { count } = await exportToPDF(projectId, projectName, activeFilters);
-      setToast({ message: `Exported ${count} activities to PDF.`, type: 'success' });
+      showToast(`Exported ${count} activities to PDF.`, 'success');
     } catch {
-      setToast({ message: 'PDF export failed.', type: 'error' });
+      showToast('PDF export failed.', 'error');
     }
     setExporting(false);
     setShowExportMenu(false);
