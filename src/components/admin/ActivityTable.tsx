@@ -6,17 +6,13 @@ import Modal from '@/components/shared/Modal';
 import {
   getActivitiesPage,
   getCriticalDelays,
-  updateActivityWithAudit,
-  bulkUpdateActivities,
-  getPhotoCount,
-  getAllFilteredActivities,
-  getAdminEmails,
 } from '@/lib/supabase-data';
-import { supabase } from '@/lib/supabase';
 import type { ActivityRow, ActivityUpdate } from '@/types/database.types';
 import type { ActivityStatus } from '@/lib/types';
 import { ADMIN_STATUS_OPTIONS, DEFAULT_PAGE_SIZE } from '@/lib/constants';
-import { normalizeToBaseStatus, formatDate, todayISO, isStatusReversal } from '@/lib/utils';
+import { normalizeToBaseStatus, formatDate, todayISO } from '@/lib/utils';
+import { updateActivityStatus, updateActivityField, bulkUpdateField } from '@/services/activity-service';
+import { exportToExcel, exportToPDF } from '@/services/export-service';
 
 interface EditingCell {
   rowId: string;
@@ -143,37 +139,6 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   }, []);
 
   // Get current user ID
-  async function getCurrentUserId(): Promise<string> {
-    const { data } = await supabase.auth.getUser();
-    return data?.user?.id || '';
-  }
-
-  // Send reversal notification email
-  async function notifyReversal(row: ActivityRow, oldStatus: string, newStatus: string) {
-    try {
-      const adminEmails = await getAdminEmails();
-      if (adminEmails.length === 0) return;
-      await fetch('/api/admin/notify-reversal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminEmails,
-          projectName,
-          floor: row.floor,
-          flatNumber: row.flat_number,
-          activity: row.activity,
-          stage: row.stage,
-          stageGate: row.stage_gate,
-          oldStatus,
-          newStatus,
-        }),
-      });
-    } catch {
-      // Email notification is best-effort
-    }
-  }
-
-  // Save inline edit
   const saveEdit = useCallback(async (valueOverride?: string) => {
     if (!editingCell || saving) return;
     const row = tableRows.find(r => (r.id) === editingCell.rowId);
@@ -185,70 +150,24 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     if (val === oldValue) { setEditingCell(null); return; }
 
     setSaving(true);
-    const userId = await getCurrentUserId();
 
     if (field === 'status') {
-      const oldStatus = row.status || 'not_started';
-      const expectedEnd = row.expected_end;
-      const overdue = expectedEnd ? expectedEnd < todayISO() : false;
-
-      // Photo check for completion
-      if (val === 'completed') {
-        const count = await getPhotoCount(row.id);
-        if (count === 0) {
-          setToast({ message: 'At least one photo is required before marking as completed.', type: 'error' });
-          setSaving(false);
-          setEditingCell(null);
-          return;
-        }
-      }
-
-      // Auto-detect delayed status
-      let newStatus = val;
-      if (val === 'in_progress' && overdue) newStatus = 'in_progress_delayed';
-      else if (val === 'not_started' && overdue) newStatus = 'delayed';
-      else if (val === 'completed' && overdue) newStatus = 'completed_delayed';
-
-      const updates: ActivityUpdate = { status: newStatus };
-      if (val === 'completed') {
-        updates.actual_end = todayISO();
-      }
-
-      const result = await updateActivityWithAudit(row.id, updates, {
-        projectId,
-        changedBy: userId,
-        oldStatus,
-        newStatus,
-        floor: row.floor,
-        flatNumber: row.flat_number,
-        stage: row.stage,
-        stageGate: row.stage_gate || '',
-        activityName: row.activity,
-      });
+      const result = await updateActivityStatus(row, val, projectId, projectName);
 
       if (result.error) {
         setToast({ message: result.error, type: 'error' });
       } else {
         setTableRows(prev => prev.map(r =>
           (r.id) === editingCell.rowId
-            ? { ...r, status: newStatus, ...(newStatus === 'completed' ? { actual_end: todayISO() } : {}) }
+            ? { ...r, ...result.updates }
             : r
         ));
         setToast({ message: 'Status updated.', type: 'success' });
-
-        if (isStatusReversal(oldStatus, newStatus)) {
-          notifyReversal(row, oldStatus, newStatus);
-        }
       }
     } else {
-      const updates = { [field]: val } as ActivityUpdate;
-      const { error } = await supabase.from('activities').update(updates).eq('id', row.id);
-      if (error) {
-        const msg = error.message.toLowerCase().includes('row level security')
-          ? 'Permission denied: unable to update this field. Please contact admin.'
-          : 'Something went wrong while updating. Please try again.';
-        console.error('[update activity field]', error.message);
-        setToast({ message: msg, type: 'error' });
+      const result = await updateActivityField(row.id, field, val);
+      if (result.error) {
+        setToast({ message: result.error, type: 'error' });
       } else {
         setTableRows(prev => prev.map(r =>
           (r.id) === editingCell.rowId ? { ...r, [field]: val } : r
@@ -261,11 +180,10 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setEditingCell(null);
   }, [editingCell, editValue, saving, tableRows, projectId, projectName]);
 
-  // Bulk: Reassign Vendor
   async function handleBulkVendor() {
     if (!bulkVendor.trim() || selectedRows.size === 0) return;
     setBulkSaving(true);
-    const result = await bulkUpdateActivities([...selectedRows], { vendor: bulkVendor.trim() });
+    const result = await bulkUpdateField([...selectedRows], { vendor: bulkVendor.trim() });
     if (result.error) {
       setToast({ message: result.error, type: 'error' });
     } else {
@@ -280,7 +198,6 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setBulkVendor('');
   }
 
-  // Bulk: Update Expected Dates
   async function handleBulkDates() {
     if (selectedRows.size === 0) return;
     const updates: ActivityUpdate = {};
@@ -291,7 +208,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     if (Object.keys(updates).length === 0) return;
 
     setBulkSaving(true);
-    const result = await bulkUpdateActivities([...selectedRows], updates);
+    const result = await bulkUpdateField([...selectedRows], updates);
     if (result.error) {
       setToast({ message: result.error, type: 'error' });
     } else {
@@ -309,29 +226,11 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setBulkRevEnd('');
   }
 
-  // Export: Excel
   async function exportExcel() {
     setExporting(true);
     try {
-      const [XLSX, rows] = await Promise.all([
-        import('xlsx'),
-        getAllFilteredActivities(projectId, activeFilters),
-      ]);
-      const wsData = [
-        ['Floor', 'Flat No.', 'Config', 'Stage', 'Stage Gate', 'Activity', 'Vendor', 'Exp. Start', 'Exp. End', 'Rev. Start', 'Rev. End', 'Act. Start', 'Act. End', 'Status', 'Delay Days', 'Delay Reason', 'Remarks'],
-        ...rows.map(r => [
-          r.floor, r.flat_number, r.configuration || '', r.stage, r.stage_gate || '', r.activity,
-          r.vendor || '', formatDate(r.expected_start), formatDate(r.expected_end),
-          formatDate(r.revised_start), formatDate(r.revised_end),
-          formatDate(r.actual_start), formatDate(r.actual_end),
-          r.status, r.delay_days || 0, r.delay_reason || '', r.remarks || '',
-        ]),
-      ];
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Activities');
-      XLSX.writeFile(wb, `${projectName}_Activities_${todayISO()}.xlsx`);
-      setToast({ message: `Exported ${rows.length} activities to Excel.`, type: 'success' });
+      const { count } = await exportToExcel(projectId, projectName, activeFilters);
+      setToast({ message: `Exported ${count} activities to Excel.`, type: 'success' });
     } catch {
       setToast({ message: 'Export failed.', type: 'error' });
     }
@@ -339,34 +238,11 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setShowExportMenu(false);
   }
 
-  // Export: PDF
   async function exportPDF() {
     setExporting(true);
     try {
-      const { default: jsPDF } = await import('jspdf');
-      const { default: autoTable } = await import('jspdf-autotable');
-      const rows = await getAllFilteredActivities(projectId, activeFilters);
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      doc.setFontSize(14);
-      doc.text(`${projectName} — Activity Report`, 14, 15);
-      doc.setFontSize(9);
-      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 21);
-
-      autoTable(doc, {
-        startY: 26,
-        head: [['Floor', 'Flat', 'Stage', 'Stage Gate', 'Activity', 'Vendor', 'Exp Start', 'Exp End', 'Rev Start', 'Rev End', 'Status', 'Delay']],
-        body: rows.map(r => [
-          String(r.floor ?? ''), String(r.flat_number ?? ''), String(r.stage ?? ''), String(r.stage_gate || ''), String(r.activity ?? ''),
-          String(r.vendor || ''), formatDate(r.expected_start), formatDate(r.expected_end),
-          formatDate(r.revised_start), formatDate(r.revised_end),
-          String(r.status ?? ''), (r.delay_days ?? 0) > 0 ? `${r.delay_days}d` : '',
-        ]),
-        styles: { fontSize: 7, cellPadding: 1.5 },
-        headStyles: { fillColor: [230, 126, 34], fontSize: 7 },
-      });
-
-      doc.save(`${projectName}_Activities_${todayISO()}.pdf`);
-      setToast({ message: `Exported ${rows.length} activities to PDF.`, type: 'success' });
+      const { count } = await exportToPDF(projectId, projectName, activeFilters);
+      setToast({ message: `Exported ${count} activities to PDF.`, type: 'success' });
     } catch {
       setToast({ message: 'PDF export failed.', type: 'error' });
     }

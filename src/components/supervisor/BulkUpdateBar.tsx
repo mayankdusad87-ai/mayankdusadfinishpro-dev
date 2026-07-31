@@ -1,9 +1,8 @@
 'use client';
 
 import { UploadedActivity } from '@/lib/project-data-store';
-import { updateActivityWithAudit } from '@/lib/supabase-data';
+import { bulkUpdateStatus } from '@/services/activity-service';
 import { normalizeStatus, TODAY, PriorityView } from './supervisor-utils';
-import type { ActivityUpdate } from '@/types/database.types';
 
 interface BulkUpdateBarProps {
   activeView: PriorityView;
@@ -33,28 +32,22 @@ export default function BulkUpdateBar({
   if (activeView !== 'floor' && !(activeView === 'all' && stageFilter)) return null;
 
   async function handleBulkAction(newStatus: 'in_progress' | 'completed') {
-    for (const id of selectedIds) {
-      const row = allActivities.find(r => r.id === id);
-      if (!row || normalizeStatus(row.status) === 'completed') continue;
-      const updates: ActivityUpdate = { status: newStatus };
-      if (newStatus === 'in_progress') {
-        updates.actual_start = TODAY;
-      } else {
-        updates.actual_end = TODAY;
-        if (!row.actual_start) updates.actual_start = TODAY;
-      }
-      await updateActivityWithAudit(id, updates, {
-        projectId,
-        changedBy: userId,
-        oldStatus: row.status,
-        newStatus,
-        floor: row.floor,
-        flatNumber: row.flat_number,
-        stage: row.stage,
-        stageGate: row.stage_gate,
-        activityName: row.activity,
-      });
-    }
+    await bulkUpdateStatus(
+      [...selectedIds],
+      allActivities.map(a => ({
+        id: a.id,
+        status: a.status,
+        actual_start: a.actual_start || null,
+        floor: a.floor,
+        flat_number: a.flat_number,
+        stage: a.stage,
+        stage_gate: a.stage_gate,
+        activity: a.activity,
+      })),
+      newStatus,
+      projectId,
+      userId,
+    );
     onBulkComplete();
   }
 

@@ -25,8 +25,9 @@ export {
   getPhotoCount,
   getAdminEmails,
   getDashboardData,
+  getInsightActivities,
 } from './activity-repo';
-export type { ActivitiesPage, SubstageRollup, DashboardData } from './activity-repo';
+export type { ActivitiesPage, SubstageRollup, DashboardData, InsightRow } from './activity-repo';
 
 export {
   uploadActivityPhoto,

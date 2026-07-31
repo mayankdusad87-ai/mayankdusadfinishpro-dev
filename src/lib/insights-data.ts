@@ -1,6 +1,7 @@
-import { supabase } from './supabase';
 import type { HeatmapData } from './floor-rollup';
 import { todayISO } from '@/lib/utils';
+import { getInsightActivities } from '@/repositories/activity-repo';
+import type { InsightRow } from '@/repositories/activity-repo';
 
 const PIPELINE_STAGES = [
   'Pre-Tiling',
@@ -100,41 +101,6 @@ export interface OperationsData {
   vendors: VendorScore[];
   delayReasons: DelayReason[];
   bottlenecks: FloorBottleneck[];
-}
-
-// ---- Lightweight activity row (only fields we need) ----
-
-interface InsightRow {
-  floor: number;
-  flat_number: number;
-  stage: string;
-  status: string;
-  expected_end: string;
-  actual_start: string;
-  actual_end: string;
-  vendor: string;
-  delay_reason: string;
-}
-
-// ---- Fetch ----
-
-async function fetchInsightRows(projectId: string): Promise<InsightRow[]> {
-  const all: InsightRow[] = [];
-  let from = 0;
-  const PAGE = 1000;
-  while (true) {
-    const { data, error } = await supabase
-      .from('activities')
-      .select('floor, flat_number, stage, status, expected_end, actual_start, actual_end, vendor, delay_reason')
-      .eq('project_id', projectId)
-      .neq('status', 'not_applicable')
-      .range(from, from + PAGE - 1);
-    if (error || !data || data.length === 0) break;
-    all.push(...(data as InsightRow[]));
-    if (data.length < PAGE) break;
-    from += PAGE;
-  }
-  return all;
 }
 
 // ---- SPI helper ----
@@ -450,7 +416,7 @@ export async function getInsightsData(
   projectId: string,
   heatmap: HeatmapData
 ): Promise<{ management: ManagementData; operations: OperationsData } | null> {
-  const rows = await fetchInsightRows(projectId);
+  const rows = await getInsightActivities(projectId);
   if (rows.length === 0) return null;
   return {
     management: computeManagement(rows, heatmap),

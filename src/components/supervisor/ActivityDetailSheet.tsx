@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { UploadedActivity } from '@/lib/project-data-store';
-import { Reason, uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto, updateActivityWithAudit, getAdminEmails } from '@/lib/supabase-data';
+import { uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivityPhoto } from '@/lib/supabase-data';
+import type { Reason } from '@/lib/supabase-data';
+import { saveActivityDetail } from '@/services/activity-service';
 import { compressImage, generatePhotoPath } from '@/lib/image-compress';
-import { normalizeStatus, daysOverdue, TODAY, SUPERVISOR_STATUS_OPTIONS, resolveStatus, isDelayReasonRequired } from './supervisor-utils';
+import { normalizeStatus, daysOverdue, TODAY, SUPERVISOR_STATUS_OPTIONS, isDelayReasonRequired } from './supervisor-utils';
 
 interface ActivityDetailSheetProps {
   activity: UploadedActivity;
@@ -102,88 +104,30 @@ export default function ActivityDetailSheet({
   async function saveDetail() {
     setDetailError('');
 
-    if (detailActualStart && detailActualStart > TODAY) {
-      setDetailError('Actual start date cannot be a future date.');
-      return;
-    }
-    if (detailActualEnd && detailActualStart && detailActualEnd < detailActualStart) {
-      setDetailError('Actual end date cannot be earlier than actual start date.');
-      return;
-    }
-    const needsReason = isDelayReasonRequired(detailStatus, activity.expected_end);
-    if (needsReason && !detailReason) {
-      const label = detailStatus === 'on_hold' ? 'On Hold' : 'overdue';
-      setDetailError(`Delay reason is mandatory for ${label} activities.`);
-      return;
-    }
-    if (detailReason === '__other__' && !detailRemarks.trim()) {
-      setDetailError('Please provide remarks when selecting "Other" as reason.');
-      return;
-    }
-    if (detailStatus === 'completed' && detailPhotos.length === 0) {
-      setDetailError('At least one photo is required before marking as completed.');
-      return;
-    }
-
-    const actualStart = detailStatus === 'completed' && !detailActualStart ? TODAY : detailActualStart;
-    const actualEnd = detailStatus === 'completed' && !detailActualEnd ? TODAY : detailActualEnd;
-    const reasonValue = detailReason === '__other__' ? detailRemarks.trim() : detailReason;
-
-    const resolvedStatus = resolveStatus(detailStatus, activity.expected_end);
-    const oldStatus = activity.status;
-    const statusChanged = oldStatus !== resolvedStatus;
-
-    const result = await updateActivityWithAudit(
-      activity.id,
-      {
-        status: resolvedStatus,
-        actual_start: actualStart,
-        actual_end: actualEnd,
-        delay_reason: reasonValue,
-        remarks: detailReason === '__other__' ? detailRemarks.trim() : '',
-      },
-      {
-        projectId,
-        changedBy: userId,
-        oldStatus: statusChanged ? oldStatus : undefined,
-        newStatus: statusChanged ? resolvedStatus : undefined,
-        floor: activity.floor,
-        flatNumber: activity.flat_number,
-        stage: activity.stage,
-        stageGate: activity.stage_gate,
-        activityName: activity.activity,
-      }
-    );
+    const result = await saveActivityDetail({
+      activityId: activity.id,
+      status: detailStatus,
+      expectedEnd: activity.expected_end || null,
+      oldStatus: activity.status,
+      actualStart: detailActualStart,
+      actualEnd: detailActualEnd,
+      delayReason: detailReason,
+      delayReasonIsOther: detailReason === '__other__',
+      remarks: detailRemarks,
+      photoCount: detailPhotos.length,
+      projectId,
+      projectName,
+      userId,
+      floor: activity.floor,
+      flatNumber: activity.flat_number,
+      stage: activity.stage,
+      stageGate: activity.stage_gate,
+      activityName: activity.activity,
+    });
 
     if (result.error) {
       setDetailError(result.error);
       return;
-    }
-
-    if (statusChanged) {
-      const RANK: Record<string, number> = { not_started: 0, in_progress: 1, in_progress_delayed: 1, completed: 2, completed_delayed: 2, on_hold: -1 };
-      const oldRank = RANK[oldStatus] ?? 0;
-      const newRank = RANK[resolvedStatus] ?? 0;
-      if (oldRank > newRank && oldRank !== -1 && newRank !== -1) {
-        getAdminEmails().then(emails => {
-          if (emails.length === 0) return;
-          fetch('/api/admin/notify-reversal', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              adminEmails: emails,
-              projectName,
-              floor: activity.floor,
-              flatNumber: activity.flat_number,
-              activity: activity.activity,
-              stage: activity.stage,
-              stageGate: activity.stage_gate,
-              oldStatus,
-              newStatus: resolvedStatus,
-            }),
-          }).catch(() => {});
-        });
-      }
     }
 
     onSaved();

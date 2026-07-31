@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
-import { getProjectsFromSupabase, getProjectDataFromSupabase, getActiveReasons, Reason, updateActivityWithAudit, getSupervisorAssignments } from '@/lib/supabase-data';
+import { getProjectsFromSupabase, getProjectDataFromSupabase, getActiveReasons, getSupervisorAssignments, updateActivityWithAudit } from '@/lib/supabase-data';
+import type { Reason } from '@/lib/supabase-data';
 import type { ActivityUpdate } from '@/types/database.types';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';

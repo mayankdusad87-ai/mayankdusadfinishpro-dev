@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { parseExcelFile, ProjectData, UploadedActivity } from '@/lib/project-data-store';
 import { useProject } from '@/lib/project-context';
-import { saveProjectToSupabase, saveActivitiesToSupabase, getProjectDataFromSupabase, updateActivityInSupabase, recordUpload } from '@/lib/supabase-data';
+import { getProjectDataFromSupabase, updateActivityInSupabase } from '@/lib/supabase-data';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { uploadTemplate, clearTemplate, countModifiedActivities } from '@/services/project-service';
 
 type UploadStep = 'pick' | 'preview' | 'saved';
 
@@ -77,12 +77,7 @@ export default function UploadPage() {
     setUploading(true);
     setError('');
     try {
-      await supabase.auth.refreshSession();
-      await saveActivitiesToSupabase(currentProject.id, previewData.activities);
-      await saveProjectToSupabase({ ...currentProject, hasTemplate: true });
-      if (user) {
-        await recordUpload(currentProject.id, previewData.fileName, previewData.totalRows, user.id);
-      }
+      await uploadTemplate(currentProject, previewData.activities, previewData.fileName, previewData.totalRows, user?.id || '');
       await refreshProjects();
       setProjectData(previewData);
       setPreviewData(null);
@@ -104,19 +99,16 @@ export default function UploadPage() {
   async function handleClear() {
     if (!currentProject || !projectData) return;
 
-    const modified = projectData.activities.filter(
-      a => a.status !== 'not_started' || a.actual_start || a.actual_end
-    );
+    const modifiedCount = countModifiedActivities(projectData.activities);
 
     let msg = `This will remove the uploaded template for "${currentProject.name}". Are you sure?`;
-    if (modified.length > 0) {
-      msg = `WARNING: ${modified.length} activities have been updated by supervisors (status changes, actual dates). Deleting will lose those changes.\n\nAre you sure you want to delete?`;
+    if (modifiedCount > 0) {
+      msg = `WARNING: ${modifiedCount} activities have been updated by supervisors (status changes, actual dates). Deleting will lose those changes.\n\nAre you sure you want to delete?`;
     }
     if (!confirm(msg)) return;
 
     try {
-      await saveActivitiesToSupabase(currentProject.id, []);
-      await saveProjectToSupabase({ ...currentProject, hasTemplate: false });
+      await clearTemplate(currentProject);
       await refreshProjects();
       setProjectData(null);
       setStep('pick');
