@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { ManagedProject } from './project-store';
 import type { UploadedActivity, ProjectData } from './project-data-store';
+import type { ActivityRow, ActivityUpdate, ProjectRow, AuditLogRow as AuditLogDbRow, ActivityPhotoRow, AppErrorRow, ReasonRow } from '@/types/database.types';
 
 function logAppError(action: string, rawError: string, userFriendly: string, extra?: Record<string, unknown>) {
   console.error(`[${action}]`, rawError);
@@ -40,19 +41,9 @@ function friendlyError(raw: string, context: string, extra?: Record<string, unkn
 
 // ---- Error Log ----
 
-export interface AppError {
-  id: string;
-  created_at: string;
-  user_id: string | null;
-  user_email: string | null;
-  action: string;
-  raw_error: string;
-  friendly_message: string;
-  context: string | null;
-  page_url: string | null;
-}
+export type { AppErrorRow as AppError };
 
-export async function getAppErrors(filters?: { startDate?: string; endDate?: string; action?: string }): Promise<AppError[]> {
+export async function getAppErrors(filters?: { startDate?: string; endDate?: string; action?: string }): Promise<AppErrorRow[]> {
   let query = supabase
     .from('app_errors')
     .select('*')
@@ -78,16 +69,20 @@ export async function getProjectsFromSupabase(): Promise<ManagedProject[]> {
 
   if (error) throw error;
 
-  return (data || []).map(row => ({
+  return (data || []).map(projectRowToManaged);
+}
+
+function projectRowToManaged(row: Pick<ProjectRow, 'id' | 'name' | 'location' | 'status' | 'total_floors' | 'total_flats' | 'created_at' | 'has_template'>): ManagedProject {
+  return {
     id: row.id,
     name: row.name,
     location: row.location,
-    status: row.status as 'active' | 'completed' | 'on_hold',
-    totalFloors: row.total_floors,
-    totalFlats: row.total_flats,
-    createdAt: row.created_at,
-    hasTemplate: row.has_template,
-  }));
+    status: (row.status || 'active') as 'active' | 'completed' | 'on_hold',
+    totalFloors: row.total_floors ?? 0,
+    totalFlats: row.total_flats ?? 0,
+    createdAt: row.created_at ?? '',
+    hasTemplate: row.has_template ?? false,
+  };
 }
 
 export async function getProjectFromSupabase(id: string): Promise<ManagedProject | null> {
@@ -98,35 +93,24 @@ export async function getProjectFromSupabase(id: string): Promise<ManagedProject
     .single();
 
   if (error) return null;
-
-  return {
-    id: data.id,
-    name: data.name,
-    location: data.location,
-    status: data.status as 'active' | 'completed' | 'on_hold',
-    totalFloors: data.total_floors,
-    totalFlats: data.total_flats,
-    createdAt: data.created_at,
-    hasTemplate: data.has_template,
-  };
+  return projectRowToManaged(data);
 }
 
 export async function saveProjectToSupabase(project: ManagedProject, createdBy?: string): Promise<string> {
   const isNew = project.id.startsWith('proj_');
-  const row: Record<string, unknown> = {
-    name: project.name,
-    location: project.location,
-    status: project.status,
-    total_floors: project.totalFloors,
-    total_flats: project.totalFlats,
-    has_template: project.hasTemplate,
-  };
 
   if (isNew) {
-    if (createdBy) row.created_by = createdBy;
     const { data, error } = await supabase
       .from('projects')
-      .insert(row)
+      .insert({
+        name: project.name,
+        location: project.location,
+        status: project.status,
+        total_floors: project.totalFloors,
+        total_flats: project.totalFlats,
+        has_template: project.hasTemplate,
+        created_by: createdBy ?? null,
+      })
       .select('id')
       .single();
     if (error) throw error;
@@ -134,7 +118,14 @@ export async function saveProjectToSupabase(project: ManagedProject, createdBy?:
   } else {
     const { error } = await supabase
       .from('projects')
-      .update(row)
+      .update({
+        name: project.name,
+        location: project.location,
+        status: project.status,
+        total_floors: project.totalFloors,
+        total_flats: project.totalFlats,
+        has_template: project.hasTemplate,
+      })
       .eq('id', project.id);
     if (error) throw error;
     return project.id;
@@ -148,9 +139,40 @@ export async function deleteProjectFromSupabase(id: string): Promise<void> {
 
 // ---- Activities ----
 
+function activityRowToUploaded(row: ActivityRow): UploadedActivity {
+  return {
+    id: row.id,
+    series: row.series || '',
+    floor: row.floor,
+    flat_number: row.flat_number,
+    configuration: row.configuration || '',
+    stage: row.stage,
+    stage_gate: row.stage_gate || '',
+    activity: row.activity,
+    vendor: row.vendor || '',
+    applicable: row.applicable ?? true,
+    expected_start: row.expected_start || '',
+    expected_end: row.expected_end || '',
+    actual_start: row.actual_start || '',
+    actual_end: row.actual_end || '',
+    status: row.status || 'not_started',
+    delay_days: row.delay_days || 0,
+    delay_reason: row.delay_reason || '',
+    remarks: row.remarks || '',
+    rooms: (row.rooms as Record<string, string>) || {},
+    sort_order: row.sort_order || 0,
+    sub_stage_status: row.sub_stage_status || '',
+    flat_status: row.flat_status || '',
+    floor_status: row.floor_status || '',
+    risk_status: row.risk_status || '',
+    revised_start: row.revised_start || '',
+    revised_end: row.revised_end || '',
+  };
+}
+
 export async function getActivitiesFromSupabase(projectId: string): Promise<UploadedActivity[]> {
   const PAGE = 1000;
-  const allRows: Record<string, unknown>[] = [];
+  const allRows: ActivityRow[] = [];
   let from = 0;
 
   while (true) {
@@ -168,34 +190,7 @@ export async function getActivitiesFromSupabase(projectId: string): Promise<Uplo
     from += PAGE;
   }
 
-  return allRows.map(row => ({
-    id: row.id as string,
-    series: (row.series as string) || '',
-    floor: row.floor as number,
-    flat_number: row.flat_number as number,
-    configuration: (row.configuration as string) || '',
-    stage: row.stage as string,
-    stage_gate: (row.stage_gate as string) || '',
-    activity: row.activity as string,
-    vendor: (row.vendor as string) || '',
-    applicable: (row.applicable as boolean) ?? true,
-    expected_start: (row.expected_start as string) || '',
-    expected_end: (row.expected_end as string) || '',
-    actual_start: (row.actual_start as string) || '',
-    actual_end: (row.actual_end as string) || '',
-    status: (row.status as string) || 'not_started',
-    delay_days: (row.delay_days as number) || 0,
-    delay_reason: (row.delay_reason as string) || '',
-    remarks: (row.remarks as string) || '',
-    rooms: (row.rooms as Record<string, string>) || {},
-    sort_order: (row.sort_order as number) || 0,
-    sub_stage_status: (row.sub_stage_status as string) || '',
-    flat_status: (row.flat_status as string) || '',
-    floor_status: (row.floor_status as string) || '',
-    risk_status: (row.risk_status as string) || '',
-    revised_start: (row.revised_start as string) || '',
-    revised_end: (row.revised_end as string) || '',
-  }));
+  return allRows.map(activityRowToUploaded);
 }
 
 export async function saveActivitiesToSupabase(
@@ -247,7 +242,7 @@ export async function updateActivityInSupabase(
   activityId: string,
   updates: Partial<UploadedActivity>
 ): Promise<void> {
-  const row: Record<string, unknown> = {};
+  const row: ActivityUpdate = {};
   if (updates.status !== undefined) row.status = updates.status;
   if (updates.actual_start !== undefined) row.actual_start = updates.actual_start;
   if (updates.actual_end !== undefined) row.actual_end = updates.actual_end;
@@ -395,7 +390,7 @@ export async function getSupervisors(): Promise<Array<{
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return (data || []).map((row: Record<string, unknown>) => {
+  return (data || []).map((row) => {
     const assignments = (row.supervisor_assignments as Array<{
       project_id: string;
       assigned_floors: number[];
@@ -403,11 +398,11 @@ export async function getSupervisors(): Promise<Array<{
     }>) || [];
     const first = assignments[0];
     return {
-      id: row.id as string,
-      full_name: row.full_name as string,
-      email: row.email as string | null,
-      phone: row.phone as string | null,
-      is_active: row.is_active as boolean,
+      id: row.id,
+      full_name: row.full_name,
+      email: row.email,
+      phone: row.phone,
+      is_active: row.is_active ?? true,
       project_name: first?.projects ? `${first.projects.name} — ${first.projects.location}` : null,
       assigned_floors: first?.assigned_floors || [],
     };
@@ -420,7 +415,10 @@ export async function getSupervisorAssignments(supervisorId: string): Promise<Ar
     .select('project_id, assigned_floors')
     .eq('supervisor_id', supervisorId);
   if (error || !data) return [];
-  return data;
+  return data.map(d => ({
+    project_id: d.project_id || '',
+    assigned_floors: d.assigned_floors || [],
+  }));
 }
 
 export async function assignSupervisorToProject(
@@ -438,17 +436,12 @@ export async function assignSupervisorToProject(
 
 // ---- Reasons management ----
 
-export interface Reason {
-  id: string;
-  label: string;
-  is_active: boolean;
-  sort_order: number;
-}
+export type Reason = ReasonRow;
 
 export async function getReasons(): Promise<Reason[]> {
   const { data, error } = await supabase
     .from('reasons')
-    .select('id, label, is_active, sort_order')
+    .select('*')
     .order('sort_order', { ascending: true });
   if (error) throw error;
   return data || [];
@@ -457,7 +450,7 @@ export async function getReasons(): Promise<Reason[]> {
 export async function getActiveReasons(): Promise<Reason[]> {
   const { data, error } = await supabase
     .from('reasons')
-    .select('id, label, is_active, sort_order')
+    .select('*')
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
   if (error) throw error;
@@ -484,22 +477,7 @@ export async function deleteReason(id: string): Promise<{ error: string | null }
 
 // ---- Activity Photos ----
 
-export interface ActivityPhoto {
-  id: string;
-  activity_id: string;
-  project_id: string;
-  storage_path: string;
-  file_name: string;
-  file_size: number;
-  uploaded_by: string | null;
-  floor: number | null;
-  stage: string | null;
-  stage_gate: string | null;
-  activity_name: string | null;
-  flat_number: number | null;
-  created_at: string;
-  url?: string;
-}
+export type ActivityPhoto = ActivityPhotoRow & { url?: string };
 
 const PHOTO_BUCKET = 'activity-photos';
 const MAX_PHOTOS_PER_ACTIVITY = 3;
@@ -630,23 +608,11 @@ export async function deleteActivityPhoto(photoId: string, storagePath: string):
 
 // ---- Audit Log ----
 
-export interface AuditLogRow {
-  id: string;
-  activity_id: string | null;
-  project_id: string;
-  changed_by: string | null;
-  old_status: string;
-  new_status: string;
-  floor: number | null;
-  flat_number: number | null;
-  stage: string | null;
-  stage_gate: string | null;
-  activity_name: string | null;
-  created_at: string;
+export type AuditLogRow = AuditLogDbRow & {
   changed_by_name?: string;
   changed_by_role?: string;
   project_name?: string;
-}
+};
 
 export async function getAuditLog(
   projectId: string,
@@ -671,7 +637,7 @@ export async function getAuditLog(
   const rows = data || [];
   if (rows.length === 0) return [];
 
-  const userIds = [...new Set(rows.map(r => r.changed_by).filter(Boolean))] as string[];
+  const userIds = [...new Set(rows.map(r => r.changed_by).filter((id): id is string => Boolean(id)))];
   let profilesMap: Record<string, { full_name: string; role: string }> = {};
 
   if (userIds.length > 0) {
@@ -716,16 +682,17 @@ export interface DashboardData {
 export async function getDashboardData(projectId: string): Promise<DashboardData | null> {
   const { data, error } = await supabase.rpc('get_dashboard_data', { p_project_id: projectId });
   if (error || !data) return null;
+  const result = data as unknown as { stats: Record<string, number>; heatmap: SubstageRollup[]; stages: string[]; vendors: string[] };
   return {
-    stats: data.stats || {},
-    heatmap: data.heatmap || [],
-    stages: (data.stages || []).filter(Boolean),
-    vendors: (data.vendors || []).filter(Boolean).sort(),
+    stats: result.stats || {},
+    heatmap: result.heatmap || [],
+    stages: (result.stages || []).filter(Boolean),
+    vendors: (result.vendors || []).filter(Boolean).sort(),
   };
 }
 
 export interface ActivitiesPage {
-  rows: Array<Record<string, unknown>>;
+  rows: ActivityRow[];
   totalCount: number;
 }
 
@@ -767,7 +734,7 @@ export async function getActivitiesPage(
   return { rows: data || [], totalCount: count || 0 };
 }
 
-export async function getCriticalDelays(projectId: string, limit = 5): Promise<Array<Record<string, unknown>>> {
+export async function getCriticalDelays(projectId: string, limit = 5): Promise<Array<Pick<ActivityRow, 'id' | 'floor' | 'flat_number' | 'stage' | 'stage_gate' | 'activity' | 'vendor' | 'delay_days'>>> {
   const { data, error } = await supabase
     .from('activities')
     .select('id, floor, flat_number, stage, stage_gate, activity, vendor, delay_days')
@@ -799,7 +766,7 @@ export async function getProjectFloors(projectId: string): Promise<number[]> {
 
 export async function updateActivityWithAudit(
   activityId: string,
-  updates: Record<string, unknown>,
+  updates: ActivityUpdate,
   auditInfo: {
     projectId: string;
     changedBy: string;
@@ -836,7 +803,7 @@ export async function updateActivityWithAudit(
 
 export async function bulkUpdateActivities(
   activityIds: string[],
-  updates: Record<string, unknown>
+  updates: ActivityUpdate
 ): Promise<{ error: string | null }> {
   const { error } = await supabase.from('activities').update(updates).in('id', activityIds);
   if (error) return { error: friendlyError(error.message, 'bulk update activities') };
@@ -855,7 +822,7 @@ export async function getPhotoCount(activityId: string): Promise<number> {
 export async function getAllFilteredActivities(
   projectId: string,
   filters: { floor?: string; stage?: string; stageGate?: string; vendor?: string; status?: string }
-): Promise<Array<Record<string, unknown>>> {
+): Promise<ActivityRow[]> {
   let query = supabase
     .from('activities')
     .select('*')
@@ -879,7 +846,7 @@ export async function getAllFilteredActivities(
     }
   }
 
-  const allRows: Record<string, unknown>[] = [];
+  const allRows: ActivityRow[] = [];
   let from = 0;
   const PAGE = 1000;
   while (true) {
@@ -898,7 +865,7 @@ export async function getAdminEmails(): Promise<string[]> {
     .select('email')
     .eq('role', 'admin');
   if (!data) return [];
-  return data.map(r => r.email).filter(Boolean);
+  return data.map(r => r.email).filter((e): e is string => Boolean(e));
 }
 
 // ---- Refuge Config ----
@@ -911,8 +878,8 @@ export async function getRefugeConfig(projectId: string): Promise<{ floors: numb
     .single();
   if (error || !data) return { floors: [], units: [] };
   return {
-    floors: (data.refuge_floors as number[]) || [],
-    units: (data.refuge_units as number[]) || [],
+    floors: data.refuge_floors || [],
+    units: data.refuge_units || [],
   };
 }
 

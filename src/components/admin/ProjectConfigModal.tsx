@@ -224,7 +224,7 @@ function StageGatesTab({ projectId }: { projectId: string }) {
       const result: { stage: string; stageGate: string }[] = [];
       for (const r of data) {
         const key = `${r.stage}||${r.stage_gate}`;
-        if (!set.has(key)) { set.add(key); result.push({ stage: r.stage, stageGate: r.stage_gate }); }
+        if (!set.has(key)) { set.add(key); result.push({ stage: r.stage, stageGate: r.stage_gate || '' }); }
       }
       result.sort((a, b) => a.stage.localeCompare(b.stage) || a.stageGate.localeCompare(b.stageGate));
       setGates(result);

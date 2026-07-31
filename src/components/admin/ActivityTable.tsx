@@ -14,6 +14,7 @@ import {
   getAdminEmails,
 } from '@/lib/supabase-data';
 import { supabase } from '@/lib/supabase';
+import type { ActivityRow, ActivityUpdate } from '@/types/database.types';
 
 const PER_PAGE = 25;
 
@@ -41,7 +42,7 @@ function normalizeStatus(s: string): ActivityStatus {
   return 'not_started';
 }
 
-function formatDate(d: string): string {
+function formatDate(d: string | null): string {
   if (!d) return '';
   return d.slice(0, 10);
 }
@@ -66,10 +67,10 @@ interface ActivityTableProps {
 }
 
 export default function ActivityTable({ projectId, filters, statusFilter, projectName, refugeFloors = [], refugeUnits = [], refreshKey = 0 }: ActivityTableProps) {
-  const [tableRows, setTableRows] = useState<Array<Record<string, unknown>>>([]);
+  const [tableRows, setTableRows] = useState<ActivityRow[]>([]);
   const [tableTotal, setTableTotal] = useState(0);
   const [tableLoading, setTableLoading] = useState(false);
-  const [criticalDelays, setCriticalDelays] = useState<Array<Record<string, unknown>>>([]);
+  const [criticalDelays, setCriticalDelays] = useState<Array<Pick<ActivityRow, 'id' | 'floor' | 'flat_number' | 'stage' | 'stage_gate' | 'activity' | 'vendor' | 'delay_days'>>>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
@@ -151,7 +152,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     if (selectedRows.size === tableRows.length) {
       setSelectedRows(new Set());
     } else {
-      setSelectedRows(new Set(tableRows.map(r => r.id as string)));
+      setSelectedRows(new Set(tableRows.map(r => r.id)));
     }
   }
 
@@ -189,7 +190,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   }
 
   // Send reversal notification email
-  async function notifyReversal(row: Record<string, unknown>, oldStatus: string, newStatus: string) {
+  async function notifyReversal(row: ActivityRow, oldStatus: string, newStatus: string) {
     try {
       const adminEmails = await getAdminEmails();
       if (adminEmails.length === 0) return;
@@ -216,7 +217,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   // Save inline edit
   const saveEdit = useCallback(async (valueOverride?: string) => {
     if (!editingCell || saving) return;
-    const row = tableRows.find(r => (r.id as string) === editingCell.rowId);
+    const row = tableRows.find(r => (r.id) === editingCell.rowId);
     if (!row) { setEditingCell(null); return; }
 
     const val = valueOverride !== undefined ? valueOverride : editValue;
@@ -228,13 +229,13 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     const userId = await getCurrentUserId();
 
     if (field === 'status') {
-      const oldStatus = row.status as string;
-      const expectedEnd = row.expected_end as string | null;
+      const oldStatus = row.status || 'not_started';
+      const expectedEnd = row.expected_end;
       const overdue = expectedEnd ? expectedEnd < todayISO() : false;
 
       // Photo check for completion
       if (val === 'completed') {
-        const count = await getPhotoCount(row.id as string);
+        const count = await getPhotoCount(row.id);
         if (count === 0) {
           setToast({ message: 'At least one photo is required before marking as completed.', type: 'error' });
           setSaving(false);
@@ -249,28 +250,28 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
       else if (val === 'not_started' && overdue) newStatus = 'delayed';
       else if (val === 'completed' && overdue) newStatus = 'completed_delayed';
 
-      const updates: Record<string, unknown> = { status: newStatus };
+      const updates: ActivityUpdate = { status: newStatus };
       if (val === 'completed') {
         updates.actual_end = todayISO();
       }
 
-      const result = await updateActivityWithAudit(row.id as string, updates, {
+      const result = await updateActivityWithAudit(row.id, updates, {
         projectId,
         changedBy: userId,
         oldStatus,
         newStatus,
-        floor: row.floor as number,
-        flatNumber: row.flat_number as number,
-        stage: row.stage as string,
-        stageGate: row.stage_gate as string,
-        activityName: row.activity as string,
+        floor: row.floor,
+        flatNumber: row.flat_number,
+        stage: row.stage,
+        stageGate: row.stage_gate || '',
+        activityName: row.activity,
       });
 
       if (result.error) {
         setToast({ message: result.error, type: 'error' });
       } else {
         setTableRows(prev => prev.map(r =>
-          (r.id as string) === editingCell.rowId
+          (r.id) === editingCell.rowId
             ? { ...r, status: newStatus, ...(newStatus === 'completed' ? { actual_end: todayISO() } : {}) }
             : r
         ));
@@ -281,8 +282,8 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
         }
       }
     } else {
-      const updates: Record<string, unknown> = { [field]: val };
-      const { error } = await supabase.from('activities').update(updates).eq('id', row.id as string);
+      const updates = { [field]: val } as ActivityUpdate;
+      const { error } = await supabase.from('activities').update(updates).eq('id', row.id);
       if (error) {
         const msg = error.message.toLowerCase().includes('row level security')
           ? 'Permission denied: unable to update this field. Please contact admin.'
@@ -291,7 +292,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
         setToast({ message: msg, type: 'error' });
       } else {
         setTableRows(prev => prev.map(r =>
-          (r.id as string) === editingCell.rowId ? { ...r, [field]: val } : r
+          (r.id) === editingCell.rowId ? { ...r, [field]: val } : r
         ));
         setToast({ message: 'Updated.', type: 'success' });
       }
@@ -310,7 +311,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
       setToast({ message: result.error, type: 'error' });
     } else {
       setTableRows(prev => prev.map(r =>
-        selectedRows.has(r.id as string) ? { ...r, vendor: bulkVendor.trim() } : r
+        selectedRows.has(r.id) ? { ...r, vendor: bulkVendor.trim() } : r
       ));
       setToast({ message: `Vendor updated for ${selectedRows.size} activities.`, type: 'success' });
       setSelectedRows(new Set());
@@ -323,7 +324,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   // Bulk: Update Expected Dates
   async function handleBulkDates() {
     if (selectedRows.size === 0) return;
-    const updates: Record<string, unknown> = {};
+    const updates: ActivityUpdate = {};
     if (bulkExpStart) updates.expected_start = bulkExpStart;
     if (bulkExpEnd) updates.expected_end = bulkExpEnd;
     if (bulkRevStart) updates.revised_start = bulkRevStart;
@@ -336,7 +337,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
       setToast({ message: result.error, type: 'error' });
     } else {
       setTableRows(prev => prev.map(r =>
-        selectedRows.has(r.id as string) ? { ...r, ...updates } : r
+        selectedRows.has(r.id) ? { ...r, ...updates } : r
       ));
       setToast({ message: `Dates updated for ${selectedRows.size} activities.`, type: 'success' });
       setSelectedRows(new Set());
@@ -361,9 +362,9 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
         ['Floor', 'Flat No.', 'Config', 'Stage', 'Stage Gate', 'Activity', 'Vendor', 'Exp. Start', 'Exp. End', 'Rev. Start', 'Rev. End', 'Act. Start', 'Act. End', 'Status', 'Delay Days', 'Delay Reason', 'Remarks'],
         ...rows.map(r => [
           r.floor, r.flat_number, r.configuration || '', r.stage, r.stage_gate || '', r.activity,
-          r.vendor || '', formatDate(r.expected_start as string), formatDate(r.expected_end as string),
-          formatDate(r.revised_start as string), formatDate(r.revised_end as string),
-          formatDate(r.actual_start as string), formatDate(r.actual_end as string),
+          r.vendor || '', formatDate(r.expected_start), formatDate(r.expected_end),
+          formatDate(r.revised_start), formatDate(r.revised_end),
+          formatDate(r.actual_start), formatDate(r.actual_end),
           r.status, r.delay_days || 0, r.delay_reason || '', r.remarks || '',
         ]),
       ];
@@ -397,9 +398,9 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
         head: [['Floor', 'Flat', 'Stage', 'Stage Gate', 'Activity', 'Vendor', 'Exp Start', 'Exp End', 'Rev Start', 'Rev End', 'Status', 'Delay']],
         body: rows.map(r => [
           String(r.floor ?? ''), String(r.flat_number ?? ''), String(r.stage ?? ''), String(r.stage_gate || ''), String(r.activity ?? ''),
-          String(r.vendor || ''), formatDate(r.expected_start as string), formatDate(r.expected_end as string),
-          formatDate(r.revised_start as string), formatDate(r.revised_end as string),
-          String(r.status ?? ''), (r.delay_days as number) > 0 ? `${r.delay_days}d` : '',
+          String(r.vendor || ''), formatDate(r.expected_start), formatDate(r.expected_end),
+          formatDate(r.revised_start), formatDate(r.revised_end),
+          String(r.status ?? ''), (r.delay_days ?? 0) > 0 ? `${r.delay_days}d` : '',
         ]),
         styles: { fontSize: 7, cellPadding: 1.5 },
         headStyles: { fillColor: [230, 126, 34], fontSize: 7 },
@@ -422,8 +423,8 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   }
 
   // Render editable cell
-  function renderEditableCell(row: Record<string, unknown>, field: EditingCell['field'], displayValue: string, className: string) {
-    const rowId = row.id as string;
+  function renderEditableCell(row: ActivityRow, field: EditingCell['field'], displayValue: string, className: string) {
+    const rowId = row.id;
     const isEditing = editingCell?.rowId === rowId && editingCell?.field === field;
 
     if (isEditing) {
@@ -478,8 +479,8 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
 
     if (field === 'status') {
       return (
-        <button onClick={() => startEdit(rowId, field, row.status as string)} className="cursor-pointer">
-          <StatusPill status={normalizeStatus((row.status as string) || 'not_started')} />
+        <button onClick={() => startEdit(rowId, field, row.status || '')} className="cursor-pointer">
+          <StatusPill status={normalizeStatus(row.status || 'not_started')} />
         </button>
       );
     }
@@ -603,17 +604,17 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {tableRows.map(row => {
-                      const isRefugeFloor = refugeFloorSet.has(row.floor as number);
-                      const isRefugeUnit = refugeUnitSet.has(row.flat_number as number);
+                      const isRefugeFloor = refugeFloorSet.has(row.floor);
+                      const isRefugeUnit = refugeUnitSet.has(row.flat_number);
                       const isRefuge = isRefugeFloor || isRefugeUnit;
                       return (
-                      <tr key={row.id as string} className={`hover:bg-gray-50 transition-colors ${selectedRows.has(row.id as string) ? 'bg-orange-50/50' : isRefuge ? 'bg-amber-50/60' : ''}`}>
+                      <tr key={row.id} className={`hover:bg-gray-50 transition-colors ${selectedRows.has(row.id) ? 'bg-orange-50/50' : isRefuge ? 'bg-amber-50/60' : ''}`}>
                         <td className="px-3 py-2.5">
-                          <input type="checkbox" checked={selectedRows.has(row.id as string)} onChange={() => toggleRow(row.id as string)} className="accent-[#E67E22] w-4 h-4" />
+                          <input type="checkbox" checked={selectedRows.has(row.id)} onChange={() => toggleRow(row.id)} className="accent-[#E67E22] w-4 h-4" />
                         </td>
                         <td className="px-3 py-2.5 text-gray-700">
                           <span className="flex items-center gap-1.5">
-                            {row.floor as number}
+                            {row.floor}
                             {isRefugeFloor && (
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200" title="Refuge Floor">
                                 R
@@ -623,7 +624,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                         </td>
                         <td className="px-3 py-2.5 font-medium text-gray-900">
                           <span className="flex items-center gap-1.5">
-                            {row.flat_number as number}
+                            {row.flat_number}
                             {isRefugeUnit && (
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200" title="Refuge Unit">
                                 R
@@ -631,32 +632,32 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                             )}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5 text-gray-600">{(row.configuration as string) || ''}</td>
-                        <td className="px-3 py-2.5 text-gray-600 max-w-[100px] truncate">{row.stage as string}</td>
-                        <td className="px-3 py-2.5 text-gray-600 max-w-[90px] truncate">{(row.stage_gate as string) || ''}</td>
-                        <td className="px-3 py-2.5 text-gray-600 max-w-[120px] truncate">{row.activity as string}</td>
+                        <td className="px-3 py-2.5 text-gray-600">{row.configuration || ''}</td>
+                        <td className="px-3 py-2.5 text-gray-600 max-w-[100px] truncate">{row.stage}</td>
+                        <td className="px-3 py-2.5 text-gray-600 max-w-[90px] truncate">{row.stage_gate || ''}</td>
+                        <td className="px-3 py-2.5 text-gray-600 max-w-[120px] truncate">{row.activity}</td>
                         <td className="px-3 py-2.5 text-gray-600 max-w-[90px]">
-                          {renderEditableCell(row, 'vendor', (row.vendor as string) || '', 'text-gray-600 truncate')}
+                          {renderEditableCell(row, 'vendor', row.vendor || '', 'text-gray-600 truncate')}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs">
-                          {renderEditableCell(row, 'expected_start', formatDate(row.expected_start as string), 'text-gray-500')}
+                          {renderEditableCell(row, 'expected_start', formatDate(row.expected_start), 'text-gray-500')}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs">
-                          {renderEditableCell(row, 'expected_end', formatDate(row.expected_end as string), 'text-gray-500')}
+                          {renderEditableCell(row, 'expected_end', formatDate(row.expected_end), 'text-gray-500')}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs">
-                          {renderEditableCell(row, 'revised_start', formatDate(row.revised_start as string), 'text-indigo-600')}
+                          {renderEditableCell(row, 'revised_start', formatDate(row.revised_start), 'text-indigo-600')}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs">
-                          {renderEditableCell(row, 'revised_end', formatDate(row.revised_end as string), 'text-indigo-600')}
+                          {renderEditableCell(row, 'revised_end', formatDate(row.revised_end), 'text-indigo-600')}
                         </td>
-                        <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap text-xs">{formatDate(row.actual_start as string) || '-'}</td>
-                        <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap text-xs">{formatDate(row.actual_end as string) || '-'}</td>
+                        <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap text-xs">{formatDate(row.actual_start) || '-'}</td>
+                        <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap text-xs">{formatDate(row.actual_end) || '-'}</td>
                         <td className="px-3 py-2.5">
                           {renderEditableCell(row, 'status', '', '')}
                         </td>
                         <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[100px] truncate">
-                          {(row.delay_days as number) > 0 ? `${row.delay_days}d` : (row.delay_reason as string) || '-'}
+                          {(row.delay_days ?? 0) > 0 ? `${row.delay_days}d` : row.delay_reason || '-'}
                         </td>
                       </tr>
                       );
@@ -718,15 +719,15 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
           ) : (
             <div className="space-y-3">
               {criticalDelays.map((d) => (
-                <div key={d.id as string} className="border border-gray-100 rounded-lg p-3 hover:border-gray-200 transition-colors">
+                <div key={d.id} className="border border-gray-100 rounded-lg p-3 hover:border-gray-200 transition-colors">
                   <div className="flex items-start justify-between mb-1">
-                    <span className="text-xs font-bold text-gray-900">Flat {d.flat_number as number}</span>
+                    <span className="text-xs font-bold text-gray-900">Flat {d.flat_number}</span>
                     <StatusPill status="delayed" />
                   </div>
-                  <div className="text-xs text-gray-600 mb-0.5">{d.activity as string}</div>
-                  <div className="text-[11px] text-gray-400">Floor {d.floor as number} &bull; {d.stage_gate as string}</div>
-                  <div className="text-[11px] text-gray-400">Vendor: {d.vendor as string}</div>
-                  <div className="text-xs font-semibold text-red-600 mt-1">Overdue by {d.delay_days as number} day{(d.delay_days as number) > 1 ? 's' : ''}</div>
+                  <div className="text-xs text-gray-600 mb-0.5">{d.activity}</div>
+                  <div className="text-[11px] text-gray-400">Floor {d.floor} &bull; {d.stage_gate}</div>
+                  <div className="text-[11px] text-gray-400">Vendor: {d.vendor}</div>
+                  <div className="text-xs font-semibold text-red-600 mt-1">Overdue by {d.delay_days} day{(d.delay_days ?? 0) > 1 ? 's' : ''}</div>
                 </div>
               ))}
             </div>

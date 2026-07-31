@@ -128,8 +128,8 @@ export default function ErrorLogPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {paginated.map((entry) => {
-                    const { date, time } = formatTimestamp(entry.created_at);
-                    const ctx = parseContext(entry.context);
+                    const { date, time } = formatTimestamp(entry.created_at || '');
+                    const ctx = parseContext(typeof entry.context === 'string' ? entry.context : null);
                     const isExpanded = expandedId === entry.id;
 
                     return (
@@ -172,7 +172,7 @@ export default function ErrorLogPage() {
               {/* Expanded detail panels rendered outside table for clean layout */}
               {paginated.map((entry) => {
                 if (expandedId !== entry.id) return null;
-                const ctx = parseContext(entry.context);
+                const ctx = parseContext(typeof entry.context === 'string' ? entry.context : null);
                 return (
                   <div key={`detail-${entry.id}`} className="bg-gray-50 border-t border-b border-gray-200 px-6 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">

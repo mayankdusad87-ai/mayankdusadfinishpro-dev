@@ -134,7 +134,7 @@ export default function PhotoReviewPage() {
                 </div>
                 <div className="text-[11px] text-gray-400 truncate">{photo.stage} &bull; {photo.stage_gate}</div>
                 <div className="text-[10px] text-gray-400 mt-0.5">
-                  {new Date(photo.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {new Date(photo.created_at || '').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </div>
               </div>
             </div>
@@ -182,7 +182,7 @@ export default function PhotoReviewPage() {
                 </div>
               </div>
               <div className="mt-2 text-xs text-gray-400">
-                Uploaded: {new Date(lightboxPhoto.created_at).toLocaleString('en-IN')} &bull; Size: {Math.round(lightboxPhoto.file_size / 1024)} KB
+                Uploaded: {new Date(lightboxPhoto.created_at || '').toLocaleString('en-IN')} &bull; Size: {Math.round((lightboxPhoto.file_size ?? 0) / 1024)} KB
               </div>
             </div>
           </div>

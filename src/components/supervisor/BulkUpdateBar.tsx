@@ -3,6 +3,7 @@
 import { UploadedActivity } from '@/lib/project-data-store';
 import { updateActivityWithAudit } from '@/lib/supabase-data';
 import { normalizeStatus, TODAY, PriorityView } from './supervisor-utils';
+import type { ActivityUpdate } from '@/types/database.types';
 
 interface BulkUpdateBarProps {
   activeView: PriorityView;
@@ -35,7 +36,7 @@ export default function BulkUpdateBar({
     for (const id of selectedIds) {
       const row = allActivities.find(r => r.id === id);
       if (!row || normalizeStatus(row.status) === 'completed') continue;
-      const updates: Record<string, unknown> = { status: newStatus };
+      const updates: ActivityUpdate = { status: newStatus };
       if (newStatus === 'in_progress') {
         updates.actual_start = TODAY;
       } else {

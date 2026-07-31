@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
 import { getProjectsFromSupabase, getProjectDataFromSupabase, getActiveReasons, Reason, updateActivityWithAudit, getSupervisorAssignments } from '@/lib/supabase-data';
+import type { ActivityUpdate } from '@/types/database.types';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { TODAY, SupervisorStatus, PriorityView, normalizeStatus, daysOverdue, getGreeting, matchesSearch } from '@/components/supervisor/supervisor-utils';
@@ -199,7 +200,7 @@ export default function SupervisorHomePage() {
       return;
     }
     const newStatus = action === 'start' ? 'in_progress' : 'delayed';
-    const updates: Record<string, unknown> = { status: newStatus };
+    const updates: ActivityUpdate = { status: newStatus };
     if (action === 'start') updates.actual_start = TODAY;
     await updateActivityWithAudit(row.id, updates, {
       projectId: selectedProjectId,
@@ -220,7 +221,7 @@ export default function SupervisorHomePage() {
       const row = allActivities.find(r => r.id === showPhotoPrompt);
       if (!row) { setShowPhotoPrompt(null); return; }
 
-      const updates: Record<string, unknown> = { status: 'completed', actual_end: TODAY };
+      const updates: ActivityUpdate = { status: 'completed', actual_end: TODAY };
       if (!row.actual_start) updates.actual_start = TODAY;
 
       await updateActivityWithAudit(showPhotoPrompt, updates, {
