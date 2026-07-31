@@ -503,6 +503,21 @@ export interface ActivityPhoto {
 
 const PHOTO_BUCKET = 'activity-photos';
 const MAX_PHOTOS_PER_ACTIVITY = 3;
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5 MB
+
+const IMAGE_SIGNATURES: Array<{ bytes: number[]; type: string }> = [
+  { bytes: [0xFF, 0xD8, 0xFF], type: 'image/jpeg' },
+  { bytes: [0x89, 0x50, 0x4E, 0x47], type: 'image/png' },
+  { bytes: [0x47, 0x49, 0x46, 0x38], type: 'image/gif' },
+  { bytes: [0x52, 0x49, 0x46, 0x46], type: 'image/webp' },
+];
+
+function detectImageType(header: Uint8Array): string | null {
+  for (const sig of IMAGE_SIGNATURES) {
+    if (sig.bytes.every((b, i) => header[i] === b)) return sig.type;
+  }
+  return null;
+}
 
 export async function uploadActivityPhoto(
   file: Blob,
@@ -519,6 +534,18 @@ export async function uploadActivityPhoto(
     uploadedBy: string;
   }
 ): Promise<{ error: string | null }> {
+  if (file.size > MAX_PHOTO_SIZE) {
+    return { error: 'Photo exceeds the 5 MB size limit.' };
+  }
+
+  const headerSlice = await file.slice(0, 12).arrayBuffer();
+  const header = new Uint8Array(headerSlice);
+  const detectedType = detectImageType(header);
+
+  if (!detectedType) {
+    return { error: 'Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.' };
+  }
+
   const existing = await supabase
     .from('activity_photos')
     .select('id', { count: 'exact' })
@@ -530,7 +557,7 @@ export async function uploadActivityPhoto(
 
   const { error: uploadError } = await supabase.storage
     .from(PHOTO_BUCKET)
-    .upload(storagePath, file, { contentType: 'image/jpeg', upsert: false });
+    .upload(storagePath, file, { contentType: detectedType, upsert: false });
 
   const photoCtx = { floor: metadata.floor, flat: metadata.flatNumber, activity: metadata.activityName, stage: metadata.stage };
 
