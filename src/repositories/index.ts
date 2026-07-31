@@ -1,9 +1,5 @@
-export {
-  logAppError,
-  friendlyError,
-  getAppErrors,
-} from '@/repositories/errors';
-export type { AppError } from '@/repositories/errors';
+export { logAppError, friendlyError, getAppErrors } from './errors';
+export type { AppError } from './errors';
 
 export {
   getProjectsFromSupabase,
@@ -15,7 +11,7 @@ export {
   saveRefugeConfig,
   getProjectDataFromSupabase,
   recordUpload,
-} from '@/repositories/project-repo';
+} from './project-repo';
 
 export {
   getActivitiesFromSupabase,
@@ -29,16 +25,16 @@ export {
   getPhotoCount,
   getAdminEmails,
   getDashboardData,
-} from '@/repositories/activity-repo';
-export type { ActivitiesPage, SubstageRollup, DashboardData } from '@/repositories/activity-repo';
+} from './activity-repo';
+export type { ActivitiesPage, SubstageRollup, DashboardData } from './activity-repo';
 
 export {
   uploadActivityPhoto,
   getPhotosForActivity,
   getPhotosForProject,
   deleteActivityPhoto,
-} from '@/repositories/photo-repo';
-export type { ActivityPhoto } from '@/repositories/photo-repo';
+} from './photo-repo';
+export type { ActivityPhoto } from './photo-repo';
 
 export {
   createSupervisor,
@@ -47,7 +43,7 @@ export {
   getSupervisors,
   getSupervisorAssignments,
   assignSupervisorToProject,
-} from '@/repositories/supervisor-repo';
+} from './supervisor-repo';
 
 export {
   getReasons,
@@ -55,8 +51,8 @@ export {
   createReason,
   updateReason,
   deleteReason,
-} from '@/repositories/reason-repo';
-export type { Reason } from '@/repositories/reason-repo';
+} from './reason-repo';
+export type { Reason } from './reason-repo';
 
-export { getAuditLog } from '@/repositories/audit-repo';
-export type { AuditLogRow } from '@/repositories/audit-repo';
+export { getAuditLog } from './audit-repo';
+export type { AuditLogRow } from './audit-repo';
