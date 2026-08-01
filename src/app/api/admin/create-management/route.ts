@@ -38,31 +38,12 @@ async function ensureProfile(
   userId: string,
   data: { full_name: string; phone?: string; email: string },
 ) {
-  const { data: existing } = await supabaseAdmin
-    .from('profiles')
-    .select('id')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (existing) {
-    return supabaseAdmin
-      .from('profiles')
-      .update({
-        full_name: data.full_name,
-        phone: data.phone || null,
-        role: 'management',
-        is_active: true,
-      })
-      .eq('id', userId);
-  }
-
-  return supabaseAdmin.from('profiles').insert({
-    id: userId,
-    full_name: data.full_name,
-    email: data.email,
-    phone: data.phone || null,
-    role: 'management',
-    is_active: true,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (supabaseAdmin.rpc as any)('set_profile_management', {
+    p_user_id: userId,
+    p_full_name: data.full_name,
+    p_email: data.email,
+    p_phone: data.phone || null,
   });
 }
 
