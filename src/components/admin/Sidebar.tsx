@@ -4,11 +4,21 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { useDevice } from '@/hooks';
+import { canAccess, type Feature, type Role } from '@/lib/permissions';
 
-const navItems = [
+interface NavItem {
+  label: string;
+  href: string;
+  feature: Feature;
+  icon: React.ReactNode;
+}
+
+const navItems: NavItem[] = [
   {
     label: 'Upload Template',
     href: '/admin/upload',
+    feature: 'upload-template',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -20,6 +30,7 @@ const navItems = [
   {
     label: 'Dashboard',
     href: '/admin/dashboard',
+    feature: 'dashboard',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
         <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -32,6 +43,7 @@ const navItems = [
   {
     label: 'Admin Panel',
     href: '/admin/manage',
+    feature: 'manage-projects',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
         <rect x="3" y="3" width="8" height="8" rx="2" />
@@ -45,6 +57,7 @@ const navItems = [
   {
     label: 'Photo Review',
     href: '/admin/photos',
+    feature: 'photo-review',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
         <path d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
@@ -55,6 +68,7 @@ const navItems = [
   {
     label: 'Insights',
     href: '/admin/reports',
+    feature: 'insights-view',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
         <path d="M4 20h16" />
@@ -68,6 +82,7 @@ const navItems = [
   {
     label: 'Settings',
     href: '/admin/settings',
+    feature: 'settings',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
         <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
@@ -85,8 +100,12 @@ interface SidebarProps {
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
+  const device = useDevice();
+  const role = (profile?.role ?? 'supervisor') as Role;
   const [collapsed, setCollapsed] = useState(false);
+
+  const visibleItems = navItems.filter(item => canAccess(role, device, item.feature));
 
   async function handleLogout() {
     await signOut();
@@ -130,7 +149,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 py-2 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link

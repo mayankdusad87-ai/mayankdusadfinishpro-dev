@@ -52,7 +52,7 @@ export async function proxy(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if (profile?.role !== 'admin' && profile?.role !== 'management') {
       if (pathname.startsWith('/api/')) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }

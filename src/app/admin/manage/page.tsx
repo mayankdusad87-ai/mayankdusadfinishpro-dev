@@ -1,9 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import { useRoleDevice } from '@/hooks';
+import { canAccess, type Feature } from '@/lib/permissions';
 
 type Tab = 'projects' | 'supervisors' | 'activity-log' | 'error-log';
+
+const tabFeatureMap: Record<Tab, Feature> = {
+  projects: 'manage-projects',
+  supervisors: 'manage-supervisors',
+  'activity-log': 'activity-log',
+  'error-log': 'error-log',
+};
 
 interface TabDef {
   id: Tab;
@@ -94,9 +103,17 @@ const panelMap: Record<Tab, React.ComponentType> = {
 };
 
 export default function ManagePage() {
+  const { role, device } = useRoleDevice();
+  const visibleTabs = useMemo(
+    () => tabs.filter(tab => canAccess(role, device, tabFeatureMap[tab.id])),
+    [role, device],
+  );
   const [activeTab, setActiveTab] = useState<Tab>('projects');
 
-  const ActivePanel = panelMap[activeTab];
+  const safeTab = visibleTabs.some(t => t.id === activeTab)
+    ? activeTab
+    : visibleTabs[0]?.id ?? 'projects';
+  const ActivePanel = panelMap[safeTab];
 
   return (
     <div className="space-y-6">
@@ -109,7 +126,7 @@ export default function ManagePage() {
 
       <div className="border-b border-gray-200">
         <div className="flex gap-0 -mb-px overflow-x-auto">
-          {tabs.map(tab => (
+          {visibleTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}

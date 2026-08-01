@@ -15,7 +15,7 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
     if (!loading && !user && !isLoginPage) {
       router.replace('/supervisor/login');
     }
-    if (!loading && profile && profile.role === 'admin') {
+    if (!loading && profile && (profile.role === 'admin' || profile.role === 'management')) {
       router.replace('/admin/dashboard');
     }
   }, [loading, user, profile, isLoginPage, router]);
@@ -28,7 +28,7 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
     );
   }
 
-  if (!isLoginPage && profile && profile.role === 'admin') {
+  if (!isLoginPage && profile && (profile.role === 'admin' || profile.role === 'management')) {
     return null;
   }
 

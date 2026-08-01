@@ -15,8 +15,10 @@ import SupervisorFilters from '@/components/supervisor/SupervisorFilters';
 import ActivityDetailSheet from '@/components/supervisor/ActivityDetailSheet';
 import BulkUpdateBar from '@/components/supervisor/BulkUpdateBar';
 import PhotoPromptModal from '@/components/supervisor/PhotoPromptModal';
+import { useCanAccess } from '@/hooks';
 
 export default function SupervisorHomePage() {
+  const allowBulk = useCanAccess('bulk-status-update');
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [availableProjects, setAvailableProjects] = useState<ManagedProject[]>([]);
@@ -655,7 +657,7 @@ export default function SupervisorHomePage() {
       </div>
 
       {/* Bulk Update Toggle Bar */}
-      <BulkUpdateBar
+      {allowBulk && <BulkUpdateBar
         activeView={activeView}
         stageFilter={stageFilter}
         bulkMode={bulkMode}
@@ -666,7 +668,7 @@ export default function SupervisorHomePage() {
         userId={user?.id || ''}
         onToggleBulkMode={() => { setBulkMode(!bulkMode); setSelectedIds(new Set()); }}
         onBulkComplete={() => { setBulkMode(false); setSelectedIds(new Set()); setRefreshKey(k => k + 1); }}
-      />
+      />}
 
       {/* Photo prompt when completing */}
       {showPhotoPrompt && (

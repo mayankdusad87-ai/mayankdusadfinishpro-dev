@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { AuditLogEntry, ChangeType } from '@/lib/types';
+import { useCanAccess } from '@/hooks';
 
 interface AuditLogTableProps {
   entries: AuditLogEntry[];
@@ -49,6 +50,7 @@ function formatTimestamp(iso: string): { date: string; time: string } {
 }
 
 export default function AuditLogTable({ entries }: AuditLogTableProps) {
+  const allowExport = useCanAccess('export-download');
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [floorFilter, setFloorFilter] = useState<string>('all');
   const [changedByFilter, setChangedByFilter] = useState<string>('all');
@@ -132,52 +134,54 @@ export default function AuditLogTable({ entries }: AuditLogTableProps) {
             Track all changes and actions performed across projects.
           </p>
         </div>
-        <div className="relative">
-          <button
-            onClick={() => setExportOpen(!exportOpen)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy-light transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            Export Log
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
-          {exportOpen && (
-            <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
-              <button
-                onClick={() => setExportOpen(false)}
-                className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg"
-              >
-                Export as CSV
-              </button>
-              <button
-                onClick={() => setExportOpen(false)}
-                className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-              >
-                Export as Excel
-              </button>
-              <button
-                onClick={() => setExportOpen(false)}
-                className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-b-lg"
-              >
-                Export as PDF
-              </button>
-            </div>
-          )}
-        </div>
+        {allowExport && (
+          <div className="relative">
+            <button
+              onClick={() => setExportOpen(!exportOpen)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy-light transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Export Log
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+                <button
+                  onClick={() => setExportOpen(false)}
+                  className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg"
+                >
+                  Export as CSV
+                </button>
+                <button
+                  onClick={() => setExportOpen(false)}
+                  className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Export as Excel
+                </button>
+                <button
+                  onClick={() => setExportOpen(false)}
+                  className="block w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-b-lg"
+                >
+                  Export as PDF
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filter bar */}
