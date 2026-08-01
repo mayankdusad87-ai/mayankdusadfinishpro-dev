@@ -30,26 +30,15 @@ const navItems = [
     ),
   },
   {
-    label: 'Manage Projects',
-    href: '/admin/projects',
+    label: 'Admin Panel',
+    href: '/admin/manage',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-        <path d="M2 20h20" />
-        <path d="M5 20V8l7-5 7 5v12" />
-        <path d="M9 20v-4h6v4" />
-        <rect x="9" y="10" width="6" height="3" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Manage Supervisors',
-    href: '/admin/supervisors',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-        <circle cx="9" cy="7" r="4" />
-        <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2" />
-        <path d="M19 8v6" />
-        <path d="M16 11h6" />
+        <rect x="3" y="3" width="8" height="8" rx="2" />
+        <rect x="13" y="3" width="8" height="8" rx="2" />
+        <rect x="3" y="13" width="8" height="8" rx="2" />
+        <path d="M17 13v8" />
+        <path d="M13 17h8" />
       </svg>
     ),
   },
@@ -64,16 +53,6 @@ const navItems = [
     ),
   },
   {
-    label: 'Activity Log',
-    href: '/admin/audit-log',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-        <path d="M12 8v4l3 3" />
-        <circle cx="12" cy="12" r="9" />
-      </svg>
-    ),
-  },
-  {
     label: 'Insights',
     href: '/admin/reports',
     icon: (
@@ -83,17 +62,6 @@ const navItems = [
         <rect x="4" y="10" width="4" height="10" rx="1" />
         <rect x="10" y="6" width="4" height="14" rx="1" />
         <rect x="16" y="2" width="4" height="18" rx="1" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Error Log',
-    href: '/admin/error-log',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-        <path d="M12 9v4" />
-        <path d="M12 17h.01" />
-        <path d="M3.44 18.67 10.14 4.33a2 2 0 0 1 3.72 0l6.7 14.34A2 2 0 0 1 18.7 22H5.3a2 2 0 0 1-1.86-3.33Z" />
       </svg>
     ),
   },
