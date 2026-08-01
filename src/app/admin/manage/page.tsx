@@ -5,11 +5,12 @@ import dynamic from 'next/dynamic';
 import { useRoleDevice } from '@/hooks';
 import { canAccess, type Feature } from '@/lib/permissions';
 
-type Tab = 'projects' | 'supervisors' | 'activity-log' | 'error-log';
+type Tab = 'projects' | 'supervisors' | 'management' | 'activity-log' | 'error-log';
 
 const tabFeatureMap: Record<Tab, Feature> = {
   projects: 'manage-projects',
   supervisors: 'manage-supervisors',
+  management: 'manage-management',
   'activity-log': 'activity-log',
   'error-log': 'error-log',
 };
@@ -42,6 +43,18 @@ const tabs: TabDef[] = [
         <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2" />
         <path d="M19 8v6" />
         <path d="M16 11h6" />
+      </svg>
+    ),
+  },
+  {
+    id: 'management',
+    label: 'Management Users',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
   },
@@ -85,6 +98,11 @@ const SupervisorsPanel = dynamic(
   { loading: () => <TabSkeleton /> },
 );
 
+const ManagementPanel = dynamic(
+  () => import('@/app/admin/management/page'),
+  { loading: () => <TabSkeleton /> },
+);
+
 const AuditLogPanel = dynamic(
   () => import('@/app/admin/audit-log/page'),
   { loading: () => <TabSkeleton /> },
@@ -98,6 +116,7 @@ const ErrorLogPanel = dynamic(
 const panelMap: Record<Tab, React.ComponentType> = {
   projects: ProjectsPanel,
   supervisors: SupervisorsPanel,
+  management: ManagementPanel,
   'activity-log': AuditLogPanel,
   'error-log': ErrorLogPanel,
 };

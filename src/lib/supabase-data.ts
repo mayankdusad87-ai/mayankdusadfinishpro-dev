@@ -51,6 +51,13 @@ export {
 } from '@/repositories/supervisor-repo';
 
 export {
+  createManagementUser,
+  getManagementUsers,
+  toggleManagementUserStatus,
+} from '@/repositories/management-repo';
+export type { ManagementUser } from '@/repositories/management-repo';
+
+export {
   getReasons,
   getActiveReasons,
   createReason,

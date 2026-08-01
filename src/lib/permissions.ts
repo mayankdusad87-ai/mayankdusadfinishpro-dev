@@ -6,6 +6,7 @@ export type Feature =
   | 'upload-template'
   | 'manage-projects'
   | 'manage-supervisors'
+  | 'manage-management'
   | 'dashboard'
   | 'activity-log'
   | 'error-log'
@@ -25,6 +26,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'upload-template': 'full',
       'manage-projects': 'full',
       'manage-supervisors': 'full',
+      'manage-management': 'full',
       dashboard: 'full',
       'activity-log': 'full',
       'error-log': 'full',
@@ -40,6 +42,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'upload-template': 'none',
       'manage-projects': 'full',
       'manage-supervisors': 'full',
+      'manage-management': 'full',
       dashboard: 'full',
       'activity-log': 'view',
       'error-log': 'view',
@@ -57,6 +60,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'upload-template': 'none',
       'manage-projects': 'view',
       'manage-supervisors': 'none',
+      'manage-management': 'none',
       dashboard: 'view',
       'activity-log': 'view',
       'error-log': 'none',
@@ -72,6 +76,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'upload-template': 'none',
       'manage-projects': 'view',
       'manage-supervisors': 'none',
+      'manage-management': 'none',
       dashboard: 'view',
       'activity-log': 'view',
       'error-log': 'none',
@@ -89,6 +94,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'upload-template': 'none',
       'manage-projects': 'none',
       'manage-supervisors': 'none',
+      'manage-management': 'none',
       dashboard: 'none',
       'activity-log': 'none',
       'error-log': 'none',
@@ -104,6 +110,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'upload-template': 'none',
       'manage-projects': 'none',
       'manage-supervisors': 'none',
+      'manage-management': 'none',
       dashboard: 'none',
       'activity-log': 'none',
       'error-log': 'none',
