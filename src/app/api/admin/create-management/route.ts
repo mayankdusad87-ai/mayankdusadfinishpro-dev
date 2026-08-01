@@ -3,6 +3,69 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyAdmin } from '@/lib/auth-guard';
 import { createManagementSchema } from '@/lib/validations';
 
+async function gotrueRequest(path: string, method: string, body?: unknown) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return fetch(`${supabaseUrl}/auth/v1${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${serviceKey}`,
+      'apikey': serviceKey,
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+}
+
+async function findAuthUserByEmail(email: string): Promise<string | null> {
+  const res = await gotrueRequest(`/admin/users?page=1&per_page=1`, 'GET');
+  if (!res.ok) return null;
+  const listRes = await gotrueRequest(
+    `/admin/users?page=1&per_page=50`,
+    'GET',
+  );
+  if (!listRes.ok) return null;
+  const listJson = await listRes.json();
+  const users = listJson.users || [];
+  const match = users.find(
+    (u: { email?: string }) =>
+      u.email?.toLowerCase() === email.toLowerCase(),
+  );
+  return match?.id || null;
+}
+
+async function ensureProfile(
+  userId: string,
+  data: { full_name: string; phone?: string; email: string },
+) {
+  const { data: existing } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (existing) {
+    return supabaseAdmin
+      .from('profiles')
+      .update({
+        full_name: data.full_name,
+        phone: data.phone || null,
+        role: 'management',
+        is_active: true,
+      })
+      .eq('id', userId);
+  }
+
+  return supabaseAdmin.from('profiles').insert({
+    id: userId,
+    full_name: data.full_name,
+    email: data.email,
+    phone: data.phone || null,
+    role: 'management',
+    is_active: true,
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const auth = await verifyAdmin(req);
@@ -18,59 +81,61 @@ export async function POST(req: NextRequest) {
     }
     const { email, password, fullName, phone } = parsed.data;
 
-    const { data: existing } = await supabaseAdmin
+    const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
-      .select('id')
+      .select('id, role')
       .eq('email', email)
       .maybeSingle();
-    if (existing) {
-      return NextResponse.json({ error: 'A user with this email already exists.' }, { status: 400 });
+    if (existingProfile?.role === 'management') {
+      return NextResponse.json({ error: 'A management user with this email already exists.' }, { status: 400 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-    const authRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceKey}`,
-        'apikey': serviceKey,
-      },
-      body: JSON.stringify({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { role: 'supervisor', full_name: fullName },
-      }),
+    const authRes = await gotrueRequest('/admin/users', 'POST', {
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { role: 'supervisor', full_name: fullName },
     });
 
     const authJson = await authRes.json();
+    let userId: string | null = null;
 
-    if (!authRes.ok) {
-      const msg = authJson.msg || authJson.message || authJson.error || JSON.stringify(authJson);
-      console.error('[create-management] GoTrue error:', authRes.status, msg);
-      return NextResponse.json({
-        error: typeof msg === 'string' && msg.length > 0 ? msg : `Auth service error (${authRes.status})`,
-        debug: JSON.stringify({ status: authRes.status, body: authJson }),
-      }, { status: 400 });
+    if (authRes.ok) {
+      userId = authJson.id || null;
+      if (!userId) {
+        return NextResponse.json({ error: 'User created but no ID returned' }, { status: 500 });
+      }
+    } else {
+      const msg = authJson.msg || authJson.message || authJson.error || '';
+      const isDuplicate =
+        typeof msg === 'string' &&
+        msg.toLowerCase().includes('already been registered');
+
+      if (!isDuplicate) {
+        console.error('[create-management] GoTrue error:', authRes.status, msg);
+        return NextResponse.json({
+          error: typeof msg === 'string' && msg.length > 0 ? msg : `Auth service error (${authRes.status})`,
+        }, { status: 400 });
+      }
+
+      userId = existingProfile?.id || (await findAuthUserByEmail(email));
+      if (!userId) {
+        return NextResponse.json({
+          error: 'User exists in auth but could not be found. Please delete from Supabase Auth dashboard and retry.',
+        }, { status: 400 });
+      }
     }
 
-    const userId = authJson.id;
-    if (!userId) {
-      return NextResponse.json({ error: 'User created but no ID returned', debug: JSON.stringify(authJson) }, { status: 500 });
-    }
+    const { error: profileError } = await ensureProfile(userId, {
+      full_name: fullName,
+      phone,
+      email,
+    });
 
-    const { error: updateError } = await supabaseAdmin
-      .from('profiles')
-      .update({ phone, full_name: fullName, role: 'management' })
-      .eq('id', userId);
-
-    if (updateError) {
-      console.error('[create-management] Profile update failed:', updateError.message);
+    if (profileError) {
+      console.error('[create-management] Profile upsert failed:', profileError.message);
       return NextResponse.json({
-        error: `User created but role update failed: ${updateError.message}`,
-        debug: JSON.stringify(updateError),
+        error: `User created but profile update failed: ${profileError.message}`,
       }, { status: 500 });
     }
 
