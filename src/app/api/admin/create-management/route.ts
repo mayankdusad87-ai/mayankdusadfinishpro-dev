@@ -3,18 +3,6 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyAdmin } from '@/lib/auth-guard';
 import { createManagementSchema } from '@/lib/validations';
 
-function authErrorMessage(error: { message: string; status?: number; code?: string }): string {
-  if (error.code === 'email_exists' || error.message?.includes('already been registered'))
-    return 'A user with this email already exists.';
-  if (error.code === 'weak_password')
-    return 'Password is too weak. Use at least 6 characters.';
-  if (error.status === 401 || error.status === 403)
-    return 'Service role key is invalid or expired. Contact admin.';
-  const msg = error.message?.replace(/^\{?\}?$/, '').trim();
-  if (msg) return msg;
-  return `Auth error (${error.status ?? 'unknown'}). Please try again or contact admin.`;
-}
-
 export async function POST(req: NextRequest) {
   try {
     const auth = await verifyAdmin(req);
@@ -39,28 +27,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'A user with this email already exists.' }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { role: 'management', full_name: fullName },
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+    const authRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceKey}`,
+        'apikey': serviceKey,
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { role: 'management', full_name: fullName },
+      }),
     });
 
-    if (error) {
-      const code = 'code' in error ? String((error as unknown as { code: string }).code) : undefined;
-      const raw = JSON.stringify({ message: error.message, status: error.status, code, name: error.name, cause: error.cause });
-      console.error('[create-management] Auth error:', raw);
-      return NextResponse.json({ error: authErrorMessage({ message: error.message, status: error.status, code }), debug: raw }, { status: 400 });
+    const authJson = await authRes.json();
+
+    if (!authRes.ok) {
+      const msg = authJson.msg || authJson.message || authJson.error || JSON.stringify(authJson);
+      console.error('[create-management] GoTrue error:', authRes.status, msg);
+      return NextResponse.json({
+        error: typeof msg === 'string' && msg.length > 0 ? msg : `Auth service error (${authRes.status})`,
+        debug: JSON.stringify({ status: authRes.status, body: authJson }),
+      }, { status: 400 });
     }
 
-    if (data.user) {
+    const userId = authJson.id;
+    if (userId) {
       await supabaseAdmin
         .from('profiles')
         .update({ phone, full_name: fullName, role: 'management' })
-        .eq('id', data.user.id);
+        .eq('id', userId);
     }
 
-    return NextResponse.json({ userId: data.user?.id });
+    return NextResponse.json({ userId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Internal server error';
     console.error('[create-management] Unhandled:', msg);
