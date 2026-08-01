@@ -27,7 +27,8 @@ export async function createManagementUser(
     catch { json = {}; }
     if (!res.ok) {
       const msg = typeof json.error === 'string' ? json.error : 'Failed to create management user';
-      logAppError('create-management', JSON.stringify(json), msg);
+      const debug = typeof json.debug === 'string' ? json.debug : '';
+      logAppError('create-management', debug || JSON.stringify(json), msg);
       return { error: msg };
     }
     return { error: null, userId: json.userId as string };

@@ -48,8 +48,9 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       const code = 'code' in error ? String((error as unknown as { code: string }).code) : undefined;
-      console.error('[create-management] Auth error:', JSON.stringify({ message: error.message, status: error.status, code }));
-      return NextResponse.json({ error: authErrorMessage({ message: error.message, status: error.status, code }) }, { status: 400 });
+      const raw = JSON.stringify({ message: error.message, status: error.status, code, name: error.name, cause: error.cause });
+      console.error('[create-management] Auth error:', raw);
+      return NextResponse.json({ error: authErrorMessage({ message: error.message, status: error.status, code }), debug: raw }, { status: 400 });
     }
 
     if (data.user) {
