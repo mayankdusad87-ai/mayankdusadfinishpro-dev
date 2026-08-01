@@ -120,11 +120,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User created but no ID returned' }, { status: 500 });
     }
 
-    if (phone) {
-      await supabaseAdmin
-        .from('profiles')
-        .update({ phone })
-        .eq('id', userId);
+    const { error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update({ role: 'management', phone: phone || null, full_name: fullName })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('[create-management] Profile update failed:', updateError.message);
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+      const patchRes = await fetch(
+        `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceKey}`,
+            'apikey': serviceKey,
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({ role: 'management', phone: phone || null, full_name: fullName }),
+        },
+      );
+
+      if (!patchRes.ok) {
+        const patchErr = await patchRes.text();
+        console.error('[create-management] Direct PATCH also failed:', patchErr);
+        return NextResponse.json({
+          error: `User created but role update failed: ${updateError.message}`,
+        }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ userId });
