@@ -57,11 +57,21 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = authJson.id;
-    if (userId) {
-      await supabaseAdmin
-        .from('profiles')
-        .update({ phone, full_name: fullName, role: 'management' })
-        .eq('id', userId);
+    if (!userId) {
+      return NextResponse.json({ error: 'User created but no ID returned', debug: JSON.stringify(authJson) }, { status: 500 });
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update({ phone, full_name: fullName, role: 'management' })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('[create-management] Profile update failed:', updateError.message);
+      return NextResponse.json({
+        error: `User created but role update failed: ${updateError.message}`,
+        debug: JSON.stringify(updateError),
+      }, { status: 500 });
     }
 
     return NextResponse.json({ userId });
