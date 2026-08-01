@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { logAppError } from './errors';
 
 export interface ManagementUser {
   id: string;
@@ -15,14 +16,27 @@ export async function createManagementUser(
   fullName: string,
   phone?: string,
 ): Promise<{ error: string | null; userId?: string }> {
-  const res = await fetch('/api/admin/create-management', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, fullName, phone }),
-  });
-  const json = await res.json();
-  if (!res.ok) return { error: json.error || 'Failed to create management user' };
-  return { error: null, userId: json.userId };
+  try {
+    const res = await fetch('/api/admin/create-management', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, fullName, phone }),
+    });
+    let json: Record<string, unknown>;
+    try { json = await res.json(); }
+    catch { json = {}; }
+    if (!res.ok) {
+      const msg = typeof json.error === 'string' ? json.error : 'Failed to create management user';
+      logAppError('create-management', JSON.stringify(json), msg);
+      return { error: msg };
+    }
+    return { error: null, userId: json.userId as string };
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
+    const msg = 'Network error creating management user. Check your connection.';
+    logAppError('create-management', raw, msg);
+    return { error: msg };
+  }
 }
 
 export async function getManagementUsers(): Promise<ManagementUser[]> {
@@ -47,12 +61,25 @@ export async function toggleManagementUserStatus(
   userId: string,
   isActive: boolean,
 ): Promise<{ error: string | null }> {
-  const res = await fetch('/api/admin/deactivate-supervisor', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, isActive }),
-  });
-  const json = await res.json();
-  if (!res.ok) return { error: json.error || 'Failed to update status' };
-  return { error: null };
+  try {
+    const res = await fetch('/api/admin/deactivate-supervisor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, isActive }),
+    });
+    let json: Record<string, unknown>;
+    try { json = await res.json(); }
+    catch { json = {}; }
+    if (!res.ok) {
+      const msg = typeof json.error === 'string' ? json.error : 'Failed to update status';
+      logAppError('toggle-management-status', JSON.stringify(json), msg);
+      return { error: msg };
+    }
+    return { error: null };
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
+    const msg = 'Network error updating user status. Check your connection.';
+    logAppError('toggle-management-status', raw, msg);
+    return { error: msg };
+  }
 }
