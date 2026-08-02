@@ -137,7 +137,7 @@ function ManagementView({ data, projectName }: Props) {
             <div className="text-center">
               <div className="text-[11px] text-white/50">Progress</div>
               <div className="text-xl md:text-2xl font-bold text-white tabular-nums">{health.overallProgressPct}%</div>
-              <div className="text-[10px] text-white/40">of all activities</div>
+              <div className="text-[10px] text-white/40">weighted across stages</div>
             </div>
             <div className="text-center">
               <div className="text-[11px] text-white/50">1st coat paint by</div>
