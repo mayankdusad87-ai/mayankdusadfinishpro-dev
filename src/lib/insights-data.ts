@@ -98,6 +98,11 @@ export interface StageFloorBreakdown {
   onHoldFlats: OnHoldFlat[];
 }
 
+export interface DelayReasonRollup {
+  category: string;
+  flatCount: number;
+}
+
 export interface ManagementBottleneck {
   floor: number;
   blockedStage: string;
@@ -105,6 +110,8 @@ export interface ManagementBottleneck {
   overdueCount: number;
   maxDaysBehind: number;
   topDelayCategory: string;
+  delayReasons: DelayReasonRollup[];
+  totalFlatsAffected: number;
 }
 
 export interface ManagementData {
@@ -210,7 +217,12 @@ export function computeManagement(
   const stageFloorOverdue = new Map<string, Set<string>>();
   const bottleneckMap = new Map<number, {
     total: number; done: number;
-    stageOverdue: Map<string, { count: number; maxDays: number; vendors: Map<string, number>; reasons: Map<string, number> }>;
+    stageOverdue: Map<string, {
+      count: number; maxDays: number;
+      vendors: Map<string, number>;
+      reasons: Map<string, number>;
+      reasonFlats: Map<string, Set<number>>;
+    }>;
   }>();
 
   for (const r of rows) {
@@ -257,14 +269,14 @@ export function computeManagement(
     if (!done && r.expected_end && r.expected_end < TODAY) {
       const daysLate = daysBetween(r.expected_end, TODAY);
       let so = bo.stageOverdue.get(r.stage);
-      if (!so) { so = { count: 0, maxDays: 0, vendors: new Map(), reasons: new Map() }; bo.stageOverdue.set(r.stage, so); }
+      if (!so) { so = { count: 0, maxDays: 0, vendors: new Map(), reasons: new Map(), reasonFlats: new Map() }; bo.stageOverdue.set(r.stage, so); }
       so.count++;
       so.maxDays = Math.max(so.maxDays, daysLate);
       if (r.vendor) so.vendors.set(r.vendor, (so.vendors.get(r.vendor) || 0) + 1);
-      if (r.delay_reason) {
-        const cat = mapDelayCategory(r.delay_reason);
-        so.reasons.set(cat, (so.reasons.get(cat) || 0) + 1);
-      }
+      const cat = r.delay_reason ? mapDelayCategory(r.delay_reason) : '__none__';
+      so.reasons.set(cat, (so.reasons.get(cat) || 0) + 1);
+      if (!so.reasonFlats.has(cat)) so.reasonFlats.set(cat, new Set());
+      so.reasonFlats.get(cat)!.add(r.flat_number);
     }
   }
 
@@ -472,11 +484,13 @@ export function computeManagement(
     let totalOverdue = 0;
     let maxDays = 0;
     let topReason = '';
+    let worstStageSo: { count: number; maxDays: number; vendors: Map<string, number>; reasons: Map<string, number>; reasonFlats: Map<string, Set<number>> } | null = null;
     for (const [stage, so] of bo.stageOverdue) {
       totalOverdue += so.count;
       if (so.maxDays > maxDays) {
         maxDays = so.maxDays;
         worstStage = stage;
+        worstStageSo = so;
         let topVendor = '', topVCount = 0;
         for (const [v, c] of so.vendors) {
           if (c > topVCount) { topVCount = c; topVendor = v; }
@@ -484,12 +498,31 @@ export function computeManagement(
         worstVendor = topVendor;
         let topReasonName = '', topRCount = 0;
         for (const [rn, rc] of so.reasons) {
-          if (rc > topRCount) { topRCount = rc; topReasonName = rn; }
+          if (rn !== '__none__' && rc > topRCount) { topRCount = rc; topReasonName = rn; }
         }
         topReason = topReasonName;
       }
     }
-    bottlenecks.push({ floor, blockedStage: worstStage, blockedVendor: worstVendor, overdueCount: totalOverdue, maxDaysBehind: maxDays, topDelayCategory: topReason });
+
+    // Build flat-level delay reason rollup from the worst stage
+    const delayReasons: DelayReasonRollup[] = [];
+    let totalFlatsAffected = 0;
+    if (worstStageSo?.reasonFlats) {
+      const allFlats = new Set<number>();
+      for (const [cat, flats] of worstStageSo.reasonFlats) {
+        const label = cat === '__none__' ? 'No reason logged' : cat;
+        delayReasons.push({ category: label, flatCount: flats.size });
+        for (const fn of flats) allFlats.add(fn);
+      }
+      totalFlatsAffected = allFlats.size;
+      delayReasons.sort((a, b) => b.flatCount - a.flatCount);
+    }
+
+    bottlenecks.push({
+      floor, blockedStage: worstStage, blockedVendor: worstVendor,
+      overdueCount: totalOverdue, maxDaysBehind: maxDays, topDelayCategory: topReason,
+      delayReasons: delayReasons.slice(0, 3), totalFlatsAffected,
+    });
   }
   bottlenecks.sort((a, b) => b.maxDaysBehind - a.maxDaysBehind);
 

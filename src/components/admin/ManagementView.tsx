@@ -28,6 +28,8 @@ const SPI_COLORS = {
   red: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500', badge: 'Behind' },
 } as const;
 
+const REASON_COLORS = ['#EF4444', '#3B82F6', '#F59E0B'];
+
 function barColor(pct: number): string {
   if (pct >= 80) return '#10B981';
   if (pct >= 50) return '#F59E0B';
@@ -291,31 +293,53 @@ function ManagementView({ data, projectName }: Props) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {bottlenecks.map(b => (
-              <div key={`${b.floor}-${b.blockedStage}`} className="bg-white rounded-xl border border-gray-200 p-4 border-t-[3px] border-t-red-500">
-                <div className="text-sm font-bold text-gray-900">Floor {b.floor}</div>
-                <div className="text-xs font-semibold text-red-600 mb-3">Stuck at {b.blockedStage}</div>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">Vendor</span>
-                    <span className="font-semibold text-gray-900">{b.blockedVendor || '—'}</span>
+              <div key={`${b.floor}-${b.blockedStage}`} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="h-[3px] bg-red-500" />
+                <div className="p-4">
+                  <div className="flex items-baseline justify-between mb-0.5">
+                    <span className="text-sm font-bold text-gray-900">Floor {b.floor}</span>
+                    <span className="text-xs font-semibold text-red-600">{b.maxDaysBehind}d behind</span>
                   </div>
-                  <div className="flex justify-between text-xs border-t border-gray-50 pt-1.5">
-                    <span className="text-gray-400">Overdue</span>
-                    <span className="font-semibold text-red-600">{b.overdueCount} {b.overdueCount === 1 ? 'activity' : 'activities'}</span>
+                  <div className="text-xs font-semibold text-red-600 mb-3">Stuck at {b.blockedStage}</div>
+
+                  <div className="space-y-1.5 border-t border-gray-100 pt-2.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Vendor</span>
+                      <span className="font-semibold text-gray-900">{b.blockedVendor || '—'}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400">Overdue</span>
+                      <span className="font-semibold text-red-600">{b.overdueCount} {b.overdueCount === 1 ? 'activity' : 'activities'}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-xs border-t border-gray-50 pt-1.5">
-                    <span className="text-gray-400">Days behind</span>
-                    <span className="font-bold text-red-600">{b.maxDaysBehind}d</span>
-                  </div>
+
+                  {b.delayReasons.length > 0 && (
+                    <div className="border-t border-gray-100 mt-2.5 pt-2.5">
+                      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Why it&apos;s stuck</div>
+                      <div className="space-y-2">
+                        {b.delayReasons.map((dr, i) => {
+                          const isNoReason = dr.category === 'No reason logged';
+                          const barPct = b.totalFlatsAffected > 0 ? Math.round((dr.flatCount / b.totalFlatsAffected) * 100) : 0;
+                          const dotColor = isNoReason ? '#9CA3AF' : REASON_COLORS[i % REASON_COLORS.length];
+                          return (
+                            <div key={dr.category}>
+                              <div className="flex justify-between items-center mb-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
+                                  <span className={`text-xs ${isNoReason ? 'text-gray-400 italic' : 'text-gray-700'}`}>{dr.category}</span>
+                                </div>
+                                <span className={`text-xs font-semibold ${isNoReason ? 'text-gray-400' : 'text-gray-900'}`}>{dr.flatCount} {dr.flatCount === 1 ? 'flat' : 'flats'}</span>
+                              </div>
+                              <div className="w-full h-1 bg-gray-100 rounded-full">
+                                <div className="h-1 rounded-full transition-all" style={{ width: `${barPct}%`, backgroundColor: dotColor, opacity: isNoReason ? 0.5 : 0.7 }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {b.topDelayCategory && (
-                  <div className="mt-3 text-[11px] bg-red-50 text-red-700 rounded px-2.5 py-1.5 flex items-center gap-1.5">
-                    <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                    </svg>
-                    {b.topDelayCategory}
-                  </div>
-                )}
               </div>
             ))}
           </div>
