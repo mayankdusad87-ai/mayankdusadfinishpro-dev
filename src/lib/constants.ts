@@ -70,6 +70,24 @@ export const STATUS_RANK: Record<string, number> = {
   on_hold: -1,
 };
 
+// ---- Stage weights for weighted progress (must sum to 100) ----
+// Adjust these values per project to reflect relative effort/importance of each finishing stage.
+
+export const STAGE_WEIGHTS: Record<string, number> = {
+  'Pre-Tiling': 8,
+  'Tiling': 25,
+  'Post Tiling': 8,
+  'Pre Paint Activities': 12,
+  '1st coat paint': 15,
+  'Post First Coat Paint': 7,
+  'Second Coat Paint': 12,
+  'Post Second Coat Paint': 8,
+  'Lobby Flooring': 5,
+};
+
+// Days to paint one flat (used for 1st coat paint projection)
+export const PAINT_DAYS_PER_FLAT = 5;
+
 // ---- Pagination ----
 
 export const DEFAULT_PAGE_SIZE = 25;

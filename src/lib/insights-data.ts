@@ -2,6 +2,7 @@ import type { HeatmapData } from './floor-rollup';
 import { todayISO } from '@/lib/utils';
 import { getInsightActivities } from '@/repositories/activity-repo';
 import type { InsightRow } from '@/repositories/activity-repo';
+import { STAGE_WEIGHTS, PAINT_DAYS_PER_FLAT } from '@/lib/constants';
 
 const PIPELINE_STAGES = [
   'Pre-Tiling',
@@ -9,6 +10,19 @@ const PIPELINE_STAGES = [
   'Post Tiling',
   'Pre Paint Activities',
   '1st coat paint',
+];
+
+// All 9 stages used for weighted progress calculation
+const ALL_STAGES = [
+  'Pre-Tiling',
+  'Tiling',
+  'Post Tiling',
+  'Pre Paint Activities',
+  '1st coat paint',
+  'Post First Coat Paint',
+  'Second Coat Paint',
+  'Post Second Coat Paint',
+  'Lobby Flooring',
 ];
 
 // ---- Delay reason mapping: granular → high-level ----
@@ -343,11 +357,81 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
     };
   });
 
-  // --- 1st Coat Paint projected date: latest floor projection for that stage ---
+  // --- Weighted progress across all 9 stages ---
+  // For each stage, compute completion % across all flats, multiply by stage weight
+  const totalWeight = ALL_STAGES.reduce((sum, s) => sum + (STAGE_WEIGHTS[s] || 0), 0);
+  let weightedSum = 0;
+  for (const stage of ALL_STAGES) {
+    const cell = heatmap.stageCompletionUnits[stage];
+    const weight = STAGE_WEIGHTS[stage] || 0;
+    if (!cell || cell.total === 0) continue;
+    const stagePct = cell.completed / cell.total;
+    weightedSum += stagePct * weight;
+  }
+  const weightedProgressPct = totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 100) : 0;
+
+  // --- 1st Coat Paint projected date: project only up to that stage ---
+  // For each floor, sum remaining days for stages up to and including "1st coat paint"
+  const FIRST_COAT_STAGE = '1st coat paint';
   let firstCoatDate: string | null = null;
-  for (const fp of floors) {
-    if (fp.projectedFinish && (!firstCoatDate || fp.projectedFinish > firstCoatDate)) {
-      firstCoatDate = fp.projectedFinish;
+  for (const floorNum of floorNumbers) {
+    const f = floorMap.get(floorNum)!;
+    let remainingDays = 0;
+    let hasProjectionData = false;
+    let reachedFirstCoat = false;
+
+    for (const stage of PIPELINE_STAGES) {
+      const sa = f.stageActuals.get(stage);
+      if (!sa) continue;
+
+      if (sa.done === sa.total) {
+        if (stage === FIRST_COAT_STAGE) { reachedFirstCoat = true; break; }
+        continue;
+      }
+
+      if (stage === FIRST_COAT_STAGE) {
+        // For the paint stage itself: use PAINT_DAYS_PER_FLAT * remaining flats
+        const remaining = sa.total - sa.done;
+        remainingDays += remaining * PAINT_DAYS_PER_FLAT;
+        hasProjectionData = true;
+        reachedFirstCoat = true;
+      } else if (benchmarkAvg.has(stage)) {
+        const avg = benchmarkAvg.get(stage)!;
+        if (sa.starts.length > 0 && sa.done < sa.total) {
+          const stageStart = sa.starts.sort()[0];
+          const spent = daysBetween(stageStart, TODAY);
+          remainingDays += Math.max(0, avg - spent);
+        } else {
+          remainingDays += avg;
+        }
+        hasProjectionData = true;
+      } else if (sa.done > 0 && sa.starts.length > 0) {
+        const stageStart = sa.starts.sort()[0];
+        const daysSoFar = Math.max(1, daysBetween(stageStart, TODAY));
+        const rate = sa.done / daysSoFar;
+        if (rate > 0) {
+          remainingDays += (sa.total - sa.done) / rate;
+          hasProjectionData = true;
+        }
+      }
+
+      if (stage === FIRST_COAT_STAGE) { reachedFirstCoat = true; break; }
+    }
+
+    // If this floor hasn't even reached 1st coat paint data, still project it
+    if (!reachedFirstCoat) {
+      const paintSa = f.stageActuals.get(FIRST_COAT_STAGE);
+      if (paintSa) {
+        remainingDays += paintSa.total * PAINT_DAYS_PER_FLAT;
+        hasProjectionData = true;
+      }
+    }
+
+    if (hasProjectionData) {
+      const floorDate = addDays(TODAY, remainingDays);
+      if (!firstCoatDate || floorDate > firstCoatDate) {
+        firstCoatDate = floorDate;
+      }
     }
   }
 
@@ -366,7 +450,7 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
 
   const health: HealthVerdict = {
     status: healthStatus,
-    overallProgressPct: projectTotal > 0 ? Math.round((projectDone / projectTotal) * 100) : 0,
+    overallProgressPct: weightedProgressPct,
     firstCoatDate,
     delayedFlats: allDelayedFlats.size,
     delayedFloors: allDelayedFloors.size,
