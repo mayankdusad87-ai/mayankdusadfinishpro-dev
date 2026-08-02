@@ -172,11 +172,16 @@ function isComplete(status: string) {
 const TODAY = todayISO();
 
 function daysBetween(a: string, b: string): number {
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  if (isNaN(ta) || isNaN(tb)) return 0;
+  return Math.round((tb - ta) / 86400000);
 }
 
 function addDays(date: string, days: number): string {
+  if (!date || !isFinite(days)) return date || '';
   const d = new Date(date);
+  if (isNaN(d.getTime())) return date;
   d.setDate(d.getDate() + Math.round(days));
   return d.toISOString().slice(0, 10);
 }
