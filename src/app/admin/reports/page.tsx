@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useProject } from '@/lib/project-context';
 import { getDashboardData } from '@/lib/supabase-data';
 import { computeHeatmapFromRollup } from '@/lib/floor-rollup';
+import type { HeatmapData } from '@/lib/floor-rollup';
 import { getInsightsData } from '@/lib/insights-data';
 import type { ManagementData, OperationsData } from '@/lib/insights-data';
 import ManagementView from '@/components/admin/ManagementView';
@@ -18,19 +19,22 @@ export default function InsightsPage() {
   const [loading, setLoading] = useState(true);
   const [mgmt, setMgmt] = useState<ManagementData | null>(null);
   const [ops, setOps] = useState<OperationsData | null>(null);
+  const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null);
 
   const loadData = useCallback(async () => {
     if (!currentProject) {
       setMgmt(null);
       setOps(null);
+      setHeatmapData(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
       const dashData = await getDashboardData(currentProject.id);
-      if (!dashData) { setMgmt(null); setOps(null); setLoading(false); return; }
+      if (!dashData) { setMgmt(null); setOps(null); setHeatmapData(null); setLoading(false); return; }
       const heatmap = computeHeatmapFromRollup(dashData.heatmap, dashData.stages);
+      setHeatmapData(heatmap);
       const insights = await getInsightsData(currentProject.id, heatmap);
       if (insights) {
         setMgmt(insights.management);
@@ -39,6 +43,7 @@ export default function InsightsPage() {
     } catch {
       setMgmt(null);
       setOps(null);
+      setHeatmapData(null);
     }
     setLoading(false);
   }, [currentProject]);
@@ -46,6 +51,7 @@ export default function InsightsPage() {
   useEffect(() => {
     setMgmt(null);
     setOps(null);
+    setHeatmapData(null);
     loadData();
   }, [loadData]);
 
@@ -113,8 +119,8 @@ export default function InsightsPage() {
         </div>
       ) : (
         <>
-          {tab === 'management' && mgmt && (
-            <ManagementView data={mgmt} projectName={currentProject.name} />
+          {tab === 'management' && mgmt && heatmapData && (
+            <ManagementView data={mgmt} projectName={currentProject.name} heatmap={heatmapData} />
           )}
           {tab === 'operations' && ops && (
             <OperationsView data={ops} />

@@ -58,18 +58,47 @@ export interface FloorProjection {
   completedActivities: number;
 }
 
+export interface HealthVerdict {
+  status: 'on_track' | 'at_risk' | 'critical';
+  overallProgressPct: number;
+  firstCoatDate: string | null;
+  delayedFlats: number;
+  delayedFloors: number;
+  projectSpi: number;
+  projectSpiStatus: 'green' | 'yellow' | 'red';
+}
+
+export interface OnHoldFlat {
+  floor: number;
+  flatNumber: number;
+  reason: string;
+}
+
+export interface StageFloorBreakdown {
+  floor: number;
+  completed: number;
+  inProgress: number;
+  yetToStart: number;
+  total: number;
+  hasOverdue: boolean;
+  onHoldFlats: OnHoldFlat[];
+}
+
+export interface ManagementBottleneck {
+  floor: number;
+  blockedStage: string;
+  blockedVendor: string;
+  overdueCount: number;
+  maxDaysBehind: number;
+  topDelayCategory: string;
+}
+
 export interface ManagementData {
+  health: HealthVerdict;
   pipeline: PipelineStage[];
   floors: FloorProjection[];
-  kpi: {
-    totalFlats: number;
-    overallProgressPct: number;
-    overdueCount: number;
-    projectSpi: number;
-    projectSpiStatus: 'green' | 'yellow' | 'red';
-    totalActivities: number;
-    completedActivities: number;
-  };
+  bottlenecks: ManagementBottleneck[];
+  stageFloorBreakdowns: Record<string, StageFloorBreakdown[]>;
 }
 
 export interface VendorScore {
@@ -146,28 +175,39 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
     };
   });
 
-  const totalFlats = pipeline.length > 0 ? Math.max(...pipeline.map(p => p.totalFlats)) : 0;
-
   // --- Per-floor aggregation (single pass) ---
-  const floorMap = new Map<number, {
+  type FloorAgg = {
     total: number;
     done: number;
     planned: number;
     overdue: number;
+    overdueFlats: Set<number>;
     stageActuals: Map<string, { total: number; done: number; starts: string[]; ends: string[] }>;
+  };
+  const floorMap = new Map<number, FloorAgg>();
+
+  // Track on-hold flats and per-stage overdue for drill-down + bottlenecks
+  const onHoldByStage = new Map<string, OnHoldFlat[]>();
+  const stageFloorOverdue = new Map<string, Set<string>>();
+  const bottleneckMap = new Map<number, {
+    total: number; done: number;
+    stageOverdue: Map<string, { count: number; maxDays: number; vendors: Map<string, number>; reasons: Map<string, number> }>;
   }>();
 
   for (const r of rows) {
     let f = floorMap.get(r.floor);
     if (!f) {
-      f = { total: 0, done: 0, planned: 0, overdue: 0, stageActuals: new Map() };
+      f = { total: 0, done: 0, planned: 0, overdue: 0, overdueFlats: new Set(), stageActuals: new Map() };
       floorMap.set(r.floor, f);
     }
     f.total++;
     const done = isComplete(r.status);
     if (done) f.done++;
     if (r.expected_end && r.expected_end <= TODAY) f.planned++;
-    if (!done && r.expected_end && r.expected_end < TODAY) f.overdue++;
+    if (!done && r.expected_end && r.expected_end < TODAY) {
+      f.overdue++;
+      f.overdueFlats.add(r.flat_number);
+    }
 
     // Stage-level tracking for projections
     let sa = f.stageActuals.get(r.stage);
@@ -176,6 +216,37 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
     if (done) sa.done++;
     if (r.actual_start) sa.starts.push(r.actual_start);
     if (r.actual_end && done) sa.ends.push(r.actual_end);
+
+    // On-hold flats per stage
+    if (r.status === 'on_hold') {
+      if (!onHoldByStage.has(r.stage)) onHoldByStage.set(r.stage, []);
+      onHoldByStage.get(r.stage)!.push({ floor: r.floor, flatNumber: r.flat_number, reason: r.delay_reason || 'No reason specified' });
+    }
+
+    // Track overdue per stage+floor for drill-down
+    if (!done && r.expected_end && r.expected_end < TODAY) {
+      const key = `${r.stage}|${r.floor}`;
+      if (!stageFloorOverdue.has(key)) stageFloorOverdue.set(key, new Set());
+      stageFloorOverdue.get(key)!.add(String(r.flat_number));
+    }
+
+    // Bottleneck tracking (same logic as operations, but with delay reasons)
+    let bo = bottleneckMap.get(r.floor);
+    if (!bo) { bo = { total: 0, done: 0, stageOverdue: new Map() }; bottleneckMap.set(r.floor, bo); }
+    bo.total++;
+    if (done) bo.done++;
+    if (!done && r.expected_end && r.expected_end < TODAY) {
+      const daysLate = daysBetween(r.expected_end, TODAY);
+      let so = bo.stageOverdue.get(r.stage);
+      if (!so) { so = { count: 0, maxDays: 0, vendors: new Map(), reasons: new Map() }; bo.stageOverdue.set(r.stage, so); }
+      so.count++;
+      so.maxDays = Math.max(so.maxDays, daysLate);
+      if (r.vendor) so.vendors.set(r.vendor, (so.vendors.get(r.vendor) || 0) + 1);
+      if (r.delay_reason) {
+        const cat = mapDelayCategory(r.delay_reason);
+        so.reasons.set(cat, (so.reasons.get(cat) || 0) + 1);
+      }
+    }
   }
 
   // --- Stage benchmarks: for each stage, collect durations from completed floors ---
@@ -200,12 +271,17 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
   }
 
   // --- Project-level totals ---
-  let projectTotal = 0, projectDone = 0, projectPlanned = 0, projectOverdue = 0;
-  for (const [, f] of floorMap) {
+  let projectTotal = 0, projectDone = 0, projectPlanned = 0;
+  const allDelayedFlats = new Set<number>();
+  const allDelayedFloors = new Set<number>();
+  for (const [floorNum, f] of floorMap) {
     projectTotal += f.total;
     projectDone += f.done;
     projectPlanned += f.planned;
-    projectOverdue += f.overdue;
+    for (const flat of f.overdueFlats) {
+      allDelayedFlats.add(flat);
+      allDelayedFloors.add(floorNum);
+    }
   }
   const projectSpiResult = computeSpi(projectPlanned, projectDone);
 
@@ -216,7 +292,6 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
     const progressPct = f.total > 0 ? Math.round((f.done / f.total) * 100) : 0;
     const spiResult = computeSpi(f.planned, f.done);
 
-    // Current stage: first pipeline stage not fully complete on this floor
     let currentStage = PIPELINE_STAGES[PIPELINE_STAGES.length - 1];
     for (const stage of PIPELINE_STAGES) {
       const sa = f.stageActuals.get(stage);
@@ -226,19 +301,14 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
       }
     }
 
-    // Projection: sum remaining stage durations
     let totalRemainingDays = 0;
     let hasData = false;
-    let hitCurrentStage = false;
     for (const stage of PIPELINE_STAGES) {
       const sa = f.stageActuals.get(stage);
       if (!sa) continue;
-      if (sa.done === sa.total) continue; // fully complete, skip
-
-      hitCurrentStage = true;
+      if (sa.done === sa.total) continue;
 
       if (benchmarkAvg.has(stage)) {
-        // Benchmark available
         const avg = benchmarkAvg.get(stage)!;
         if (stage === currentStage && sa.starts.length > 0) {
           const stageStart = sa.starts.sort()[0];
@@ -249,7 +319,6 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
         }
         hasData = true;
       } else if (sa.done > 0 && sa.starts.length > 0) {
-        // Rate-based fallback
         const stageStart = sa.starts.sort()[0];
         const daysSoFar = Math.max(1, daysBetween(stageStart, TODAY));
         const rate = sa.done / daysSoFar;
@@ -274,18 +343,97 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
     };
   });
 
+  // --- 1st Coat Paint projected date: latest floor projection for that stage ---
+  let firstCoatDate: string | null = null;
+  for (const fp of floors) {
+    if (fp.projectedFinish && (!firstCoatDate || fp.projectedFinish > firstCoatDate)) {
+      firstCoatDate = fp.projectedFinish;
+    }
+  }
+
+  // --- Health verdict ---
+  const totalFlatCount = pipeline[0]?.totalFlats || 1;
+  const overduePct = totalFlatCount > 0 ? (allDelayedFlats.size / totalFlatCount) * 100 : 0;
+  const anyFloorRed = floors.some(f => f.spiStatus === 'red');
+  let healthStatus: HealthVerdict['status'];
+  if (projectSpiResult.spi > 0.95 && !anyFloorRed && overduePct < 5) {
+    healthStatus = 'on_track';
+  } else if (projectSpiResult.spi < 0.80 || overduePct > 15) {
+    healthStatus = 'critical';
+  } else {
+    healthStatus = 'at_risk';
+  }
+
+  const health: HealthVerdict = {
+    status: healthStatus,
+    overallProgressPct: projectTotal > 0 ? Math.round((projectDone / projectTotal) * 100) : 0,
+    firstCoatDate,
+    delayedFlats: allDelayedFlats.size,
+    delayedFloors: allDelayedFloors.size,
+    projectSpi: Math.round(projectSpiResult.spi * 100) / 100,
+    projectSpiStatus: projectSpiResult.status,
+  };
+
+  // --- Bottlenecks (top 3) ---
+  const bottlenecks: ManagementBottleneck[] = [];
+  for (const [floor, bo] of bottleneckMap) {
+    if (bo.stageOverdue.size === 0) continue;
+    let worstStage = '';
+    let worstVendor = '';
+    let totalOverdue = 0;
+    let maxDays = 0;
+    let topReason = '';
+    for (const [stage, so] of bo.stageOverdue) {
+      totalOverdue += so.count;
+      if (so.maxDays > maxDays) {
+        maxDays = so.maxDays;
+        worstStage = stage;
+        let topVendor = '', topVCount = 0;
+        for (const [v, c] of so.vendors) {
+          if (c > topVCount) { topVCount = c; topVendor = v; }
+        }
+        worstVendor = topVendor;
+        let topReasonName = '', topRCount = 0;
+        for (const [rn, rc] of so.reasons) {
+          if (rc > topRCount) { topRCount = rc; topReasonName = rn; }
+        }
+        topReason = topReasonName;
+      }
+    }
+    bottlenecks.push({ floor, blockedStage: worstStage, blockedVendor: worstVendor, overdueCount: totalOverdue, maxDaysBehind: maxDays, topDelayCategory: topReason });
+  }
+  bottlenecks.sort((a, b) => b.maxDaysBehind - a.maxDaysBehind);
+
+  // --- Stage floor breakdowns (for drill-down) ---
+  const stageFloorBreakdowns: Record<string, StageFloorBreakdown[]> = {};
+  for (const stage of PIPELINE_STAGES) {
+    const breakdowns: StageFloorBreakdown[] = [];
+    for (const floorRow of heatmap.floors) {
+      const cell = floorRow.stages[stage];
+      if (!cell || cell.total === 0) continue;
+      const overdueKey = `${stage}|${floorRow.floor}`;
+      const hasOverdue = stageFloorOverdue.has(overdueKey);
+      const stageOnHold = (onHoldByStage.get(stage) || []).filter(oh => oh.floor === floorRow.floor);
+      breakdowns.push({
+        floor: floorRow.floor,
+        completed: cell.completed,
+        inProgress: cell.running,
+        yetToStart: cell.total - cell.completed - cell.running,
+        total: cell.total,
+        hasOverdue,
+        onHoldFlats: stageOnHold,
+      });
+    }
+    breakdowns.sort((a, b) => a.floor - b.floor);
+    stageFloorBreakdowns[stage] = breakdowns;
+  }
+
   return {
+    health,
     pipeline,
     floors,
-    kpi: {
-      totalFlats,
-      overallProgressPct: projectTotal > 0 ? Math.round((projectDone / projectTotal) * 100) : 0,
-      overdueCount: projectOverdue,
-      projectSpi: Math.round(projectSpiResult.spi * 100) / 100,
-      projectSpiStatus: projectSpiResult.status,
-      totalActivities: projectTotal,
-      completedActivities: projectDone,
-    },
+    bottlenecks: bottlenecks.slice(0, 3),
+    stageFloorBreakdowns,
   };
 }
 
