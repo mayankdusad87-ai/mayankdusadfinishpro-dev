@@ -33,7 +33,11 @@ export default function InsightsPage() {
     setLoading(true);
     try {
       const dashData = await getDashboardData(currentProject.id);
-      if (!dashData) { setMgmt(null); setOps(null); setHeatmapData(null); setLoading(false); return; }
+      if (!dashData) {
+        console.warn('[Insights] getDashboardData returned null for', currentProject.name, currentProject.id);
+        setMgmt(null); setOps(null); setHeatmapData(null); setLoading(false); return;
+      }
+      console.log('[Insights]', currentProject.name, '— dashData heatmap rows:', dashData.heatmap.length, 'stages:', dashData.stages);
       const heatmap = computeHeatmapFromRollup(dashData.heatmap, dashData.stages);
       setHeatmapData(heatmap);
       const [dbWeights, dbPaintDays] = await Promise.all([
@@ -47,10 +51,16 @@ export default function InsightsPage() {
         dbPaintDays ?? undefined,
       );
       if (insights) {
+        console.log('[Insights]', currentProject.name, '— management data loaded');
         setMgmt(insights.management);
         setOps(insights.operations);
+      } else {
+        console.warn('[Insights]', currentProject.name, '— getInsightsData returned null (0 activity rows passed filter)');
+        setMgmt(null);
+        setOps(null);
       }
-    } catch {
+    } catch (err) {
+      console.error('[Insights] Failed to load data:', err);
       setMgmt(null);
       setOps(null);
       setHeatmapData(null);

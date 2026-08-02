@@ -333,7 +333,8 @@ export async function getInsightActivities(projectId: string): Promise<InsightRo
       .eq('project_id', projectId)
       .neq('status', 'not_applicable')
       .range(from, from + PAGE - 1);
-    if (error || !data || data.length === 0) break;
+    if (error) { console.error('[getInsightActivities] query error:', error.message, error.code); break; }
+    if (!data || data.length === 0) break;
     all.push(...(data as InsightRow[]));
     if (data.length < PAGE) break;
     from += PAGE;
