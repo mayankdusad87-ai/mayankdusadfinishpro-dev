@@ -57,3 +57,10 @@ export type { Reason } from './reason-repo';
 
 export { getAuditLog } from './audit-repo';
 export type { AuditLogRow } from './audit-repo';
+
+export {
+  getStageWeights,
+  setStageWeights,
+  getPaintDaysPerFlat,
+  setPaintDaysPerFlat,
+} from './settings-repo';

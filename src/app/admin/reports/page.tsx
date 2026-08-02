@@ -6,6 +6,7 @@ import { getDashboardData } from '@/lib/supabase-data';
 import { computeHeatmapFromRollup } from '@/lib/floor-rollup';
 import type { HeatmapData } from '@/lib/floor-rollup';
 import { getInsightsData } from '@/lib/insights-data';
+import { getStageWeights, getPaintDaysPerFlat } from '@/repositories/settings-repo';
 import type { ManagementData, OperationsData } from '@/lib/insights-data';
 import ManagementView from '@/components/admin/ManagementView';
 import OperationsView from '@/components/admin/OperationsView';
@@ -35,7 +36,16 @@ export default function InsightsPage() {
       if (!dashData) { setMgmt(null); setOps(null); setHeatmapData(null); setLoading(false); return; }
       const heatmap = computeHeatmapFromRollup(dashData.heatmap, dashData.stages);
       setHeatmapData(heatmap);
-      const insights = await getInsightsData(currentProject.id, heatmap);
+      const [dbWeights, dbPaintDays] = await Promise.all([
+        getStageWeights(),
+        getPaintDaysPerFlat(),
+      ]);
+      const insights = await getInsightsData(
+        currentProject.id,
+        heatmap,
+        dbWeights ?? undefined,
+        dbPaintDays ?? undefined,
+      );
       if (insights) {
         setMgmt(insights.management);
         setOps(insights.operations);

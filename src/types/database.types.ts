@@ -181,6 +181,24 @@ export type Database = {
           },
         ]
       }
+      app_settings: {
+        Row: {
+          key: string
+          value: Json
+          updated_at: string | null
+        }
+        Insert: {
+          key: string
+          value: Json
+          updated_at?: string | null
+        }
+        Update: {
+          key?: string
+          value?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       app_errors: {
         Row: {
           action: string

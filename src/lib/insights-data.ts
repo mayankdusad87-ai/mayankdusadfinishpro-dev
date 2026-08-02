@@ -2,7 +2,7 @@ import type { HeatmapData } from './floor-rollup';
 import { todayISO } from '@/lib/utils';
 import { getInsightActivities } from '@/repositories/activity-repo';
 import type { InsightRow } from '@/repositories/activity-repo';
-import { STAGE_WEIGHTS, PAINT_DAYS_PER_FLAT } from '@/lib/constants';
+import { STAGE_WEIGHTS as DEFAULT_STAGE_WEIGHTS, PAINT_DAYS_PER_FLAT as DEFAULT_PAINT_DAYS } from '@/lib/constants';
 
 const PIPELINE_STAGES = [
   'Pre-Tiling',
@@ -176,7 +176,12 @@ function addDays(date: string, days: number): string {
 
 // ---- Management ----
 
-export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): ManagementData {
+export function computeManagement(
+  rows: InsightRow[],
+  heatmap: HeatmapData,
+  stageWeights: Record<string, number> = DEFAULT_STAGE_WEIGHTS,
+  paintDaysPerFlat: number = DEFAULT_PAINT_DAYS,
+): ManagementData {
   // --- Pipeline from heatmap (reuse existing rollup) ---
   const pipeline: PipelineStage[] = PIPELINE_STAGES.map(stage => {
     const cell = heatmap.stageCompletionUnits[stage];
@@ -359,11 +364,11 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
 
   // --- Weighted progress across all 9 stages ---
   // For each stage, compute completion % across all flats, multiply by stage weight
-  const totalWeight = ALL_STAGES.reduce((sum, s) => sum + (STAGE_WEIGHTS[s] || 0), 0);
+  const totalWeight = ALL_STAGES.reduce((sum, s) => sum + (stageWeights[s] || 0), 0);
   let weightedSum = 0;
   for (const stage of ALL_STAGES) {
     const cell = heatmap.stageCompletionUnits[stage];
-    const weight = STAGE_WEIGHTS[stage] || 0;
+    const weight = stageWeights[stage] || 0;
     if (!cell || cell.total === 0) continue;
     const stagePct = cell.completed / cell.total;
     weightedSum += stagePct * weight;
@@ -390,9 +395,9 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
       }
 
       if (stage === FIRST_COAT_STAGE) {
-        // For the paint stage itself: use PAINT_DAYS_PER_FLAT * remaining flats
+        // For the paint stage itself: use paintDaysPerFlat * remaining flats
         const remaining = sa.total - sa.done;
-        remainingDays += remaining * PAINT_DAYS_PER_FLAT;
+        remainingDays += remaining * paintDaysPerFlat;
         hasProjectionData = true;
         reachedFirstCoat = true;
       } else if (benchmarkAvg.has(stage)) {
@@ -422,7 +427,7 @@ export function computeManagement(rows: InsightRow[], heatmap: HeatmapData): Man
     if (!reachedFirstCoat) {
       const paintSa = f.stageActuals.get(FIRST_COAT_STAGE);
       if (paintSa) {
-        remainingDays += paintSa.total * PAINT_DAYS_PER_FLAT;
+        remainingDays += paintSa.total * paintDaysPerFlat;
         hasProjectionData = true;
       }
     }
@@ -646,12 +651,14 @@ export function computeOperations(rows: InsightRow[]): OperationsData {
 
 export async function getInsightsData(
   projectId: string,
-  heatmap: HeatmapData
+  heatmap: HeatmapData,
+  stageWeights?: Record<string, number>,
+  paintDaysPerFlat?: number,
 ): Promise<{ management: ManagementData; operations: OperationsData } | null> {
   const rows = await getInsightActivities(projectId);
   if (rows.length === 0) return null;
   return {
-    management: computeManagement(rows, heatmap),
+    management: computeManagement(rows, heatmap, stageWeights, paintDaysPerFlat),
     operations: computeOperations(rows),
   };
 }
