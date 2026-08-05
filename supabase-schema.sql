@@ -465,3 +465,52 @@ BEGIN
     ORDER BY a.floor;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
+
+-- ============================================
+-- 14. STORAGE POLICIES FOR activity-photos BUCKET
+-- The bucket must exist first:
+--   INSERT INTO storage.buckets (id, name, public) VALUES ('activity-photos', 'activity-photos', false);
+-- Then apply these RLS policies on storage.objects:
+-- ============================================
+
+-- Admin full access
+CREATE POLICY "Admin full access to activity-photos"
+ON storage.objects FOR ALL
+USING (bucket_id = 'activity-photos' AND is_admin())
+WITH CHECK (bucket_id = 'activity-photos' AND is_admin());
+
+-- Supervisor can upload photos for assigned projects
+CREATE POLICY "Supervisor upload to activity-photos"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'activity-photos'
+  AND EXISTS (
+    SELECT 1 FROM supervisor_assignments
+    WHERE supervisor_id = auth.uid()
+    AND project_id = (storage.foldername(name))[1]::uuid
+  )
+);
+
+-- Supervisor can view photos for assigned projects
+CREATE POLICY "Supervisor read from activity-photos"
+ON storage.objects FOR SELECT
+USING (
+  bucket_id = 'activity-photos'
+  AND EXISTS (
+    SELECT 1 FROM supervisor_assignments
+    WHERE supervisor_id = auth.uid()
+    AND project_id = (storage.foldername(name))[1]::uuid
+  )
+);
+
+-- Supervisor can delete photos for assigned projects
+CREATE POLICY "Supervisor delete from activity-photos"
+ON storage.objects FOR DELETE
+USING (
+  bucket_id = 'activity-photos'
+  AND EXISTS (
+    SELECT 1 FROM supervisor_assignments
+    WHERE supervisor_id = auth.uid()
+    AND project_id = (storage.foldername(name))[1]::uuid
+  )
+);

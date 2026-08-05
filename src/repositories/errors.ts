@@ -19,7 +19,7 @@ export function logAppError(action: string, rawError: string, userFriendly: stri
 export function friendlyError(raw: string, context: string, extra?: Record<string, unknown>): string {
   const lower = raw.toLowerCase();
   let friendly: string;
-  if (lower.includes('row level security') || lower.includes('rls'))
+  if (lower.includes('row level security') || lower.includes('row-level security') || lower.includes('rls'))
     friendly = `Permission denied: unable to ${context}. Please contact admin.`;
   else if (lower.includes('duplicate key') || lower.includes('unique constraint'))
     friendly = `This ${context} already exists.`;
