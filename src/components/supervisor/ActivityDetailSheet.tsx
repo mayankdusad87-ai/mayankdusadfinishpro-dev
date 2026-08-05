@@ -32,6 +32,7 @@ export default function ActivityDetailSheet({
   const [detailActualEnd, setDetailActualEnd] = useState(activity.actual_end || '');
   const [detailError, setDetailError] = useState('');
   const [detailPhotos, setDetailPhotos] = useState<ActivityPhoto[]>([]);
+  const [pendingPhotos, setPendingPhotos] = useState<{ file: Blob; preview: string; fileName: string }[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
 
@@ -53,43 +54,40 @@ export default function ActivityDetailSheet({
   async function handlePhotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    if (detailPhotos.length + files.length > 3) {
+    const totalCount = detailPhotos.length + pendingPhotos.length + files.length;
+    if (totalCount > 3) {
       setPhotoError('Maximum 3 photos per activity.');
       e.target.value = '';
       return;
     }
 
-    setPhotoUploading(true);
     setPhotoError('');
+    const newPending: typeof pendingPhotos = [];
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (const file of files) {
       try {
         const compressed = await compressImage(file);
-        const path = generatePhotoPath(projectId, activity.id, detailPhotos.length + i);
-        const result = await uploadActivityPhoto(compressed, path, {
-          activityId: activity.id,
-          projectId,
-          fileName: file.name || `photo_${detailPhotos.length + i}.jpg`,
-          floor: activity.floor,
-          stage: activity.stage,
-          stageGate: activity.stage_gate,
-          activityName: activity.activity,
-          flatNumber: activity.flat_number,
-          uploadedBy: userId,
+        const preview = URL.createObjectURL(compressed);
+        newPending.push({
+          file: compressed,
+          preview,
+          fileName: file.name || `photo_${detailPhotos.length + pendingPhotos.length + newPending.length}.jpg`,
         });
-        if (result.error) {
-          setPhotoError(result.error);
-        }
       } catch {
-        setPhotoError('Failed to upload photo. Please try again.');
+        setPhotoError('Failed to compress photo. Please try again.');
       }
     }
-    const updatedPhotos = await getPhotosForActivity(activity.id);
-    setDetailPhotos(updatedPhotos);
 
-    setPhotoUploading(false);
+    setPendingPhotos(prev => [...prev, ...newPending]);
     e.target.value = '';
+  }
+
+  function removePendingPhoto(index: number) {
+    setPendingPhotos(prev => {
+      const removed = prev[index];
+      if (removed) URL.revokeObjectURL(removed.preview);
+      return prev.filter((_, i) => i !== index);
+    });
   }
 
   async function handleDeletePhoto(photo: ActivityPhoto) {
@@ -103,7 +101,44 @@ export default function ActivityDetailSheet({
 
   async function saveDetail() {
     setDetailError('');
+    setPhotoError('');
 
+    // Upload pending photos first
+    if (pendingPhotos.length > 0) {
+      setPhotoUploading(true);
+      for (let i = 0; i < pendingPhotos.length; i++) {
+        const pending = pendingPhotos[i];
+        try {
+          const path = generatePhotoPath(projectId, activity.id, detailPhotos.length + i);
+          const uploadResult = await uploadActivityPhoto(pending.file, path, {
+            activityId: activity.id,
+            projectId,
+            fileName: pending.fileName,
+            floor: activity.floor,
+            stage: activity.stage,
+            stageGate: activity.stage_gate,
+            activityName: activity.activity,
+            flatNumber: activity.flat_number,
+            uploadedBy: userId,
+          });
+          if (uploadResult.error) {
+            setPhotoError(uploadResult.error);
+            setPhotoUploading(false);
+            return;
+          }
+        } catch {
+          setPhotoError('Failed to upload photo. Please try again.');
+          setPhotoUploading(false);
+          return;
+        }
+      }
+      // Clean up preview URLs
+      pendingPhotos.forEach(p => URL.revokeObjectURL(p.preview));
+      setPendingPhotos([]);
+      setPhotoUploading(false);
+    }
+
+    const totalPhotos = detailPhotos.length + pendingPhotos.length;
     const result = await saveActivityDetail({
       activityId: activity.id,
       status: detailStatus,
@@ -114,7 +149,7 @@ export default function ActivityDetailSheet({
       delayReason: detailReason,
       delayReasonIsOther: detailReason === '__other__',
       remarks: detailRemarks,
-      photoCount: detailPhotos.length,
+      photoCount: totalPhotos,
       projectId,
       projectName,
       userId,
@@ -279,7 +314,10 @@ export default function ActivityDetailSheet({
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-2">
-                Photo Evidence <span className="text-gray-400 font-normal">({detailPhotos.length}/3)</span>
+                Photo Evidence <span className="text-gray-400 font-normal">({detailPhotos.length + pendingPhotos.length}/3)</span>
+                {pendingPhotos.length > 0 && (
+                  <span className="text-amber-600 font-normal ml-1">• {pendingPhotos.length} unsaved</span>
+                )}
               </label>
 
               {photoError && (
@@ -288,8 +326,9 @@ export default function ActivityDetailSheet({
                 </div>
               )}
 
-              {detailPhotos.length > 0 && (
+              {(detailPhotos.length > 0 || pendingPhotos.length > 0) && (
                 <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+                  {/* Existing saved photos */}
                   {detailPhotos.map(photo => (
                     <div key={photo.id} className="relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
                       <img
@@ -305,10 +344,29 @@ export default function ActivityDetailSheet({
                       </button>
                     </div>
                   ))}
+                  {/* Pending (unsaved) photos */}
+                  {pendingPhotos.map((pending, idx) => (
+                    <div key={`pending-${idx}`} className="relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 border-amber-300">
+                      <img
+                        src={pending.preview}
+                        alt={pending.fileName}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-amber-500 text-white text-[9px] text-center py-0.5 font-medium">
+                        Unsaved
+                      </div>
+                      <button
+                        onClick={() => removePendingPhoto(idx)}
+                        className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {detailPhotos.length < 3 && (
+              {detailPhotos.length + pendingPhotos.length < 3 && (
                 <label className={`w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed rounded-lg text-sm transition-colors cursor-pointer ${
                   photoUploading ? 'border-gray-200 text-gray-400 pointer-events-none' : 'border-gray-300 text-gray-500 hover:border-primary hover:text-primary'
                 }`}>
@@ -321,20 +379,11 @@ export default function ActivityDetailSheet({
                     disabled={photoUploading}
                     className="hidden"
                   />
-                  {photoUploading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      Compressing & uploading...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
-                      </svg>
-                      Tap to take photo or upload
-                    </>
-                  )}
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+                  </svg>
+                  Tap to take photo or upload
                 </label>
               )}
             </div>
@@ -344,9 +393,19 @@ export default function ActivityDetailSheet({
         <div className="sticky bottom-0 bg-white border-t border-gray-200 px-5 py-3">
           <button
             onClick={saveDetail}
-            className="w-full py-3 bg-primary hover:bg-primary-dark text-white font-semibold rounded-xl transition-colors"
+            disabled={photoUploading}
+            className={`w-full py-3 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 ${
+              photoUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark'
+            }`}
           >
-            Save Changes
+            {photoUploading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Uploading photos...
+              </>
+            ) : (
+              `Save Changes${pendingPhotos.length > 0 ? ` (${pendingPhotos.length} photo${pendingPhotos.length > 1 ? 's' : ''})` : ''}`
+            )}
           </button>
         </div>
       </div>

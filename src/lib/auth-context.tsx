@@ -95,33 +95,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchProfile]);
 
+  const logAuthEvent = useCallback(async (userId: string, event: 'signed_in' | 'signed_out', email?: string) => {
+    try {
+      await supabase.from('audit_log').insert({
+        changed_by: userId,
+        old_status: event === 'signed_in' ? 'signed_out' : 'signed_in',
+        new_status: event,
+        activity_name: email || null,
+        stage: 'auth',
+      });
+    } catch {
+      // Non-critical — don't block auth flow
+    }
+  }, []);
+
   const signIn = useCallback(async (email: string, password: string) => {
-  console.log("SUPABASE URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+    if (error) {
+      return {
+        error: `${error.message} (${error.status ?? "no-status"})`,
+      };
+    }
 
-  console.log("Login Result:", { data, error });
+    if (data.user) {
+      logAuthEvent(data.user.id, 'signed_in', email);
+    }
 
-  if (error) {
-    console.error("Supabase Login Error:", error);
-
-    return {
-      error: `${error.message} (${error.status ?? "no-status"})`,
-    };
-  }
-
-  return { error: null };
-}, []);
+    return { error: null };
+  }, [logAuthEvent]);
 
   const signOut = useCallback(async () => {
+    if (user) {
+      await logAuthEvent(user.id, 'signed_out', user.email || undefined);
+    }
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
     setSession(null);
-  }, []);
+  }, [user, logAuthEvent]);
 
   useEffect(() => {
     if (!user) return;

@@ -9,25 +9,51 @@ export type AuditLogRow = AuditLogDbRow & {
 
 export async function getAuditLog(
   projectId: string,
-  filters?: { startDate?: string; endDate?: string }
+  filters?: { startDate?: string; endDate?: string; includeAuth?: boolean }
 ): Promise<AuditLogRow[]> {
-  let query = supabase
+  // Fetch project-specific entries
+  let projectQuery = supabase
     .from('audit_log')
     .select('id, activity_id, project_id, changed_by, old_status, new_status, floor, flat_number, stage, stage_gate, activity_name, created_at')
     .eq('project_id', projectId)
     .order('created_at', { ascending: false });
 
   if (filters?.startDate) {
-    query = query.gte('created_at', `${filters.startDate}T00:00:00`);
+    projectQuery = projectQuery.gte('created_at', `${filters.startDate}T00:00:00`);
   }
   if (filters?.endDate) {
-    query = query.lte('created_at', `${filters.endDate}T23:59:59`);
+    projectQuery = projectQuery.lte('created_at', `${filters.endDate}T23:59:59`);
   }
 
-  const { data, error } = await query.limit(500);
-  if (error) return [];
+  const { data: projectData, error: projectError } = await projectQuery.limit(500);
 
-  const rows = data || [];
+  // Also fetch auth events (stage = 'auth', project_id is null)
+  let authQuery = supabase
+    .from('audit_log')
+    .select('id, activity_id, project_id, changed_by, old_status, new_status, floor, flat_number, stage, stage_gate, activity_name, created_at')
+    .eq('stage', 'auth')
+    .is('project_id', null)
+    .order('created_at', { ascending: false });
+
+  if (filters?.startDate) {
+    authQuery = authQuery.gte('created_at', `${filters.startDate}T00:00:00`);
+  }
+  if (filters?.endDate) {
+    authQuery = authQuery.lte('created_at', `${filters.endDate}T23:59:59`);
+  }
+
+  const { data: authData } = await authQuery.limit(100);
+
+  if (projectError) return [];
+
+  // Merge and sort by created_at descending
+  const rows = [...(projectData || []), ...(authData || [])];
+  rows.sort((a, b) => {
+    const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return tb - ta;
+  });
+
   if (rows.length === 0) return [];
 
   const userIds = [...new Set(rows.map(r => r.changed_by).filter((id): id is string => Boolean(id)))];

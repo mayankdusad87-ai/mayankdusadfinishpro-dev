@@ -19,7 +19,7 @@ import { useCanAccess } from '@/hooks';
 
 export default function SupervisorHomePage() {
   const allowBulk = useCanAccess('bulk-status-update');
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const router = useRouter();
   const [availableProjects, setAvailableProjects] = useState<ManagedProject[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -41,6 +41,7 @@ export default function SupervisorHomePage() {
   const [reasons, setReasons] = useState<Reason[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [assignedFloors, setAssignedFloors] = useState<number[] | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
 
   useEffect(() => {
     getProjectsFromSupabase().then(projects => {
@@ -312,19 +313,48 @@ export default function SupervisorHomePage() {
                 </span>
               )}
             </button>
+            {/* Profile avatar */}
             <button
-              onClick={async () => { await signOut(); router.replace('/supervisor/login'); }}
-              className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+              onClick={() => setShowProfile(!showProfile)}
+              className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-primary text-sm font-bold"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
-              </svg>
+              {(profile?.full_name || 'S').charAt(0).toUpperCase()}
             </button>
           </div>
         </div>
 
+        {/* Profile dropdown */}
+        {showProfile && (
+          <div className="mb-3 bg-navy-light/80 rounded-xl p-4 border border-white/10">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-11 h-11 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center text-primary text-lg font-bold">
+                {(profile?.full_name || 'S').charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-white font-semibold text-sm truncate">{profile?.full_name || 'Supervisor'}</div>
+                <div className="text-gray-400 text-xs truncate">{user?.email || ''}</div>
+                {profile?.phone && <div className="text-gray-500 text-xs truncate">{profile.phone}</div>}
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-white/10">
+              <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
+                {profile?.role || 'supervisor'}
+              </span>
+              <button
+                onClick={async () => { await signOut(); router.replace('/supervisor/login'); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 text-xs font-medium rounded-lg hover:bg-red-500/20 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+                </svg>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mb-3">
-          <div className="text-white text-base font-semibold">{getGreeting()}, Supervisor</div>
+          <div className="text-white text-base font-semibold">{getGreeting()}, {profile?.full_name?.split(' ')[0] || 'Supervisor'}</div>
           <div className="text-gray-400 text-xs">{todayFormatted}</div>
         </div>
 

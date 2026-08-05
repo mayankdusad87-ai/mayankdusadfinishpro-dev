@@ -13,6 +13,13 @@ const STATUS_COLORS: Record<string, string> = {
   completed: 'bg-green-100 text-green-700',
   delayed: 'bg-orange-100 text-orange-700',
   on_hold: 'bg-red-100 text-red-700',
+  signed_in: 'bg-emerald-100 text-emerald-700',
+  signed_out: 'bg-slate-100 text-slate-700',
+};
+
+const AUTH_LABELS: Record<string, string> = {
+  signed_in: 'Signed In',
+  signed_out: 'Signed Out',
 };
 
 export default function AuditLogPage() {
@@ -136,8 +143,9 @@ export default function AuditLogPage() {
                 <tbody className="divide-y divide-gray-100">
                   {paginated.map((entry) => {
                     const { date, time } = formatTimestamp(entry.created_at || '');
+                    const isAuth = entry.stage === 'auth';
                     return (
-                      <tr key={entry.id} className="border-l-4 border-l-blue-400 hover:bg-gray-50/50 transition-colors">
+                      <tr key={entry.id} className={`border-l-4 hover:bg-gray-50/50 transition-colors ${isAuth ? 'border-l-purple-400' : 'border-l-blue-400'}`}>
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <div className="font-medium text-gray-900">{date}</div>
                           <div className="text-xs text-gray-400 mt-0.5">{time}</div>
@@ -146,30 +154,51 @@ export default function AuditLogPage() {
                           <div className="font-medium text-gray-900">
                             {entry.changed_by_name || 'System'}
                           </div>
+                          {isAuth && entry.changed_by_role && (
+                            <div className="text-[10px] text-purple-500 font-medium uppercase mt-0.5">{entry.changed_by_role}</div>
+                          )}
                         </td>
                         <td className="px-4 py-3.5">
-                          <div className="text-gray-900">{entry.activity_name || '-'}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">
-                            {entry.stage}{entry.stage_gate ? ` / ${entry.stage_gate}` : ''}
-                          </div>
+                          {isAuth ? (
+                            <div className="text-purple-700 font-medium text-xs">
+                              {entry.activity_name || '-'}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="text-gray-900">{entry.activity_name || '-'}</div>
+                              <div className="text-xs text-gray-400 mt-0.5">
+                                {entry.stage}{entry.stage_gate ? ` / ${entry.stage_gate}` : ''}
+                              </div>
+                            </>
+                          )}
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
-                          <div className="text-gray-700">
-                            Floor {entry.floor}, Flat {entry.flat_number}
-                          </div>
+                          {isAuth ? (
+                            <span className="text-xs text-gray-400">—</span>
+                          ) : (
+                            <div className="text-gray-700">
+                              Floor {entry.floor}, Flat {entry.flat_number}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[entry.old_status] || 'bg-gray-100 text-gray-700'}`}>
-                              {STATUS_LABELS[entry.old_status] || entry.old_status}
+                          {isAuth ? (
+                            <span className={`inline-flex px-2.5 py-1 rounded text-xs font-semibold ${STATUS_COLORS[entry.new_status || ''] || 'bg-gray-100 text-gray-700'}`}>
+                              {AUTH_LABELS[entry.new_status || ''] || entry.new_status}
                             </span>
-                            <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                            </svg>
-                            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[entry.new_status] || 'bg-gray-100 text-gray-700'}`}>
-                              {STATUS_LABELS[entry.new_status] || entry.new_status}
-                            </span>
-                          </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[entry.old_status || ''] || 'bg-gray-100 text-gray-700'}`}>
+                                {STATUS_LABELS[entry.old_status || ''] || entry.old_status}
+                              </span>
+                              <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                              </svg>
+                              <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[entry.new_status || ''] || 'bg-gray-100 text-gray-700'}`}>
+                                {STATUS_LABELS[entry.new_status || ''] || entry.new_status}
+                              </span>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

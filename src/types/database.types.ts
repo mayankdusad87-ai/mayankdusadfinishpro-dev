@@ -244,9 +244,9 @@ export type Database = {
           flat_number: number | null
           floor: number | null
           id: string
-          new_status: string
-          old_status: string
-          project_id: string
+          new_status: string | null
+          old_status: string | null
+          project_id: string | null
           stage: string | null
           stage_gate: string | null
         }
@@ -258,9 +258,9 @@ export type Database = {
           flat_number?: number | null
           floor?: number | null
           id?: string
-          new_status: string
-          old_status: string
-          project_id: string
+          new_status?: string | null
+          old_status?: string | null
+          project_id?: string | null
           stage?: string | null
           stage_gate?: string | null
         }

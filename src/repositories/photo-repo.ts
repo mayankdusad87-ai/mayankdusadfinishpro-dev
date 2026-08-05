@@ -83,10 +83,14 @@ export async function getPhotosForActivity(activityId: string): Promise<Activity
 
   if (error) return [];
 
-  return (data || []).map(photo => {
-    const { data: urlData } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(photo.storage_path);
-    return { ...photo, url: urlData.publicUrl };
-  });
+  const photos: ActivityPhoto[] = [];
+  for (const photo of data || []) {
+    const { data: urlData } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .createSignedUrl(photo.storage_path, 3600);
+    photos.push({ ...photo, url: urlData?.signedUrl || '' });
+  }
+  return photos;
 }
 
 export async function getPhotosForProject(
@@ -106,10 +110,14 @@ export async function getPhotosForProject(
   const { data, error } = await query;
   if (error) return [];
 
-  return (data || []).map(photo => {
-    const { data: urlData } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(photo.storage_path);
-    return { ...photo, url: urlData.publicUrl };
-  });
+  const photos: ActivityPhoto[] = [];
+  for (const photo of data || []) {
+    const { data: urlData } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .createSignedUrl(photo.storage_path, 3600);
+    photos.push({ ...photo, url: urlData?.signedUrl || '' });
+  }
+  return photos;
 }
 
 export async function deleteActivityPhoto(photoId: string, storagePath: string): Promise<{ error: string | null }> {
