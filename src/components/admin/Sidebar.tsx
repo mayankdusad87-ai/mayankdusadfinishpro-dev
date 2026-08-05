@@ -100,7 +100,7 @@ interface SidebarProps {
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, user } = useAuth();
   const device = useDevice();
   const role = (profile?.role ?? 'supervisor') as Role;
   const [collapsed, setCollapsed] = useState(false);
@@ -171,6 +171,29 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           );
         })}
       </nav>
+
+      {/* Profile */}
+      <div className={`border-t border-white/10 px-3 py-3 ${collapsed ? 'flex justify-center' : ''}`}>
+        {collapsed ? (
+          <div
+            className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-primary text-sm font-bold cursor-default"
+            title={`${profile?.full_name || 'User'}\n${user?.email || ''}\n${(profile?.role || 'admin').toUpperCase()}`}
+          >
+            {(profile?.full_name || 'U').charAt(0).toUpperCase()}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-primary text-sm font-bold flex-shrink-0">
+              {(profile?.full_name || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-white text-xs font-semibold truncate">{profile?.full_name || 'User'}</div>
+              <div className="text-gray-400 text-[10px] truncate">{user?.email || ''}</div>
+              <div className="text-[9px] uppercase tracking-wider text-primary/70 font-medium mt-0.5">{profile?.role || 'admin'}</div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Logout */}
       <button
