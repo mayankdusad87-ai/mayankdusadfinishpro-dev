@@ -15,6 +15,7 @@ import SupervisorFilters from '@/components/supervisor/SupervisorFilters';
 import ActivityDetailSheet from '@/components/supervisor/ActivityDetailSheet';
 import BulkUpdateBar from '@/components/supervisor/BulkUpdateBar';
 import PhotoPromptModal from '@/components/supervisor/PhotoPromptModal';
+import DelayReasonModal from '@/components/supervisor/DelayReasonModal';
 import { useCanAccess } from '@/hooks';
 
 export default function SupervisorHomePage() {
@@ -37,6 +38,7 @@ export default function SupervisorHomePage() {
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showPhotoPrompt, setShowPhotoPrompt] = useState<string | null>(null);
+  const [delayPromptRow, setDelayPromptRow] = useState<UploadedActivity | null>(null);
   const [detailError, setDetailError] = useState('');
   const [reasons, setReasons] = useState<Reason[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -203,20 +205,41 @@ export default function SupervisorHomePage() {
       setShowPhotoPrompt(row.id);
       return;
     }
-    const newStatus = action === 'start' ? 'in_progress' : 'delayed';
-    const updates: ActivityUpdate = { status: newStatus };
-    if (action === 'start') updates.actual_start = TODAY;
+    if (action === 'delay') {
+      setDelayPromptRow(row);
+      return;
+    }
+    const updates: ActivityUpdate = { status: 'in_progress', actual_start: TODAY };
     await updateActivityWithAudit(row.id, updates, {
       projectId: selectedProjectId,
       changedBy: user?.id || '',
       oldStatus: row.status,
-      newStatus,
+      newStatus: 'in_progress',
       floor: row.floor,
       flatNumber: row.flat_number,
       stage: row.stage,
       stageGate: row.stage_gate,
       activityName: row.activity,
     });
+    setRefreshKey(k => k + 1);
+  }
+
+  async function confirmDelay(reason: string) {
+    if (!delayPromptRow) return;
+    const row = delayPromptRow;
+    const updates: ActivityUpdate = { status: 'delayed', delay_reason: reason };
+    await updateActivityWithAudit(row.id, updates, {
+      projectId: selectedProjectId,
+      changedBy: user?.id || '',
+      oldStatus: row.status,
+      newStatus: 'delayed',
+      floor: row.floor,
+      flatNumber: row.flat_number,
+      stage: row.stage,
+      stageGate: row.stage_gate,
+      activityName: row.activity,
+    });
+    setDelayPromptRow(null);
     setRefreshKey(k => k + 1);
   }
 
@@ -705,6 +728,15 @@ export default function SupervisorHomePage() {
         <PhotoPromptModal
           onConfirm={confirmComplete}
           onCancel={() => setShowPhotoPrompt(null)}
+        />
+      )}
+
+      {/* Delay reason prompt */}
+      {delayPromptRow && (
+        <DelayReasonModal
+          reasons={reasons}
+          onConfirm={(reason) => confirmDelay(reason)}
+          onCancel={() => setDelayPromptRow(null)}
         />
       )}
 
