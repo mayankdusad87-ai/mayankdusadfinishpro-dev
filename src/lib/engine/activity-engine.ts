@@ -51,7 +51,7 @@ export function validateSupervisorSave(input: {
     return { field: 'actual_end', message: 'Actual end date cannot be earlier than actual start date.' };
   }
   if (isDelayReasonRequired(input.status, input.expectedEnd) && !input.delayReason) {
-    const label = input.status === 'on_hold' ? 'On Hold' : 'overdue';
+    const label = input.status === 'on_hold' ? 'On Hold' : input.status === 'delayed' ? 'Delayed' : 'overdue';
     return { field: 'delay_reason', message: `Delay reason is mandatory for ${label} activities.` };
   }
   if (input.delayReasonIsOther && !input.remarks.trim()) {
