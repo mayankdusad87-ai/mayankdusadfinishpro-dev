@@ -39,6 +39,9 @@ export default function SupervisorHomePage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showPhotoPrompt, setShowPhotoPrompt] = useState<string | null>(null);
   const [delayPromptRow, setDelayPromptRow] = useState<UploadedActivity | null>(null);
+  const [delayPromptMode, setDelayPromptMode] = useState<'delay' | 'complete' | 'overdue_capture'>('delay');
+  const [pendingCompleteReason, setPendingCompleteReason] = useState<string | null>(null);
+  const [pendingDetailRow, setPendingDetailRow] = useState<UploadedActivity | null>(null);
   const [detailError, setDetailError] = useState('');
   const [reasons, setReasons] = useState<Reason[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -193,6 +196,19 @@ export default function SupervisorHomePage() {
     setSearch('');
   }
 
+  /** Gate: if activity is overdue in-progress with no delay_reason, capture reason first */
+  function openDetail(row: UploadedActivity) {
+    const status = normalizeStatus(row.status);
+    const isOverdueInProgress = (status === 'in_progress') && row.expected_end && row.expected_end < TODAY && !row.delay_reason;
+    if (isOverdueInProgress) {
+      setPendingDetailRow(row);
+      setDelayPromptRow(row);
+      setDelayPromptMode('overdue_capture');
+      return;
+    }
+    setSelectedDetail(row);
+  }
+
   async function handleQuickAction(row: UploadedActivity, action: 'start' | 'complete' | 'delay') {
     if (action === 'complete') {
       if (!row.actual_start) {
@@ -200,6 +216,13 @@ export default function SupervisorHomePage() {
         setTimeout(() => {
           setDetailError('Please enter the Actual Start date before marking as completed.');
         }, 100);
+        return;
+      }
+      // If overdue, capture delay reason before completing
+      const isOverdue = row.expected_end && row.expected_end < TODAY;
+      if (isOverdue && !row.delay_reason) {
+        setDelayPromptRow(row);
+        setDelayPromptMode('complete');
         return;
       }
       setShowPhotoPrompt(row.id);
@@ -227,6 +250,42 @@ export default function SupervisorHomePage() {
   async function confirmDelay(reason: string) {
     if (!delayPromptRow) return;
     const row = delayPromptRow;
+
+    if (delayPromptMode === 'complete') {
+      // Store reason and proceed to photo prompt
+      setPendingCompleteReason(reason);
+      setDelayPromptRow(null);
+      setDelayPromptMode('delay');
+      setShowPhotoPrompt(row.id);
+      return;
+    }
+
+    if (delayPromptMode === 'overdue_capture') {
+      // Save delay_reason to DB immediately, then open detail sheet
+      const updates: ActivityUpdate = { delay_reason: reason };
+      await updateActivityWithAudit(row.id, updates, {
+        projectId: selectedProjectId,
+        changedBy: user?.id || '',
+        oldStatus: row.status,
+        newStatus: row.status,
+        floor: row.floor,
+        flatNumber: row.flat_number,
+        stage: row.stage,
+        stageGate: row.stage_gate,
+        activityName: row.activity,
+      });
+      setDelayPromptRow(null);
+      setDelayPromptMode('delay');
+      // Open detail sheet with updated row
+      if (pendingDetailRow) {
+        setSelectedDetail({ ...pendingDetailRow, delay_reason: reason });
+        setPendingDetailRow(null);
+      }
+      setRefreshKey(k => k + 1);
+      return;
+    }
+
+    // Pure delay flow
     const updates: ActivityUpdate = { status: 'delayed', delay_reason: reason };
     await updateActivityWithAudit(row.id, updates, {
       projectId: selectedProjectId,
@@ -240,16 +299,18 @@ export default function SupervisorHomePage() {
       activityName: row.activity,
     });
     setDelayPromptRow(null);
+    setDelayPromptMode('delay');
     setRefreshKey(k => k + 1);
   }
 
   async function confirmComplete(withPhoto: boolean) {
     if (showPhotoPrompt) {
       const row = allActivities.find(r => r.id === showPhotoPrompt);
-      if (!row) { setShowPhotoPrompt(null); return; }
+      if (!row) { setShowPhotoPrompt(null); setPendingCompleteReason(null); return; }
 
       const updates: ActivityUpdate = { status: 'completed', actual_end: TODAY };
       if (!row.actual_start) updates.actual_start = TODAY;
+      if (pendingCompleteReason) updates.delay_reason = pendingCompleteReason;
 
       await updateActivityWithAudit(showPhotoPrompt, updates, {
         projectId: selectedProjectId,
@@ -268,6 +329,7 @@ export default function SupervisorHomePage() {
       }
     }
     setShowPhotoPrompt(null);
+    setPendingCompleteReason(null);
   }
 
   function getPriorityRows(): UploadedActivity[] {
@@ -444,6 +506,33 @@ export default function SupervisorHomePage() {
           </div>
         </div>
 
+        {/* Overdue without delay reason banner */}
+        {(() => {
+          const needsReason = priorities.overdue.filter(r => normalizeStatus(r.status) === 'in_progress' && !r.delay_reason);
+          if (needsReason.length === 0) return null;
+          return (
+            <button
+              onClick={() => setActiveView('overdue')}
+              className="w-full flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-3 text-left"
+            >
+              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-red-800">
+                  {needsReason.length} overdue {needsReason.length === 1 ? 'activity needs' : 'activities need'} delay reason
+                </div>
+                <div className="text-xs text-red-600/70">Tap overdue activities to capture reasons</div>
+              </div>
+              <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              </svg>
+            </button>
+          );
+        })()}
+
         {/* Floor Tabs */}
         {(activeView === 'floor' || activeView === 'all') && (
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -511,7 +600,7 @@ export default function SupervisorHomePage() {
                 <PriorityCard
                   key={row.id}
                   row={row}
-                  onDetail={() => setSelectedDetail(row)}
+                  onDetail={() => openDetail(row)}
                   onQuickAction={(action) => handleQuickAction(row, action)}
                 />
               ))
@@ -598,7 +687,7 @@ export default function SupervisorHomePage() {
                           bulkMode={bulkMode}
                           isSelected={selectedIds.has(row.id)}
                           onToggleSelect={toggleSelection}
-                          onOpenDetail={setSelectedDetail}
+                          onOpenDetail={openDetail}
                           onQuickAction={handleQuickAction}
                         />
                       ))}
@@ -694,7 +783,7 @@ export default function SupervisorHomePage() {
                     bulkMode={bulkMode}
                     isSelected={selectedIds.has(row.id)}
                     onToggleSelect={toggleSelection}
-                    onOpenDetail={setSelectedDetail}
+                    onOpenDetail={openDetail}
                     onQuickAction={handleQuickAction}
                   />
                 ))
@@ -735,8 +824,9 @@ export default function SupervisorHomePage() {
       {delayPromptRow && (
         <DelayReasonModal
           reasons={reasons}
+          mode={delayPromptMode}
           onConfirm={(reason) => confirmDelay(reason)}
-          onCancel={() => setDelayPromptRow(null)}
+          onCancel={() => { setDelayPromptRow(null); setDelayPromptMode('delay'); setPendingDetailRow(null); }}
         />
       )}
 
