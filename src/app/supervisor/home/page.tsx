@@ -65,7 +65,8 @@ export default function SupervisorHomePage() {
 
   useEffect(() => {
     if (!selectedProjectId) { setProjectData(null); setAssignedFloors(null); return; }
-    setLoading(true);
+    // Only show full-screen loading on initial load, not background refreshes
+    if (!projectData) setLoading(true);
     Promise.all([
       getProjectDataFromSupabase(selectedProjectId),
       user ? getSupervisorAssignments(user.id) : Promise.resolve([]),
