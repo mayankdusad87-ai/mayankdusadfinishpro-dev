@@ -7,7 +7,7 @@ interface DelayReasonModalProps {
   reasons: Reason[];
   onConfirm: (reason: string, remarks: string) => void;
   onCancel: () => void;
-  mode?: 'complete' | 'overdue_capture';
+  mode?: 'complete' | 'overdue_start' | 'overdue_capture';
 }
 
 export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 'overdue_capture' }: DelayReasonModalProps) {
@@ -34,11 +34,15 @@ export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 
             </div>
             <div>
               <h3 className="text-base font-bold text-gray-900">
-                {mode === 'complete' ? 'Completing Overdue Activity' : 'Overdue — Delay Reason Required'}
+                {mode === 'complete' ? 'Completing Overdue Activity'
+                  : mode === 'overdue_start' ? 'Starting Overdue Activity'
+                  : 'Overdue — Delay Reason Required'}
               </h3>
               <p className="text-xs text-gray-500">
                 {mode === 'complete'
                   ? 'This activity crossed its expected end date. Please select the delay reason.'
+                  : mode === 'overdue_start'
+                  ? 'This activity is already past its expected end date. Please capture the reason before starting.'
                   : 'This activity is past its expected end date. Please capture the delay reason before proceeding.'}
               </p>
             </div>
@@ -105,7 +109,7 @@ export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
-              {mode === 'complete' ? 'Continue' : 'Submit & Continue'}
+              {mode === 'complete' ? 'Continue' : mode === 'overdue_start' ? 'Start Activity' : 'Submit & Continue'}
             </button>
           </div>
         </div>

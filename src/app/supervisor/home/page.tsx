@@ -39,7 +39,7 @@ export default function SupervisorHomePage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showPhotoPrompt, setShowPhotoPrompt] = useState<string | null>(null);
   const [delayPromptRow, setDelayPromptRow] = useState<UploadedActivity | null>(null);
-  const [delayPromptMode, setDelayPromptMode] = useState<'complete' | 'overdue_capture'>('overdue_capture');
+  const [delayPromptMode, setDelayPromptMode] = useState<'complete' | 'overdue_start' | 'overdue_capture'>('overdue_capture');
   const [pendingCompleteReason, setPendingCompleteReason] = useState<string | null>(null);
   const [pendingDetailRow, setPendingDetailRow] = useState<UploadedActivity | null>(null);
   const [detailError, setDetailError] = useState('');
@@ -229,6 +229,13 @@ export default function SupervisorHomePage() {
       setShowPhotoPrompt(row.id);
       return;
     }
+    // action === 'start': check if activity is already overdue
+    const isOverdueStart = row.expected_end && row.expected_end < TODAY;
+    if (isOverdueStart) {
+      setDelayPromptRow(row);
+      setDelayPromptMode('overdue_start');
+      return;
+    }
     const updates: ActivityUpdate = { status: 'in_progress', actual_start: TODAY };
     await updateActivityWithAudit(row.id, updates, {
       projectId: selectedProjectId,
@@ -254,6 +261,26 @@ export default function SupervisorHomePage() {
       setDelayPromptRow(null);
       setDelayPromptMode('overdue_capture');
       setShowPhotoPrompt(row.id);
+      return;
+    }
+
+    if (delayPromptMode === 'overdue_start') {
+      // Start the overdue activity with delay reason in one save
+      const updates: ActivityUpdate = { status: 'in_progress', actual_start: TODAY, delay_reason: reason };
+      await updateActivityWithAudit(row.id, updates, {
+        projectId: selectedProjectId,
+        changedBy: user?.id || '',
+        oldStatus: row.status,
+        newStatus: 'in_progress',
+        floor: row.floor,
+        flatNumber: row.flat_number,
+        stage: row.stage,
+        stageGate: row.stage_gate,
+        activityName: row.activity,
+      });
+      setDelayPromptRow(null);
+      setDelayPromptMode('overdue_capture');
+      setRefreshKey(k => k + 1);
       return;
     }
 
