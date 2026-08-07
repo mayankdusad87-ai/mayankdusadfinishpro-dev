@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { UploadedActivity } from '@/lib/project-data-store';
-import { SupervisorStatus, STATUS_CONFIG, normalizeStatus, daysOverdue, TODAY } from './supervisor-utils';
+import { SupervisorStatus, STATUS_CONFIG, normalizeStatus, daysOverdue, formatDDMMYYYY, TODAY } from './supervisor-utils';
 
 interface ActivityCardProps {
   row: UploadedActivity;
@@ -67,7 +67,7 @@ function ActivityCard({
 
       <div className="flex items-center justify-between mt-2">
         <span className="text-xs text-gray-400">
-          {row.expected_start} → {row.expected_end}
+          {formatDDMMYYYY(row.expected_start)} → {formatDDMMYYYY(row.expected_end)}
         </span>
       </div>
 

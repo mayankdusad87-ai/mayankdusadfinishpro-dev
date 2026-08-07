@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { UploadedActivity } from '@/lib/project-data-store';
-import { STATUS_CONFIG, normalizeStatus, daysOverdue, TODAY } from './supervisor-utils';
+import { STATUS_CONFIG, normalizeStatus, daysOverdue, formatDDMMYYYY, TODAY } from './supervisor-utils';
 
 interface PriorityCardProps {
   row: UploadedActivity;
@@ -38,7 +38,7 @@ function PriorityCard({ row, onDetail, onQuickAction }: PriorityCardProps) {
 
       <div className="text-sm font-semibold text-gray-800 mt-1" onClick={onDetail}>{row.activity}</div>
       <div className="text-xs text-gray-500 mt-0.5">{row.vendor}</div>
-      <div className="text-xs text-gray-400 mt-1">{row.expected_start} → {row.expected_end}</div>
+      <div className="text-xs text-gray-400 mt-1">{formatDDMMYYYY(row.expected_start)} → {formatDDMMYYYY(row.expected_end)}</div>
 
       {status !== 'completed' && (
         <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">

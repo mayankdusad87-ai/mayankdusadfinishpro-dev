@@ -42,6 +42,14 @@ export function toSelectableStatus(raw: string): string {
 
 export const daysOverdue = _daysOverdue;
 
+/** Format ISO date (yyyy-mm-dd) to dd/mm/yyyy for display */
+export function formatDDMMYYYY(date: string | null | undefined): string {
+  if (!date) return '-';
+  const [y, m, d] = date.slice(0, 10).split('-');
+  if (!y || !m || !d) return date;
+  return `${d}/${m}/${y}`;
+}
+
 export function getGreeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return 'Good morning';

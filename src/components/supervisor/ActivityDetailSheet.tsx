@@ -6,7 +6,7 @@ import { uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivit
 import type { Reason } from '@/lib/supabase-data';
 import { saveActivityDetail } from '@/services/activity-service';
 import { compressImage, generatePhotoPath } from '@/lib/image-compress';
-import { normalizeStatus, toSelectableStatus, daysOverdue, TODAY, SUPERVISOR_STATUS_OPTIONS, isDelayReasonRequired, isDelayReasonVisible } from './supervisor-utils';
+import { normalizeStatus, toSelectableStatus, daysOverdue, formatDDMMYYYY, TODAY, SUPERVISOR_STATUS_OPTIONS, isDelayReasonRequired, isDelayReasonVisible } from './supervisor-utils';
 
 interface ActivityDetailSheetProps {
   activity: UploadedActivity;
@@ -206,11 +206,11 @@ export default function ActivityDetailSheet({
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-[11px] text-gray-500 uppercase tracking-wide">Expected Start</div>
-              <div className="text-sm font-medium text-gray-900 mt-1">{activity.expected_start || '-'}</div>
+              <div className="text-sm font-medium text-gray-900 mt-1">{formatDDMMYYYY(activity.expected_start)}</div>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-[11px] text-gray-500 uppercase tracking-wide">Expected End</div>
-              <div className="text-sm font-medium text-gray-900 mt-1">{activity.expected_end || '-'}</div>
+              <div className="text-sm font-medium text-gray-900 mt-1">{formatDDMMYYYY(activity.expected_end)}</div>
             </div>
           </div>
 
@@ -218,11 +218,11 @@ export default function ActivityDetailSheet({
             <div className="grid grid-cols-2 gap-3 mb-5">
               <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
                 <div className="text-[11px] text-indigo-600 uppercase tracking-wide">Revised Start</div>
-                <div className="text-sm font-medium text-indigo-900 mt-1">{activity.revised_start || '-'}</div>
+                <div className="text-sm font-medium text-indigo-900 mt-1">{formatDDMMYYYY(activity.revised_start)}</div>
               </div>
               <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
                 <div className="text-[11px] text-indigo-600 uppercase tracking-wide">Revised End</div>
-                <div className="text-sm font-medium text-indigo-900 mt-1">{activity.revised_end || '-'}</div>
+                <div className="text-sm font-medium text-indigo-900 mt-1">{formatDDMMYYYY(activity.revised_end)}</div>
               </div>
             </div>
           )}
