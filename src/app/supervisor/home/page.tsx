@@ -28,7 +28,7 @@ export default function SupervisorHomePage() {
   const [loading, setLoading] = useState(true);
   const [activeFloor, setActiveFloor] = useState<number>(0);
   const [activeView, setActiveView] = useState<PriorityView>('floor');
-  const [statusFilter, setStatusFilter] = useState<SupervisorStatus | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState('');
   const [subStageFilter, setSubStageFilter] = useState('');
   const [activityFilter, setActivityFilter] = useState('');
@@ -134,7 +134,11 @@ export default function SupervisorHomePage() {
 
   const floorRows = useMemo(() => {
     let rows = allActivities.filter(r => r.floor === activeFloor);
-    if (statusFilter) rows = rows.filter(r => normalizeStatus(r.status) === statusFilter);
+    if (statusFilter === '__overdue__') {
+      rows = rows.filter(r => normalizeStatus(r.status) !== 'completed' && r.expected_end != null && r.expected_end < TODAY);
+    } else if (statusFilter) {
+      rows = rows.filter(r => normalizeStatus(r.status) === statusFilter);
+    }
     if (statusDropdown) rows = rows.filter(r => normalizeStatus(r.status) === statusDropdown);
     if (stageFilter) rows = rows.filter(r => r.stage === stageFilter);
     if (subStageFilter) rows = rows.filter(r => r.stage_gate === subStageFilter);
@@ -175,7 +179,10 @@ export default function SupervisorHomePage() {
     return {
       total: rows.length,
       in_progress: rows.filter(r => normalizeStatus(r.status) === 'in_progress').length,
-      delayed: rows.filter(r => normalizeStatus(r.status) === 'delayed').length,
+      overdue: rows.filter(r => {
+        const s = normalizeStatus(r.status);
+        return s !== 'completed' && r.expected_end != null && r.expected_end < TODAY;
+      }).length,
       on_hold: rows.filter(r => normalizeStatus(r.status) === 'on_hold').length,
     };
   }, [allActivities, activeFloor]);
@@ -709,10 +716,10 @@ export default function SupervisorHomePage() {
             {/* Floor summary strip */}
             <div className="flex gap-2 mb-4">
               {([
-                { label: 'Total', count: statusCounts.total, filter: null as SupervisorStatus | null },
-                { label: 'In Progress', count: statusCounts.in_progress, filter: 'in_progress' as SupervisorStatus },
-                { label: 'Delayed', count: statusCounts.delayed, filter: 'delayed' as SupervisorStatus },
-                { label: 'On Hold', count: statusCounts.on_hold, filter: 'on_hold' as SupervisorStatus },
+                { label: 'Total', count: statusCounts.total, filter: null as string | null },
+                { label: 'In Progress', count: statusCounts.in_progress, filter: 'in_progress' },
+                { label: 'Overdue', count: statusCounts.overdue, filter: '__overdue__' },
+                { label: 'On Hold', count: statusCounts.on_hold, filter: 'on_hold' },
               ]).map(stat => (
                 <button
                   key={stat.label}

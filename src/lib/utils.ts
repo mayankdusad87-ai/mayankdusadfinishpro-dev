@@ -21,22 +21,29 @@ export function formatTimestamp(iso: string): { date: string; time: string } {
  * Collapse delayed variants to their base status.
  * Used by admin views where the StatusPill shows base color.
  */
+/**
+ * Collapse DB statuses to their base for display.
+ * Delayed is system-derived — show the base status; the overdue badge handles the rest.
+ */
 export function normalizeToBaseStatus(raw: string): ActivityStatus {
   if (raw === 'in_progress' || raw === 'in_progress_delayed') return 'in_progress';
   if (raw === 'completed' || raw === 'completed_delayed') return 'completed';
-  if (raw === 'delayed') return 'delayed';
+  if (raw === 'delayed') return 'not_started';
   if (raw === 'on_hold') return 'on_hold';
   return 'not_started';
 }
 
 /**
- * Reveal delay status for supervisor views.
- * in_progress_delayed → delayed, completed_delayed → completed.
+ * Collapse DB statuses to their base for supervisor views.
+ * delayed → not_started, in_progress_delayed → in_progress.
+ * The overdue badge on cards already communicates the delay.
  */
 export function normalizeToDisplayStatus(raw: string): ActivityStatus {
-  if (raw === 'in_progress_delayed') return 'delayed';
+  if (raw === 'in_progress_delayed') return 'in_progress';
   if (raw === 'completed_delayed') return 'completed';
-  if (raw === 'not_started' || raw === 'in_progress' || raw === 'completed' || raw === 'delayed' || raw === 'on_hold') return raw;
+  if (raw === 'delayed') return 'not_started';
+  if (raw === 'on_hold') return 'on_hold';
+  if (raw === 'not_started' || raw === 'in_progress' || raw === 'completed') return raw;
   return 'not_started';
 }
 
