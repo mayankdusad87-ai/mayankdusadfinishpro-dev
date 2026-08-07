@@ -114,12 +114,29 @@ export interface ManagementBottleneck {
   totalFlatsAffected: number;
 }
 
+export interface WeeklyStageProgress {
+  stage: string;
+  flatsProgressed: number;
+  floors: number[];            // which floors had movement
+}
+
+export interface WeeklyProgress {
+  thisWeekFlats: number;
+  lastWeekFlats: number;
+  delta: number;               // thisWeek - lastWeek
+  todayFlats: number;
+  busiestStage: { stage: string; count: number } | null;
+  slowestStage: { stage: string; count: number } | null;
+  stageBreakdown: WeeklyStageProgress[];  // for drill-down
+}
+
 export interface ManagementData {
   health: HealthVerdict;
   pipeline: PipelineStage[];
   floors: FloorProjection[];
   bottlenecks: ManagementBottleneck[];
   stageFloorBreakdowns: Record<string, StageFloorBreakdown[]>;
+  weeklyProgress: WeeklyProgress;
 }
 
 export interface VendorScore {
@@ -184,6 +201,85 @@ function addDays(date: string, days: number): string {
   if (isNaN(d.getTime())) return date;
   d.setDate(d.getDate() + Math.round(days));
   return d.toISOString().slice(0, 10);
+}
+
+/** Monday of the week containing `date` (ISO string) */
+function mondayOf(date: string): string {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun, 1=Mon...
+  const diff = day === 0 ? 6 : day - 1; // days since Monday
+  d.setDate(d.getDate() - diff);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Compute weekly progress from activity rows */
+function computeWeeklyProgress(rows: InsightRow[]): WeeklyProgress {
+  const thisMonday = mondayOf(TODAY);
+  const lastMonday = addDays(thisMonday, -7);
+  const lastSunday = addDays(thisMonday, -1);
+
+  // Track unique flats (by stage) that had any activity complete or start
+  // "flat progressed" = any activity in that flat had actual_end or actual_start in the range
+  const thisWeekFlats = new Set<string>();  // "floor|flat" keys
+  const lastWeekFlats = new Set<string>();
+  const todayFlats = new Set<string>();
+
+  // Stage breakdown for drill-down
+  const thisWeekByStage = new Map<string, { flats: Set<string>; floors: Set<number> }>();
+
+  for (const r of rows) {
+    const flatKey = `${r.floor}|${r.flat_number}`;
+
+    // Check actual_end (completed) and actual_start (started) dates
+    const dates = [r.actual_end, r.actual_start].filter(Boolean);
+    for (const d of dates) {
+      if (!d) continue;
+
+      // This week: Monday <= d <= TODAY
+      if (d >= thisMonday && d <= TODAY) {
+        thisWeekFlats.add(flatKey);
+        if (!thisWeekByStage.has(r.stage)) {
+          thisWeekByStage.set(r.stage, { flats: new Set(), floors: new Set() });
+        }
+        thisWeekByStage.get(r.stage)!.flats.add(flatKey);
+        thisWeekByStage.get(r.stage)!.floors.add(r.floor);
+      }
+
+      // Today
+      if (d === TODAY) {
+        todayFlats.add(flatKey);
+      }
+
+      // Last week: lastMonday <= d <= lastSunday
+      if (d >= lastMonday && d <= lastSunday) {
+        lastWeekFlats.add(flatKey);
+      }
+    }
+  }
+
+  // Build stage breakdown sorted by count descending
+  const stageBreakdown: WeeklyStageProgress[] = [];
+  for (const [stage, data] of thisWeekByStage) {
+    stageBreakdown.push({
+      stage,
+      flatsProgressed: data.flats.size,
+      floors: [...data.floors].sort((a, b) => a - b),
+    });
+  }
+  stageBreakdown.sort((a, b) => b.flatsProgressed - a.flatsProgressed);
+
+  const busiest = stageBreakdown.length > 0 ? { stage: stageBreakdown[0].stage, count: stageBreakdown[0].flatsProgressed } : null;
+  const slowest = stageBreakdown.length > 1 ? { stage: stageBreakdown[stageBreakdown.length - 1].stage, count: stageBreakdown[stageBreakdown.length - 1].flatsProgressed } : null;
+
+  return {
+    thisWeekFlats: thisWeekFlats.size,
+    lastWeekFlats: lastWeekFlats.size,
+    delta: thisWeekFlats.size - lastWeekFlats.size,
+    todayFlats: todayFlats.size,
+    busiestStage: busiest,
+    slowestStage: slowest,
+    stageBreakdown,
+  };
 }
 
 // ---- Management ----
@@ -555,12 +651,16 @@ export function computeManagement(
     stageFloorBreakdowns[stage] = breakdowns;
   }
 
+  // --- Weekly progress ---
+  const weeklyProgress = computeWeeklyProgress(rows);
+
   return {
     health,
     pipeline,
     floors,
     bottlenecks: bottlenecks.slice(0, 3),
     stageFloorBreakdowns,
+    weeklyProgress,
   };
 }
 

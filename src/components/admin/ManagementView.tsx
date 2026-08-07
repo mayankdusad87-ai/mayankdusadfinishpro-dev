@@ -22,12 +22,6 @@ const HEALTH_STYLES = {
   critical: { bg: 'bg-red-900', label: 'Critical', sub: 'Immediate action required' },
 } as const;
 
-const SPI_COLORS = {
-  green: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500', badge: 'On Track' },
-  yellow: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500', badge: 'At Risk' },
-  red: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500', badge: 'Behind' },
-} as const;
-
 const REASON_COLORS = ['#EF4444', '#3B82F6', '#F59E0B'];
 
 function barColor(pct: number): string {
@@ -113,8 +107,9 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
 }
 
 function ManagementView({ data, projectName }: Props) {
-  const { health, pipeline, floors, bottlenecks, stageFloorBreakdowns } = data;
+  const { health, pipeline, bottlenecks, stageFloorBreakdowns, weeklyProgress } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  const [weeklyExpanded, setWeeklyExpanded] = useState(false);
 
   const hs = HEALTH_STYLES[health.status];
 
@@ -346,41 +341,100 @@ function ManagementView({ data, projectName }: Props) {
         )}
       </div>
 
-      {/* ---- SECTION 5: FLOOR HEALTH GRID ---- */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
+      {/* ---- SECTION 5: WEEKLY PROGRESS ---- */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-base md:text-lg font-bold text-gray-900">Floor Health</h3>
-            <p className="text-xs text-gray-400 mt-0.5">All floors at a glance</p>
+            <h3 className="text-base md:text-lg font-bold text-gray-900">Weekly Progress</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Flats that moved forward this week vs last</p>
           </div>
-          <div className="flex gap-3 text-[11px] text-gray-400">
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> On track</span>
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> At risk</span>
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Behind</span>
+          {weeklyProgress.delta !== 0 && (
+            <div className={`flex items-center gap-1 text-sm font-bold ${weeklyProgress.delta > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+              <svg className={`w-4 h-4 ${weeklyProgress.delta < 0 ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+              </svg>
+              {Math.abs(weeklyProgress.delta)} vs last week
+            </div>
+          )}
+        </div>
+
+        {/* Summary row */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <div className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums">{weeklyProgress.thisWeekFlats}</div>
+            <div className="text-[11px] text-gray-500 mt-0.5">This week</div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <div className="text-2xl md:text-3xl font-bold text-gray-400 tabular-nums">{weeklyProgress.lastWeekFlats}</div>
+            <div className="text-[11px] text-gray-500 mt-0.5">Last week</div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <div className="text-2xl md:text-3xl font-bold text-primary tabular-nums">{weeklyProgress.todayFlats}</div>
+            <div className="text-[11px] text-gray-500 mt-0.5">Today</div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {floors.map(f => {
-            const sc = SPI_COLORS[f.spiStatus];
-            const fillColor = f.spiStatus === 'green' ? '#10B981' : f.spiStatus === 'yellow' ? '#F59E0B' : '#EF4444';
-            return (
-              <div key={f.floor} className="bg-white rounded-xl border border-gray-200 p-3.5 relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ backgroundColor: fillColor }} />
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-gray-900">Floor {f.floor}</span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${sc.bg} ${sc.text}`}>{sc.badge}</span>
-                </div>
-                <div className="text-lg font-bold text-gray-900 tabular-nums">{f.progressPct}%</div>
-                <div className="w-full h-1 bg-gray-100 rounded-full mt-1 mb-2">
-                  <div className="h-1 rounded-full transition-all" style={{ width: `${f.progressPct}%`, backgroundColor: fillColor }} />
-                </div>
-                <div className="text-[11px] text-gray-500 truncate">{f.currentStage}</div>
-                <div className="text-[11px] text-gray-400 tabular-nums">Est. {formatDate(f.projectedFinish)}</div>
+        {/* Busiest / Slowest */}
+        {(weeklyProgress.busiestStage || weeklyProgress.slowestStage) && (
+          <div className="flex flex-wrap gap-3 mb-3">
+            {weeklyProgress.busiestStage && (
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                <span className="text-gray-600">Busiest:</span>
+                <span className="font-semibold text-emerald-800">{weeklyProgress.busiestStage.stage}</span>
+                <span className="text-emerald-600 tabular-nums">({weeklyProgress.busiestStage.count} flats)</span>
               </div>
-            );
-          })}
-        </div>
+            )}
+            {weeklyProgress.slowestStage && (
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm">
+                <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                <span className="text-gray-600">Slowest:</span>
+                <span className="font-semibold text-amber-800">{weeklyProgress.slowestStage.stage}</span>
+                <span className="text-amber-600 tabular-nums">({weeklyProgress.slowestStage.count} flats)</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Drill-down toggle */}
+        {weeklyProgress.stageBreakdown.length > 0 && (
+          <button
+            onClick={() => setWeeklyExpanded(!weeklyExpanded)}
+            className="flex items-center gap-1.5 text-xs text-primary font-medium hover:text-primary-dark transition-colors cursor-pointer"
+          >
+            <svg className={`w-3.5 h-3.5 transition-transform ${weeklyExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+            </svg>
+            {weeklyExpanded ? 'Hide' : 'View'} stage breakdown
+          </button>
+        )}
+
+        {/* Drill-down: stage-by-stage details */}
+        {weeklyExpanded && weeklyProgress.stageBreakdown.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {weeklyProgress.stageBreakdown.map(s => (
+              <div key={s.stage} className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-900 truncate">{s.stage}</div>
+                  <div className="text-[11px] text-gray-400">
+                    {s.floors.length} {s.floors.length === 1 ? 'floor' : 'floors'}: {s.floors.map(f => `F${f}`).join(', ')}
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-lg font-bold text-gray-900 tabular-nums">{s.flatsProgressed}</div>
+                  <div className="text-[10px] text-gray-400">{s.flatsProgressed === 1 ? 'flat' : 'flats'}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {weeklyProgress.thisWeekFlats === 0 && weeklyProgress.lastWeekFlats === 0 && (
+          <div className="text-center py-4 text-sm text-gray-400">
+            No activity movement recorded this week or last week.
+          </div>
+        )}
       </div>
     </div>
   );
