@@ -6,6 +6,7 @@ import {
   normalizeToDisplayStatus,
   resolveStatus as _resolveStatus,
   isDelayReasonRequired as _isDelayReasonRequired,
+  isDelayReasonVisible as _isDelayReasonVisible,
   daysOverdue as _daysOverdue,
 } from '@/lib/utils';
 
@@ -25,8 +26,18 @@ export const resolveStatus = _resolveStatus;
 
 export const isDelayReasonRequired = _isDelayReasonRequired;
 
+export const isDelayReasonVisible = _isDelayReasonVisible;
+
 export function normalizeStatus(raw: string): SupervisorStatus {
   return normalizeToDisplayStatus(raw);
+}
+
+/** Map DB status to a user-selectable dropdown value.
+ *  'delayed' (system-derived from not_started+overdue) → 'not_started' */
+export function toSelectableStatus(raw: string): string {
+  const display = normalizeToDisplayStatus(raw);
+  if (display === 'delayed') return 'not_started';
+  return display;
 }
 
 export const daysOverdue = _daysOverdue;

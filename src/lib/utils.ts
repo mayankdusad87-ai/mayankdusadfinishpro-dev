@@ -49,9 +49,24 @@ export function resolveStatus(userStatus: string, expectedEnd: string | null): s
   return userStatus;
 }
 
-export function isDelayReasonRequired(userStatus: string, expectedEnd: string | null): boolean {
-  if (userStatus === 'delayed' || userStatus === 'on_hold') return true;
+/**
+ * Should the delay/non-start reason field be visible?
+ * True for on_hold, and any non-completed overdue activity (in_progress or not_started).
+ */
+export function isDelayReasonVisible(userStatus: string, expectedEnd: string | null): boolean {
+  if (userStatus === 'on_hold') return true;
   if (userStatus === 'completed') return false;
+  if (!expectedEnd) return false;
+  return expectedEnd < todayISO();
+}
+
+/**
+ * Is the delay reason mandatory (blocks save)?
+ * True for on_hold and in_progress+overdue. NOT required for not_started+overdue (optional).
+ */
+export function isDelayReasonRequired(userStatus: string, expectedEnd: string | null): boolean {
+  if (userStatus === 'on_hold') return true;
+  if (userStatus === 'completed' || userStatus === 'not_started') return false;
   if (!expectedEnd) return false;
   return expectedEnd < todayISO();
 }

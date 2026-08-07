@@ -6,7 +6,7 @@ import { uploadActivityPhoto, getPhotosForActivity, ActivityPhoto, deleteActivit
 import type { Reason } from '@/lib/supabase-data';
 import { saveActivityDetail } from '@/services/activity-service';
 import { compressImage, generatePhotoPath } from '@/lib/image-compress';
-import { normalizeStatus, daysOverdue, TODAY, SUPERVISOR_STATUS_OPTIONS, isDelayReasonRequired } from './supervisor-utils';
+import { normalizeStatus, toSelectableStatus, daysOverdue, TODAY, SUPERVISOR_STATUS_OPTIONS, isDelayReasonRequired, isDelayReasonVisible } from './supervisor-utils';
 
 interface ActivityDetailSheetProps {
   activity: UploadedActivity;
@@ -27,7 +27,7 @@ export default function ActivityDetailSheet({
   onClose,
   onSaved,
 }: ActivityDetailSheetProps) {
-  const [detailStatus, setDetailStatus] = useState<string>(normalizeStatus(activity.status));
+  const [detailStatus, setDetailStatus] = useState<string>(toSelectableStatus(activity.status));
   const [detailActualStart, setDetailActualStart] = useState(activity.actual_start || '');
   const [detailActualEnd, setDetailActualEnd] = useState(activity.actual_end || '');
   const [detailError, setDetailError] = useState('');
@@ -278,10 +278,13 @@ export default function ActivityDetailSheet({
               <input type="text" defaultValue={activity.vendor} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50" readOnly />
             </div>
 
-            {isDelayReasonRequired(detailStatus, activity.expected_end) && (
+            {isDelayReasonVisible(detailStatus, activity.expected_end) && (
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Delay Reason <span className="text-red-500">*</span>
+                  {detailStatus === 'not_started'
+                    ? <>Reason for Non-Start <span className="text-gray-400 font-normal">(optional)</span></>
+                    : <>Delay Reason <span className="text-red-500">*</span></>
+                  }
                 </label>
                 <select
                   value={detailReason}

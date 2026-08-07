@@ -10,7 +10,7 @@ interface ActivityCardProps {
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   onOpenDetail: (row: UploadedActivity) => void;
-  onQuickAction: (row: UploadedActivity, action: 'start' | 'complete' | 'delay') => void;
+  onQuickAction: (row: UploadedActivity, action: 'start' | 'complete') => void;
 }
 
 function ActivityCard({
@@ -93,17 +93,6 @@ function ActivityCard({
             </svg>
             Complete
           </button>
-          {status !== 'delayed' && (
-            <button
-              onClick={() => onQuickAction(row, 'delay')}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-              </svg>
-              Delay
-            </button>
-          )}
         </div>
       )}
     </div>

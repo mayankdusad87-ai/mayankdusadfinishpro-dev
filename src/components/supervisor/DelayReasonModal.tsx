@@ -7,10 +7,10 @@ interface DelayReasonModalProps {
   reasons: Reason[];
   onConfirm: (reason: string, remarks: string) => void;
   onCancel: () => void;
-  mode?: 'delay' | 'complete' | 'overdue_capture';
+  mode?: 'complete' | 'overdue_capture';
 }
 
-export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 'delay' }: DelayReasonModalProps) {
+export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 'overdue_capture' }: DelayReasonModalProps) {
   const [selected, setSelected] = useState('');
   const [remarks, setRemarks] = useState('');
   const isOther = selected === '__other__';
@@ -34,16 +34,12 @@ export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 
             </div>
             <div>
               <h3 className="text-base font-bold text-gray-900">
-                {mode === 'complete' ? 'Completing Overdue Activity'
-                  : mode === 'overdue_capture' ? 'Overdue — Delay Reason Required'
-                  : 'Mark as Delayed'}
+                {mode === 'complete' ? 'Completing Overdue Activity' : 'Overdue — Delay Reason Required'}
               </h3>
               <p className="text-xs text-gray-500">
                 {mode === 'complete'
                   ? 'This activity crossed its expected end date. Please select the delay reason.'
-                  : mode === 'overdue_capture'
-                  ? 'This activity is past its expected end date. Please capture the delay reason before proceeding.'
-                  : 'Select the reason for the delay'}
+                  : 'This activity is past its expected end date. Please capture the delay reason before proceeding.'}
               </p>
             </div>
           </div>
@@ -109,7 +105,7 @@ export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
-              {mode === 'complete' ? 'Continue' : mode === 'overdue_capture' ? 'Submit & Continue' : 'Mark Delayed'}
+              {mode === 'complete' ? 'Continue' : 'Submit & Continue'}
             </button>
           </div>
         </div>

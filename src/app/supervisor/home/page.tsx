@@ -39,7 +39,7 @@ export default function SupervisorHomePage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showPhotoPrompt, setShowPhotoPrompt] = useState<string | null>(null);
   const [delayPromptRow, setDelayPromptRow] = useState<UploadedActivity | null>(null);
-  const [delayPromptMode, setDelayPromptMode] = useState<'delay' | 'complete' | 'overdue_capture'>('delay');
+  const [delayPromptMode, setDelayPromptMode] = useState<'complete' | 'overdue_capture'>('overdue_capture');
   const [pendingCompleteReason, setPendingCompleteReason] = useState<string | null>(null);
   const [pendingDetailRow, setPendingDetailRow] = useState<UploadedActivity | null>(null);
   const [detailError, setDetailError] = useState('');
@@ -210,7 +210,7 @@ export default function SupervisorHomePage() {
     setSelectedDetail(row);
   }
 
-  async function handleQuickAction(row: UploadedActivity, action: 'start' | 'complete' | 'delay') {
+  async function handleQuickAction(row: UploadedActivity, action: 'start' | 'complete') {
     if (action === 'complete') {
       if (!row.actual_start) {
         setSelectedDetail(row);
@@ -227,10 +227,6 @@ export default function SupervisorHomePage() {
         return;
       }
       setShowPhotoPrompt(row.id);
-      return;
-    }
-    if (action === 'delay') {
-      setDelayPromptRow(row);
       return;
     }
     const updates: ActivityUpdate = { status: 'in_progress', actual_start: TODAY };
@@ -256,43 +252,18 @@ export default function SupervisorHomePage() {
       // Store reason and proceed to photo prompt
       setPendingCompleteReason(reason);
       setDelayPromptRow(null);
-      setDelayPromptMode('delay');
+      setDelayPromptMode('overdue_capture');
       setShowPhotoPrompt(row.id);
       return;
     }
 
-    if (delayPromptMode === 'overdue_capture') {
-      // Save delay_reason to DB immediately, then open detail sheet
-      const updates: ActivityUpdate = { delay_reason: reason };
-      await updateActivityWithAudit(row.id, updates, {
-        projectId: selectedProjectId,
-        changedBy: user?.id || '',
-        oldStatus: row.status,
-        newStatus: row.status,
-        floor: row.floor,
-        flatNumber: row.flat_number,
-        stage: row.stage,
-        stageGate: row.stage_gate,
-        activityName: row.activity,
-      });
-      setDelayPromptRow(null);
-      setDelayPromptMode('delay');
-      // Open detail sheet with updated row
-      if (pendingDetailRow) {
-        setSelectedDetail({ ...pendingDetailRow, delay_reason: reason });
-        setPendingDetailRow(null);
-      }
-      setRefreshKey(k => k + 1);
-      return;
-    }
-
-    // Pure delay flow
-    const updates: ActivityUpdate = { status: 'delayed', delay_reason: reason };
+    // overdue_capture: save delay_reason to DB immediately, then open detail sheet
+    const updates: ActivityUpdate = { delay_reason: reason };
     await updateActivityWithAudit(row.id, updates, {
       projectId: selectedProjectId,
       changedBy: user?.id || '',
       oldStatus: row.status,
-      newStatus: 'delayed',
+      newStatus: row.status,
       floor: row.floor,
       flatNumber: row.flat_number,
       stage: row.stage,
@@ -300,7 +271,12 @@ export default function SupervisorHomePage() {
       activityName: row.activity,
     });
     setDelayPromptRow(null);
-    setDelayPromptMode('delay');
+    setDelayPromptMode('overdue_capture');
+    // Open detail sheet with updated row
+    if (pendingDetailRow) {
+      setSelectedDetail({ ...pendingDetailRow, delay_reason: reason });
+      setPendingDetailRow(null);
+    }
     setRefreshKey(k => k + 1);
   }
 
@@ -827,7 +803,7 @@ export default function SupervisorHomePage() {
           reasons={reasons}
           mode={delayPromptMode}
           onConfirm={(reason) => confirmDelay(reason)}
-          onCancel={() => { setDelayPromptRow(null); setDelayPromptMode('delay'); setPendingDetailRow(null); }}
+          onCancel={() => { setDelayPromptRow(null); setDelayPromptMode('overdue_capture'); setPendingDetailRow(null); }}
         />
       )}
 
