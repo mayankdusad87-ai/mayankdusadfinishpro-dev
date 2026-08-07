@@ -114,20 +114,28 @@ export interface ManagementBottleneck {
   totalFlatsAffected: number;
 }
 
-export interface WeeklyStageProgress {
+export interface SitePulseStage {
   stage: string;
-  flatsProgressed: number;
-  floors: number[];            // which floors had movement
+  completedThisWeek: number;
+  floors: number[];
 }
 
-export interface WeeklyProgress {
-  thisWeekFlats: number;
-  lastWeekFlats: number;
-  delta: number;               // thisWeek - lastWeek
-  todayFlats: number;
-  busiestStage: { stage: string; count: number } | null;
-  slowestStage: { stage: string; count: number } | null;
-  stageBreakdown: WeeklyStageProgress[];  // for drill-down
+export interface SitePulse {
+  // Completion snapshot: flats where every activity is done
+  fullyFinishedFlats: number;
+  totalFlats: number;
+  completionPct: number;
+
+  // Velocity: activities completed this week vs last week
+  completionsThisWeek: number;
+  completionsLastWeek: number;
+  velocityDelta: number;       // thisWeek − lastWeek
+
+  // Bottleneck: stage with the most flats stuck (overdue & incomplete)
+  bottleneck: { stage: string; waitingFlats: number } | null;
+
+  // Drill-down: stages that had completions this week
+  stagesActiveThisWeek: SitePulseStage[];
 }
 
 export interface ManagementData {
@@ -136,7 +144,7 @@ export interface ManagementData {
   floors: FloorProjection[];
   bottlenecks: ManagementBottleneck[];
   stageFloorBreakdowns: Record<string, StageFloorBreakdown[]>;
-  weeklyProgress: WeeklyProgress;
+  sitePulse: SitePulse;
 }
 
 export interface VendorScore {
@@ -212,73 +220,91 @@ function mondayOf(date: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Compute weekly progress from activity rows */
-function computeWeeklyProgress(rows: InsightRow[]): WeeklyProgress {
+/** Compute site pulse metrics from activity rows */
+function computeSitePulse(rows: InsightRow[]): SitePulse {
   const thisMonday = mondayOf(TODAY);
   const lastMonday = addDays(thisMonday, -7);
   const lastSunday = addDays(thisMonday, -1);
 
-  // Track unique flats (by stage) that had any activity complete or start
-  // "flat progressed" = any activity in that flat had actual_end or actual_start in the range
-  const thisWeekFlats = new Set<string>();  // "floor|flat" keys
-  const lastWeekFlats = new Set<string>();
-  const todayFlats = new Set<string>();
-
-  // Stage breakdown for drill-down
-  const thisWeekByStage = new Map<string, { flats: Set<string>; floors: Set<number> }>();
+  // 1. Completion snapshot: a flat is "fully finished" when every activity for it is complete
+  const flatActivities = new Map<string, { total: number; done: number }>();
+  // 2. Velocity: activities completed this week / last week (by actual_end date)
+  let completionsThisWeek = 0;
+  let completionsLastWeek = 0;
+  // Stage drill-down for this week
+  const thisWeekByStage = new Map<string, { count: number; floors: Set<number> }>();
+  // 3. Bottleneck: stage with the most unique flats that are overdue & incomplete
+  const stageOverdueFlats = new Map<string, Set<string>>();
 
   for (const r of rows) {
     const flatKey = `${r.floor}|${r.flat_number}`;
+    const done = isComplete(r.status);
 
-    // Check actual_end (completed) and actual_start (started) dates
-    const dates = [r.actual_end, r.actual_start].filter(Boolean);
-    for (const d of dates) {
-      if (!d) continue;
+    // Track per-flat completion
+    let fa = flatActivities.get(flatKey);
+    if (!fa) { fa = { total: 0, done: 0 }; flatActivities.set(flatKey, fa); }
+    fa.total++;
+    if (done) fa.done++;
 
-      // This week: Monday <= d <= TODAY
-      if (d >= thisMonday && d <= TODAY) {
-        thisWeekFlats.add(flatKey);
-        if (!thisWeekByStage.has(r.stage)) {
-          thisWeekByStage.set(r.stage, { flats: new Set(), floors: new Set() });
-        }
-        thisWeekByStage.get(r.stage)!.flats.add(flatKey);
-        thisWeekByStage.get(r.stage)!.floors.add(r.floor);
+    // Count completed activities by week (only those with actual_end)
+    if (done && r.actual_end) {
+      if (r.actual_end >= thisMonday && r.actual_end <= TODAY) {
+        completionsThisWeek++;
+        let sb = thisWeekByStage.get(r.stage);
+        if (!sb) { sb = { count: 0, floors: new Set() }; thisWeekByStage.set(r.stage, sb); }
+        sb.count++;
+        sb.floors.add(r.floor);
       }
-
-      // Today
-      if (d === TODAY) {
-        todayFlats.add(flatKey);
+      if (r.actual_end >= lastMonday && r.actual_end <= lastSunday) {
+        completionsLastWeek++;
       }
+    }
 
-      // Last week: lastMonday <= d <= lastSunday
-      if (d >= lastMonday && d <= lastSunday) {
-        lastWeekFlats.add(flatKey);
-      }
+    // Track overdue incomplete flats per stage
+    if (!done && r.expected_end && r.expected_end < TODAY) {
+      if (!stageOverdueFlats.has(r.stage)) stageOverdueFlats.set(r.stage, new Set());
+      stageOverdueFlats.get(r.stage)!.add(flatKey);
     }
   }
 
-  // Build stage breakdown sorted by count descending
-  const stageBreakdown: WeeklyStageProgress[] = [];
+  // Compute fully-finished flats
+  let fullyFinishedFlats = 0;
+  for (const fa of flatActivities.values()) {
+    if (fa.done === fa.total) fullyFinishedFlats++;
+  }
+  const totalFlats = flatActivities.size;
+  const completionPct = totalFlats > 0 ? Math.round((fullyFinishedFlats / totalFlats) * 100) : 0;
+
+  // Find bottleneck stage (most overdue flats)
+  let bottleneck: SitePulse['bottleneck'] = null;
+  let maxWaiting = 0;
+  for (const [stage, flats] of stageOverdueFlats) {
+    if (flats.size > maxWaiting) {
+      maxWaiting = flats.size;
+      bottleneck = { stage, waitingFlats: flats.size };
+    }
+  }
+
+  // Build stage drill-down sorted by completions descending
+  const stagesActiveThisWeek: SitePulseStage[] = [];
   for (const [stage, data] of thisWeekByStage) {
-    stageBreakdown.push({
+    stagesActiveThisWeek.push({
       stage,
-      flatsProgressed: data.flats.size,
+      completedThisWeek: data.count,
       floors: [...data.floors].sort((a, b) => a - b),
     });
   }
-  stageBreakdown.sort((a, b) => b.flatsProgressed - a.flatsProgressed);
-
-  const busiest = stageBreakdown.length > 0 ? { stage: stageBreakdown[0].stage, count: stageBreakdown[0].flatsProgressed } : null;
-  const slowest = stageBreakdown.length > 1 ? { stage: stageBreakdown[stageBreakdown.length - 1].stage, count: stageBreakdown[stageBreakdown.length - 1].flatsProgressed } : null;
+  stagesActiveThisWeek.sort((a, b) => b.completedThisWeek - a.completedThisWeek);
 
   return {
-    thisWeekFlats: thisWeekFlats.size,
-    lastWeekFlats: lastWeekFlats.size,
-    delta: thisWeekFlats.size - lastWeekFlats.size,
-    todayFlats: todayFlats.size,
-    busiestStage: busiest,
-    slowestStage: slowest,
-    stageBreakdown,
+    fullyFinishedFlats,
+    totalFlats,
+    completionPct,
+    completionsThisWeek,
+    completionsLastWeek,
+    velocityDelta: completionsThisWeek - completionsLastWeek,
+    bottleneck,
+    stagesActiveThisWeek,
   };
 }
 
@@ -651,8 +677,8 @@ export function computeManagement(
     stageFloorBreakdowns[stage] = breakdowns;
   }
 
-  // --- Weekly progress ---
-  const weeklyProgress = computeWeeklyProgress(rows);
+  // --- Site pulse ---
+  const sitePulse = computeSitePulse(rows);
 
   return {
     health,
@@ -660,7 +686,7 @@ export function computeManagement(
     floors,
     bottlenecks: bottlenecks.slice(0, 3),
     stageFloorBreakdowns,
-    weeklyProgress,
+    sitePulse,
   };
 }
 
