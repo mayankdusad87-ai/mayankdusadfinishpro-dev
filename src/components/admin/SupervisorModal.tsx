@@ -201,7 +201,7 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleFloor(floor)}
-                        className="accent-[#E67E22] w-4 h-4"
+                        className="accent-[#C8922A] w-4 h-4"
                       />
                       Floor {floor}
                     </label>

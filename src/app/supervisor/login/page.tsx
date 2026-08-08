@@ -59,11 +59,11 @@ export default function SupervisorLoginPage() {
         {/* Logo */}
         <div className="relative z-10 mb-4">
           <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-20 h-20">
-            <path d="M40 12L12 42V72H68V42L40 12Z" fill="#1B2A4A" stroke="white" strokeWidth="2" />
+            <path d="M40 12L12 42V72H68V42L40 12Z" fill="#162032" stroke="white" strokeWidth="2" />
             <path d="M24 72V50H38V72" fill="white" opacity="0.3" />
             <path d="M46 50H60V64H46V50Z" fill="#3B82F6" opacity="0.4" />
-            <ellipse cx="40" cy="16" rx="18" ry="10" fill="#E67E22" />
-            <rect x="34" y="8" width="12" height="5" rx="2.5" fill="#E67E22" />
+            <ellipse cx="40" cy="16" rx="18" ry="10" fill="#C8922A" />
+            <rect x="34" y="8" width="12" height="5" rx="2.5" fill="#C8922A" />
           </svg>
         </div>
         <h1 className="text-3xl font-bold text-white relative z-10">
@@ -181,10 +181,10 @@ export default function SupervisorLoginPage() {
         .bg-repeating-stripe {
           background: repeating-linear-gradient(
             -45deg,
-            #E67E22,
-            #E67E22 8px,
-            #1B2A4A 8px,
-            #1B2A4A 16px
+            #C8922A,
+            #C8922A 8px,
+            #162032 8px,
+            #162032 16px
           );
         }
       `}</style>

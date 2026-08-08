@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { UploadedActivity } from '@/lib/project-data-store';
-import { SupervisorStatus, STATUS_CONFIG, normalizeStatus, daysOverdue, formatDDMMYYYY, TODAY } from './supervisor-utils';
+import { SupervisorStatus, STATUS_CONFIG, normalizeStatus, daysOverdue, TODAY } from './supervisor-utils';
 
 interface ActivityCardProps {
   row: UploadedActivity;
@@ -29,28 +29,27 @@ function ActivityCard({
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 transition-colors">
-      <div className="flex items-start justify-between mb-1" onClick={() => !bulkMode && onOpenDetail(row)}>
-        <div className="flex items-start gap-3">
+      <div className="flex items-start justify-between" onClick={() => !bulkMode && onOpenDetail(row)}>
+        <div className="flex items-start gap-3 flex-1 min-w-0">
           {bulkMode && !isCompleted && (
             <input
               type="checkbox"
               checked={isSelected}
               onChange={() => onToggleSelect(row.id)}
-              className="accent-[#E67E22] w-5 h-5 mt-0.5"
+              className="accent-[#C8922A] w-5 h-5 mt-0.5"
             />
           )}
           {bulkMode && isCompleted && (
             <input type="checkbox" disabled className="w-5 h-5 mt-0.5 opacity-30" />
           )}
-          <div>
-            <div className="text-sm font-bold text-gray-900">
-              Flat {row.flat_number} &bull; {row.configuration}
-            </div>
-            <div className="text-xs text-gray-500 mt-0.5">{row.stage}</div>
-            <div className="text-xs font-semibold text-primary mt-0.5">Sub Stage: {row.stage_gate}</div>
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-gray-900">{row.activity}</div>
+            <div className="text-xs text-gray-500 mt-1">F{row.floor} &bull; Flat {row.flat_number} &bull; {row.configuration}</div>
+            <div className="text-xs text-primary font-medium mt-0.5">{row.stage} → {row.stage_gate}</div>
+            <div className="text-xs text-gray-400 mt-0.5">{row.vendor}</div>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${sc.bg} ${sc.text}`}>
             {sc.label}
           </span>
@@ -60,15 +59,6 @@ function ActivityCard({
             </span>
           )}
         </div>
-      </div>
-
-      <div className="text-sm font-semibold text-gray-800 mt-1" onClick={() => !bulkMode && onOpenDetail(row)}>{row.activity}</div>
-      <div className="text-xs text-gray-500 mt-0.5">{row.vendor}</div>
-
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-xs text-gray-400">
-          {formatDDMMYYYY(row.expected_start)} → {formatDDMMYYYY(row.expected_end)}
-        </span>
       </div>
 
       {!bulkMode && !isCompleted && (

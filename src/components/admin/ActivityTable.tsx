@@ -346,7 +346,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
         {selectedRows.size > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 sm:px-4 py-2.5 flex flex-wrap items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-2">
-              <input type="checkbox" checked readOnly className="accent-[#E67E22] w-4 h-4" />
+              <input type="checkbox" checked readOnly className="accent-[#C8922A] w-4 h-4" />
               <span className="text-sm font-medium text-blue-800">{selectedRows.size} rows selected</span>
             </div>
             <span className="text-gray-300">|</span>
@@ -410,7 +410,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="px-3 py-3 w-10">
-                        <input type="checkbox" checked={selectedRows.size === tableRows.length && tableRows.length > 0} onChange={toggleAll} className="accent-[#E67E22] w-4 h-4" />
+                        <input type="checkbox" checked={selectedRows.size === tableRows.length && tableRows.length > 0} onChange={toggleAll} className="accent-[#C8922A] w-4 h-4" />
                       </th>
                       <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">Floor</th>
                       <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">Flat No.</th>
@@ -449,7 +449,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                       return (
                       <tr key={row.id} className={`hover:bg-gray-50 transition-colors ${selectedRows.has(row.id) ? 'bg-orange-50/50' : isRefuge ? 'bg-amber-50/60' : ''}`}>
                         <td className="px-3 py-2.5">
-                          <input type="checkbox" checked={selectedRows.has(row.id)} onChange={() => toggleRow(row.id)} className="accent-[#E67E22] w-4 h-4" />
+                          <input type="checkbox" checked={selectedRows.has(row.id)} onChange={() => toggleRow(row.id)} className="accent-[#C8922A] w-4 h-4" />
                         </td>
                         <td className="px-3 py-2.5 text-gray-700">
                           <span className="flex items-center gap-1.5">

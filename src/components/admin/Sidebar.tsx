@@ -122,10 +122,10 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       <div className={`flex items-center gap-2 px-3 py-4 border-b border-white/10 ${collapsed ? 'justify-center' : ''}`}>
         <div className="w-8 h-8 flex-shrink-0">
           <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <ellipse cx="20" cy="14" rx="16" ry="10" fill="#E67E22" />
-            <rect x="6" y="14" width="28" height="4" rx="1" fill="#D35400" />
-            <rect x="17" y="4" width="6" height="4" rx="2" fill="#E67E22" />
-            <path d="M8 18h24v2a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2Z" fill="#D35400" />
+            <ellipse cx="20" cy="14" rx="16" ry="10" fill="#C8922A" />
+            <rect x="6" y="14" width="28" height="4" rx="1" fill="#A67921" />
+            <rect x="17" y="4" width="6" height="4" rx="2" fill="#C8922A" />
+            <path d="M8 18h24v2a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2Z" fill="#A67921" />
           </svg>
         </div>
         {!collapsed && (

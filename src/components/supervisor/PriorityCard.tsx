@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { UploadedActivity } from '@/lib/project-data-store';
-import { STATUS_CONFIG, normalizeStatus, daysOverdue, formatDDMMYYYY, TODAY } from './supervisor-utils';
+import { STATUS_CONFIG, normalizeStatus, daysOverdue, TODAY } from './supervisor-utils';
 
 interface PriorityCardProps {
   row: UploadedActivity;
@@ -17,14 +17,14 @@ function PriorityCard({ row, onDetail, onQuickAction }: PriorityCardProps) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <div className="flex items-start justify-between mb-1" onClick={onDetail}>
-        <div>
-          <div className="text-sm font-bold text-gray-900">
-            Floor {row.floor} &bull; Flat {row.flat_number}
-          </div>
-          <div className="text-xs text-gray-500 mt-0.5">{row.stage} &bull; {row.stage_gate}</div>
+      <div className="flex items-start justify-between" onClick={onDetail}>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-gray-900">{row.activity}</div>
+          <div className="text-xs text-gray-500 mt-1">F{row.floor} &bull; Flat {row.flat_number}</div>
+          <div className="text-xs text-primary font-medium mt-0.5">{row.stage} → {row.stage_gate}</div>
+          <div className="text-xs text-gray-400 mt-0.5">{row.vendor}</div>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${sc.bg} ${sc.text}`}>
             {sc.label}
           </span>
@@ -35,10 +35,6 @@ function PriorityCard({ row, onDetail, onQuickAction }: PriorityCardProps) {
           )}
         </div>
       </div>
-
-      <div className="text-sm font-semibold text-gray-800 mt-1" onClick={onDetail}>{row.activity}</div>
-      <div className="text-xs text-gray-500 mt-0.5">{row.vendor}</div>
-      <div className="text-xs text-gray-400 mt-1">{formatDDMMYYYY(row.expected_start)} → {formatDDMMYYYY(row.expected_end)}</div>
 
       {status !== 'completed' && (
         <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">
-      <div style="background: #E67E22; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+      <div style="background: #C8922A; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0;">
         <h2 style="margin: 0; font-size: 18px;">Status Reversal Alert</h2>
       </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">

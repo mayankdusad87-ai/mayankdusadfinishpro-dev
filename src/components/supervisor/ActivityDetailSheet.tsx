@@ -237,29 +237,7 @@ export default function ActivityDetailSheet({
           )}
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Actual Start</label>
-                <input
-                  type="date"
-                  value={detailActualStart}
-                  max={TODAY}
-                  onChange={(e) => { setDetailActualStart(e.target.value); setDetailError(''); }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Actual End</label>
-                <input
-                  type="date"
-                  value={detailActualEnd}
-                  min={detailActualStart || undefined}
-                  onChange={(e) => { setDetailActualEnd(e.target.value); setDetailError(''); }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                />
-              </div>
-            </div>
-
+            {/* 1. Status (primary action) */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
               <select
@@ -273,11 +251,7 @@ export default function ActivityDetailSheet({
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Vendor</label>
-              <input type="text" defaultValue={activity.vendor} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50" readOnly />
-            </div>
-
+            {/* 2. Delay reason (right after status) */}
             {isDelayReasonVisible(detailStatus, activity.expected_end) && (
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -314,6 +288,36 @@ export default function ActivityDetailSheet({
                 />
               </div>
             )}
+
+            {/* 3. Actual dates */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Actual Start</label>
+                <input
+                  type="date"
+                  value={detailActualStart}
+                  max={TODAY}
+                  onChange={(e) => { setDetailActualStart(e.target.value); setDetailError(''); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Actual End</label>
+                <input
+                  type="date"
+                  value={detailActualEnd}
+                  min={detailActualStart || undefined}
+                  onChange={(e) => { setDetailActualEnd(e.target.value); setDetailError(''); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+            </div>
+
+            {/* 4. Vendor (read-only) */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Vendor</label>
+              <input type="text" defaultValue={activity.vendor} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50" readOnly />
+            </div>
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-2">
