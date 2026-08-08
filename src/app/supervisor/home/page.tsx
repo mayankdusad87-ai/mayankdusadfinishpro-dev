@@ -47,6 +47,7 @@ export default function SupervisorHomePage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [assignedFloors, setAssignedFloors] = useState<number[] | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     getProjectsFromSupabase().then(projects => {
@@ -512,27 +513,24 @@ export default function SupervisorHomePage() {
           </div>
         </div>
 
-        {/* Overdue without delay reason banner */}
+        {/* Overdue without delay reason banner — slim single-line */}
         {(() => {
           const needsReason = priorities.overdue.filter(r => normalizeStatus(r.status) === 'in_progress' && !r.delay_reason);
           if (needsReason.length === 0) return null;
           return (
             <button
               onClick={() => setActiveView('overdue')}
-              className="w-full flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 mb-3 text-left"
+              className="w-full flex items-center justify-between bg-red-500/15 rounded-lg px-3 py-1.5 mb-2 text-left"
             >
-              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                 </svg>
+                <span className="text-xs font-semibold text-red-300">
+                  {needsReason.length} {needsReason.length === 1 ? 'activity needs' : 'need'} delay reason
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-red-800">
-                  {needsReason.length} overdue {needsReason.length === 1 ? 'activity needs' : 'activities need'} delay reason
-                </div>
-                <div className="text-xs text-red-600/70">Tap overdue activities to capture reasons</div>
-              </div>
-              <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-3.5 h-3.5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
               </svg>
             </button>
@@ -617,48 +615,70 @@ export default function SupervisorHomePage() {
         {/* All floors view content */}
         {activeView === 'all' && (
           <>
-            {/* Search */}
-            <div className="relative mb-3">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="m21 21-4.35-4.35" />
-              </svg>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by Flat No., Floor, Stage, Activity, Vendor..."
-                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-              />
-              {search && (
-                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
+            {/* Collapsed search + filter row */}
+            <div className="flex gap-2 mb-3">
+              <div className="relative flex-1">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="m21 21-4.35-4.35" />
+                </svg>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search flat, floor, stage, vendor..."
+                  className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors flex-shrink-0 ${
+                  showFilters || hasFilters
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-gray-200 bg-white text-gray-600'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75M10.5 18a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 18H7.5m3-6h9.75M10.5 12a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 12H7.5" />
+                </svg>
+                Filter
+                {hasFilters && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                )}
+              </button>
             </div>
 
-            <SupervisorFilters
-              stages={projectData?.stages || []}
-              subStageOptions={subStageOptions}
-              activityOptions={activityOptions}
-              stageFilter={stageFilter}
-              subStageFilter={subStageFilter}
-              activityFilter={activityFilter}
-              statusDropdown={statusDropdown}
-              onStageChange={(v) => { setStageFilter(v); setSubStageFilter(''); setActivityFilter(''); setSelectedIds(new Set()); }}
-              onSubStageChange={(v) => { setSubStageFilter(v); setActivityFilter(''); setSelectedIds(new Set()); }}
-              onActivityChange={(v) => { setActivityFilter(v); setSelectedIds(new Set()); }}
-              onStatusChange={(v) => { setStatusDropdown(v); setSelectedIds(new Set()); }}
-            />
-
-            {hasFilters && (
-              <button onClick={() => { clearFilters(); setSelectedIds(new Set()); }} className="text-xs text-primary font-medium mb-3 flex items-center gap-1">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-                Clear all filters
-              </button>
+            {/* Expandable advanced filters */}
+            {showFilters && (
+              <>
+                <SupervisorFilters
+                  stages={projectData?.stages || []}
+                  subStageOptions={subStageOptions}
+                  activityOptions={activityOptions}
+                  stageFilter={stageFilter}
+                  subStageFilter={subStageFilter}
+                  activityFilter={activityFilter}
+                  statusDropdown={statusDropdown}
+                  onStageChange={(v) => { setStageFilter(v); setSubStageFilter(''); setActivityFilter(''); setSelectedIds(new Set()); }}
+                  onSubStageChange={(v) => { setSubStageFilter(v); setActivityFilter(''); setSelectedIds(new Set()); }}
+                  onActivityChange={(v) => { setActivityFilter(v); setSelectedIds(new Set()); }}
+                  onStatusChange={(v) => { setStatusDropdown(v); setSelectedIds(new Set()); }}
+                />
+                {hasFilters && (
+                  <button onClick={() => { clearFilters(); setSelectedIds(new Set()); }} className="text-xs text-primary font-medium mb-3 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                    Clear all filters
+                  </button>
+                )}
+              </>
             )}
 
             {!stageFilter && !search ? (
@@ -733,49 +753,71 @@ export default function SupervisorHomePage() {
               ))}
             </div>
 
-            <SupervisorFilters
-              stages={projectData?.stages || []}
-              subStageOptions={subStageOptions}
-              activityOptions={activityOptions}
-              stageFilter={stageFilter}
-              subStageFilter={subStageFilter}
-              activityFilter={activityFilter}
-              statusDropdown={statusDropdown}
-              onStageChange={(v) => { setStageFilter(v); setSubStageFilter(''); setActivityFilter(''); }}
-              onSubStageChange={(v) => { setSubStageFilter(v); setActivityFilter(''); }}
-              onActivityChange={(v) => setActivityFilter(v)}
-              onStatusChange={(v) => setStatusDropdown(v)}
-            />
-
-            {hasFilters && (
-              <button onClick={clearFilters} className="text-xs text-primary font-medium mb-3 flex items-center gap-1">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            {/* Collapsed search + filter row */}
+            <div className="flex gap-2 mb-3">
+              <div className="relative flex-1">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="m21 21-4.35-4.35" />
                 </svg>
-                Clear all filters
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search flat, stage, vendor..."
+                  className="w-full pl-9 pr-8 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors flex-shrink-0 ${
+                  showFilters || hasFilters
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-gray-200 bg-white text-gray-600'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75M10.5 18a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 18H7.5m3-6h9.75M10.5 12a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 12H7.5" />
+                </svg>
+                Filter
+                {hasFilters && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                )}
               </button>
-            )}
-
-            {/* Search */}
-            <div className="relative mb-4">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="m21 21-4.35-4.35" />
-              </svg>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by Flat No., Stage, Activity, Vendor..."
-                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-              />
-              {search && (
-                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
             </div>
+
+            {/* Expandable advanced filters */}
+            {showFilters && (
+              <>
+                <SupervisorFilters
+                  stages={projectData?.stages || []}
+                  subStageOptions={subStageOptions}
+                  activityOptions={activityOptions}
+                  stageFilter={stageFilter}
+                  subStageFilter={subStageFilter}
+                  activityFilter={activityFilter}
+                  statusDropdown={statusDropdown}
+                  onStageChange={(v) => { setStageFilter(v); setSubStageFilter(''); setActivityFilter(''); }}
+                  onSubStageChange={(v) => { setSubStageFilter(v); setActivityFilter(''); }}
+                  onActivityChange={(v) => setActivityFilter(v)}
+                  onStatusChange={(v) => setStatusDropdown(v)}
+                />
+                {hasFilters && (
+                  <button onClick={clearFilters} className="text-xs text-primary font-medium mb-3 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                    Clear all filters
+                  </button>
+                )}
+              </>
+            )}
 
             {/* Activity Cards */}
             <div className="space-y-3">
