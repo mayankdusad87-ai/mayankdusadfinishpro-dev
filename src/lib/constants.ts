@@ -36,7 +36,6 @@ export const FILTER_STATUS_OPTIONS: { value: ActivityStatus | ''; label: string 
   { value: 'not_started', label: 'Not Started' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'completed', label: 'Completed' },
-  { value: 'delayed', label: 'Delayed' },
   { value: 'on_hold', label: 'On Hold' },
 ];
 

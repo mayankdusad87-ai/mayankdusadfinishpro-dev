@@ -242,7 +242,16 @@ export default function ActivityDetailSheet({
               <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
               <select
                 value={detailStatus}
-                onChange={(e) => { setDetailStatus(e.target.value); setDetailError(''); }}
+                onChange={(e) => {
+                  const newStatus = e.target.value;
+                  setDetailStatus(newStatus);
+                  setDetailError('');
+                  // Clear actual dates when reverting to not_started
+                  if (newStatus === 'not_started') {
+                    setDetailActualStart('');
+                    setDetailActualEnd('');
+                  }
+                }}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/30 focus:border-primary"
               >
                 {SUPERVISOR_STATUS_OPTIONS.map(o => (

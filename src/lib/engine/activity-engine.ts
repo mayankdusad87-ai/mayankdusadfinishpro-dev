@@ -69,12 +69,14 @@ export function computeStatusUpdate(input: StatusChangeInput): StatusChangeResul
 
   const updates: ActivityUpdate = { status: resolved };
 
-  if (input.userStatus === 'completed') {
+  if (input.userStatus === 'not_started') {
+    // Reversal — clear actual dates
+    updates.actual_start = null;
+    updates.actual_end = null;
+  } else if (input.userStatus === 'completed') {
     if (!input.actualEnd) updates.actual_end = today;
     if (!input.actualStart) updates.actual_start = today;
-  }
-
-  if (input.userStatus === 'in_progress' && !input.actualStart) {
+  } else if (input.userStatus === 'in_progress' && !input.actualStart) {
     updates.actual_start = today;
   }
 
@@ -99,14 +101,24 @@ export function computeSupervisorUpdate(input: {
   const today = todayISO();
   const resolved = resolveStatus(input.status, input.expectedEnd);
 
-  const actualStart = input.status === 'completed' && !input.actualStart ? today : input.actualStart;
-  const actualEnd = input.status === 'completed' && !input.actualEnd ? today : input.actualEnd;
+  let actualStart = input.actualStart;
+  let actualEnd = input.actualEnd;
+
+  if (input.status === 'not_started') {
+    // Reversal — clear actual dates
+    actualStart = '';
+    actualEnd = '';
+  } else if (input.status === 'completed') {
+    if (!actualStart) actualStart = today;
+    if (!actualEnd) actualEnd = today;
+  }
+
   const reasonValue = input.delayReasonIsOther ? input.remarks.trim() : input.delayReason;
 
   const updates: ActivityUpdate = {
     status: resolved,
-    actual_start: actualStart,
-    actual_end: actualEnd,
+    actual_start: actualStart || null,
+    actual_end: actualEnd || null,
     delay_reason: reasonValue,
     remarks: input.delayReasonIsOther ? input.remarks.trim() : '',
   };
