@@ -6,7 +6,6 @@ import FilterBar, { Filters } from '@/components/admin/FilterBar';
 import FloorHeatmap from '@/components/admin/FloorHeatmap';
 import ActivityTable from '@/components/admin/ActivityTable';
 import { useProject } from '@/lib/project-context';
-import { useSearch } from '@/lib/search-context';
 import { getDashboardData, DashboardData, getRefugeConfig } from '@/lib/supabase-data';
 import { computeHeatmapFromRollup, HeatmapData } from '@/lib/floor-rollup';
 import { ActivityStatus } from '@/lib/types';
@@ -16,7 +15,6 @@ type DashboardView = 'heatmap' | 'table';
 
 export default function DashboardPage() {
   const { projects, currentProject } = useProject();
-  const { search } = useSearch();
   const [dashData, setDashData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<DashboardView>('heatmap');
@@ -68,7 +66,7 @@ export default function DashboardPage() {
 
   // Build active filters for table query
   const activeFilters = useMemo(() => {
-    const f: { floor?: string; flat?: string; stage?: string; stageGate?: string; vendor?: string; status?: string; search?: string } = {};
+    const f: { floor?: string; flat?: string; stage?: string; stageGate?: string; vendor?: string; status?: string } = {};
     if (filters.floor) f.floor = filters.floor;
     if (filters.flat) f.flat = filters.flat;
     if (filters.stage) f.stage = filters.stage;
@@ -76,9 +74,8 @@ export default function DashboardPage() {
     if (filters.vendor) f.vendor = filters.vendor;
     if (filters.status) f.status = filters.status;
     if (statusFilter) f.status = statusFilter;
-    if (search) f.search = search;
     return f;
-  }, [filters, statusFilter, search]);
+  }, [filters, statusFilter]);
 
   // Compute heatmap from rollup data
   const heatmapData: HeatmapData = useMemo(() => {
