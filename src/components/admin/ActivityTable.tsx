@@ -23,7 +23,7 @@ interface EditingCell {
 
 interface ActivityTableProps {
   projectId: string;
-  filters: { floor?: string; stage?: string; stageGate?: string; vendor?: string; status?: string };
+  filters: { floor?: string; flat?: string; stage?: string; stageGate?: string; vendor?: string; status?: string; search?: string };
   statusFilter: ActivityStatus | null;
   projectName: string;
   refugeFloors?: number[];
@@ -60,7 +60,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   const [exporting, setExporting] = useState(false);
 
   const activeFilters = useMemo(() => {
-    const f: { floor?: string; stage?: string; stageGate?: string; vendor?: string; status?: string } = { ...filters };
+    const f: { floor?: string; flat?: string; stage?: string; stageGate?: string; vendor?: string; status?: string; search?: string } = { ...filters };
     if (statusFilter) f.status = statusFilter;
     return f;
   }, [filters, statusFilter]);

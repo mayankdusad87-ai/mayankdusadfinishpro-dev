@@ -7,6 +7,7 @@ import type { ActivityStatus } from '@/lib/types';
 export interface Filters {
   project: string;
   floor: string;
+  flat: string;
   stage: string;
   stageGate: string;
   vendor: string;
@@ -18,10 +19,10 @@ export interface Filters {
 interface FilterBarProps {
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
-  onApply: () => void;
   onClear: () => void;
   projects: string[];
   floors: string[];
+  flats: string[];
   stages: string[];
   stageGates: string[];
   vendors: string[];
@@ -32,10 +33,10 @@ interface FilterBarProps {
 function FilterBar({
   filters,
   onFiltersChange,
-  onApply,
   onClear,
   projects,
   floors,
+  flats,
   stages,
   stageGates,
   vendors,
@@ -78,6 +79,21 @@ function FilterBar({
           >
             <option value="">All Floors</option>
             {floors.map((f) => (
+              <option key={f} value={f}>{f}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Flat */}
+        <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">
+          <label className="text-xs font-medium text-gray-500">Flat</label>
+          <select
+            className={selectClass}
+            value={filters.flat}
+            onChange={(e) => update('flat', e.target.value)}
+          >
+            <option value="">All Flats</option>
+            {flats.map((f) => (
               <option key={f} value={f}>{f}</option>
             ))}
           </select>
@@ -162,19 +178,13 @@ function FilterBar({
           </div>
         </div>
 
-        {/* Buttons */}
-        <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+        {/* Clear button */}
+        <div className="flex items-center w-full sm:w-auto sm:ml-auto">
           <button
             onClick={onClear}
             className="h-9 px-4 rounded-md border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
           >
             Clear
-          </button>
-          <button
-            onClick={onApply}
-            className="h-9 px-4 rounded-md bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors cursor-pointer"
-          >
-            Apply Filters
           </button>
         </div>
       </div>

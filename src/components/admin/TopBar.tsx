@@ -1,17 +1,20 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useProject } from '@/lib/project-context';
 import { useAuth } from '@/lib/auth-context';
+import { useSearch } from '@/lib/search-context';
 
 interface TopBarProps {
   onMenuClick: () => void;
 }
 
 export default function TopBar({ onMenuClick }: TopBarProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const { search: searchQuery, setSearch: setSearchQuery } = useSearch();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileSearchRef = useRef<HTMLInputElement>(null);
   const { projects, currentProject, setCurrentProjectId } = useProject();
   const { profile } = useAuth();
 
@@ -69,7 +72,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
                   onClick={() => { setCurrentProjectId(p.id); setDropdownOpen(false); }}
                   className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
                     currentProject?.id === p.id
-                      ? 'bg-orange-50 text-primary font-semibold'
+                      ? 'bg-primary/10 text-primary font-semibold'
                       : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
@@ -89,7 +92,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
         </div>
       </div>
 
-      {/* Search bar - hidden on small mobile */}
+      {/* Search bar - desktop */}
       <div className="hidden sm:block flex-1 max-w-md">
         <div className="relative">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">
@@ -98,31 +101,50 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           </svg>
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search flat, floor, stage, sub-stage..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+            className="w-full pl-9 pr-8 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 transition-colors cursor-pointer"
+              aria-label="Clear search"
+            >
+              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Right section */}
       <div className="flex items-center gap-2 md:gap-3">
-        <button className="sm:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+        {/* Mobile search toggle */}
+        <button
+          className="sm:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+          onClick={() => {
+            setMobileSearchOpen(!mobileSearchOpen);
+            if (!mobileSearchOpen) setTimeout(() => mobileSearchRef.current?.focus(), 100);
+          }}
+          aria-label="Toggle search"
+        >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-gray-600">
             <circle cx="11" cy="11" r="8" />
             <path d="M21 21l-4.35-4.35" />
           </svg>
+          {searchQuery && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full" />
+          )}
         </button>
 
-        <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+        <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer" aria-label="Notifications">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-gray-600">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
-          <span className="absolute -top-0.5 -right-0.5 w-4.5 h-4.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
-            3
-          </span>
         </button>
 
         <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
@@ -135,6 +157,37 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
           </div>
         </div>
       </div>
+
+      {/* Mobile search bar — slides under header */}
+      {mobileSearchOpen && (
+        <div className="absolute top-14 left-0 right-0 bg-white border-b border-gray-200 px-3 py-2 sm:hidden z-40">
+          <div className="relative">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              ref={mobileSearchRef}
+              type="text"
+              placeholder="Search flat, floor, stage, sub-stage..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(''); mobileSearchRef.current?.focus(); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 transition-colors cursor-pointer"
+                aria-label="Clear search"
+              >
+                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

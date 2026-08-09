@@ -6,6 +6,7 @@ import FilterBar, { Filters } from '@/components/admin/FilterBar';
 import FloorHeatmap from '@/components/admin/FloorHeatmap';
 import ActivityTable from '@/components/admin/ActivityTable';
 import { useProject } from '@/lib/project-context';
+import { useSearch } from '@/lib/search-context';
 import { getDashboardData, DashboardData, getRefugeConfig } from '@/lib/supabase-data';
 import { computeHeatmapFromRollup, HeatmapData } from '@/lib/floor-rollup';
 import { ActivityStatus } from '@/lib/types';
@@ -15,6 +16,7 @@ type DashboardView = 'heatmap' | 'table';
 
 export default function DashboardPage() {
   const { projects, currentProject } = useProject();
+  const { search } = useSearch();
   const [dashData, setDashData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<DashboardView>('heatmap');
@@ -22,7 +24,7 @@ export default function DashboardPage() {
   const [refugeFloors, setRefugeFloors] = useState<number[]>([]);
   const [refugeUnits, setRefugeUnits] = useState<number[]>([]);
   const [filters, setFilters] = useState<Filters>({
-    project: '', floor: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '',
+    project: '', floor: '', flat: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '',
   });
   const [tableRefreshKey, setTableRefreshKey] = useState(0);
 
@@ -46,7 +48,7 @@ export default function DashboardPage() {
     setDashData(null);
     setRefugeFloors([]);
     setRefugeUnits([]);
-    setFilters({ project: '', floor: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '' });
+    setFilters({ project: '', floor: '', flat: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '' });
     setStatusFilter(null);
 
     if (!currentProject) {
@@ -66,15 +68,17 @@ export default function DashboardPage() {
 
   // Build active filters for table query
   const activeFilters = useMemo(() => {
-    const f: { floor?: string; stage?: string; stageGate?: string; vendor?: string; status?: string } = {};
+    const f: { floor?: string; flat?: string; stage?: string; stageGate?: string; vendor?: string; status?: string; search?: string } = {};
     if (filters.floor) f.floor = filters.floor;
+    if (filters.flat) f.flat = filters.flat;
     if (filters.stage) f.stage = filters.stage;
     if (filters.stageGate) f.stageGate = filters.stageGate;
     if (filters.vendor) f.vendor = filters.vendor;
     if (filters.status) f.status = filters.status;
     if (statusFilter) f.status = statusFilter;
+    if (search) f.search = search;
     return f;
-  }, [filters, statusFilter]);
+  }, [filters, statusFilter, search]);
 
   // Compute heatmap from rollup data
   const heatmapData: HeatmapData = useMemo(() => {
@@ -104,6 +108,12 @@ export default function DashboardPage() {
     return [...set].sort((a, b) => a - b).map(f => `Floor ${f}`);
   }, [dashData]);
 
+  const flats = useMemo(() => {
+    if (!dashData) return [];
+    const set = new Set(dashData.heatmap.map(r => r.flat_number));
+    return [...set].sort((a, b) => a - b).map(f => `Flat ${f}`);
+  }, [dashData]);
+
   const stages = useMemo(() => dashData?.stages || [], [dashData]);
   const stageGates = useMemo(() => {
     if (!dashData) return [];
@@ -113,7 +123,7 @@ export default function DashboardPage() {
   const vendors = useMemo(() => dashData?.vendors || [], [dashData]);
 
   function clearFilters() {
-    setFilters({ project: '', floor: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '' });
+    setFilters({ project: '', floor: '', flat: '', stage: '', stageGate: '', vendor: '', status: '', dateFrom: '', dateTo: '' });
     setStatusFilter(null);
   }
 
@@ -208,10 +218,10 @@ export default function DashboardPage() {
           <FilterBar
             filters={filters}
             onFiltersChange={(f) => { setFilters(f); }}
-            onApply={() => {}}
             onClear={clearFilters}
             projects={projects.filter(p => p.hasTemplate).map(p => p.name)}
             floors={floors}
+            flats={flats}
             stages={stages}
             stageGates={stageGates}
             vendors={vendors}

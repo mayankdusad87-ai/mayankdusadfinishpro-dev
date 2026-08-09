@@ -127,7 +127,7 @@ export interface ActivitiesPage {
 
 export async function getActivitiesPage(
   projectId: string,
-  filters: { floor?: string; stage?: string; stageGate?: string; vendor?: string; status?: string },
+  filters: { floor?: string; flat?: string; stage?: string; stageGate?: string; vendor?: string; status?: string; search?: string },
   page: number,
   perPage: number
 ): Promise<ActivitiesPage> {
@@ -141,6 +141,10 @@ export async function getActivitiesPage(
     const floorNum = parseInt(filters.floor.replace('Floor ', ''), 10);
     if (!isNaN(floorNum)) query = query.eq('floor', floorNum);
   }
+  if (filters.flat) {
+    const flatNum = parseInt(filters.flat.replace('Flat ', ''), 10);
+    if (!isNaN(flatNum)) query = query.eq('flat_number', flatNum);
+  }
   if (filters.stage) query = query.eq('stage', filters.stage);
   if (filters.stageGate) query = query.eq('stage_gate', filters.stageGate);
   if (filters.vendor) query = query.eq('vendor', filters.vendor);
@@ -152,6 +156,21 @@ export async function getActivitiesPage(
     } else {
       query = query.eq('status', filters.status);
     }
+  }
+
+  // Global text search — matches flat_number, floor, stage, or stage_gate
+  if (filters.search) {
+    const term = filters.search.trim();
+    const num = parseInt(term, 10);
+    const orClauses: string[] = [
+      `stage.ilike.%${term}%`,
+      `stage_gate.ilike.%${term}%`,
+    ];
+    if (!isNaN(num)) {
+      orClauses.push(`flat_number.eq.${num}`);
+      orClauses.push(`floor.eq.${num}`);
+    }
+    query = query.or(orClauses.join(','));
   }
 
   const from = (page - 1) * perPage;
