@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/auth-guard';
 import { notifyReversalSchema } from '@/lib/validations';
 import { STATUS_LABELS } from '@/lib/constants';
+import { createNotificationForUsers, getAdminUserIds } from '@/lib/notify';
 
 export async function POST(req: NextRequest) {
   const auth = await verifyAdmin(req);
@@ -69,6 +70,20 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       const err = await res.json();
       return NextResponse.json({ error: err.message || 'Email send failed' }, { status: 500 });
+    }
+
+    // Also create in-app notification for all admins
+    try {
+      const adminIds = await getAdminUserIds();
+      await createNotificationForUsers(
+        adminIds,
+        'reversal',
+        `Status Reversal — Floor ${floor}, Flat ${flatNumber}`,
+        `${activity} (${stage}${stageGate ? ` / ${stageGate}` : ''}) reversed from ${oldLabel} → ${newLabel} in ${projectName}`,
+        { projectName, floor, flatNumber, activity, stage, stageGate, oldStatus, newStatus },
+      );
+    } catch {
+      // best-effort, don't fail the request
     }
 
     return NextResponse.json({ success: true });

@@ -328,6 +328,47 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          type: string
+          title: string
+          message: string
+          metadata: Json | null
+          is_read: boolean
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: string
+          title: string
+          message: string
+          metadata?: Json | null
+          is_read?: boolean
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: string
+          title?: string
+          message?: string
+          metadata?: Json | null
+          is_read?: boolean
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           created_at: string | null
@@ -628,3 +669,5 @@ export type AppErrorRow = DbTables['app_errors']['Row'];
 export type ReasonRow = DbTables['reasons']['Row'];
 export type SupervisorAssignmentRow = DbTables['supervisor_assignments']['Row'];
 export type UploadRow = DbTables['uploads']['Row'];
+export type NotificationRow = DbTables['notifications']['Row'];
+export type NotificationInsert = DbTables['notifications']['Insert'];

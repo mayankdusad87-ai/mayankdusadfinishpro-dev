@@ -64,3 +64,10 @@ export {
   getPaintDaysPerFlat,
   setPaintDaysPerFlat,
 } from './settings-repo';
+
+export {
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from './notification-repo';
+export type { NotificationsResult } from './notification-repo';
