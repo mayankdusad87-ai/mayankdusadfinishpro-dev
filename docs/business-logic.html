@@ -1,0 +1,1679 @@
+<title>Finishing Pro — Business Logic Document</title>
+<style>
+  @font-face {
+    font-family: 'DocSerif';
+    src: local('Georgia'), local('Cambria'), local('Times New Roman');
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'DocSans';
+    src: local('Segoe UI'), local('Helvetica Neue'), local('Arial');
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'DocMono';
+    src: local('Cascadia Code'), local('Consolas'), local('Courier New');
+    font-display: swap;
+  }
+
+  :root {
+    --bg: #FAFAF8;
+    --bg-card: #FFFFFF;
+    --bg-code: #F3F2EE;
+    --bg-accent: #FFF7ED;
+    --text: #1A1A18;
+    --text-secondary: #5C5C58;
+    --text-muted: #8A8A85;
+    --border: #E5E4E0;
+    --accent: #D97706;
+    --accent-dark: #B45309;
+    --green: #16A34A;
+    --yellow: #CA8A04;
+    --red: #DC2626;
+    --blue: #2563EB;
+    --indigo: #4F46E5;
+    --section-rule: #D97706;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413;
+      --bg-card: #1E1E1C;
+      --bg-code: #252523;
+      --bg-accent: #27201A;
+      --text: #EAEAE8;
+      --text-secondary: #A8A8A4;
+      --text-muted: #6E6E6A;
+      --border: #333330;
+      --accent: #F59E0B;
+      --accent-dark: #FBBF24;
+      --green: #22C55E;
+      --yellow: #EAB308;
+      --red: #EF4444;
+      --blue: #3B82F6;
+      --indigo: #818CF8;
+      --section-rule: #F59E0B;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141413;
+    --bg-card: #1E1E1C;
+    --bg-code: #252523;
+    --bg-accent: #27201A;
+    --text: #EAEAE8;
+    --text-secondary: #A8A8A4;
+    --text-muted: #6E6E6A;
+    --border: #333330;
+    --accent: #F59E0B;
+    --accent-dark: #FBBF24;
+    --green: #22C55E;
+    --yellow: #EAB308;
+    --red: #EF4444;
+    --blue: #3B82F6;
+    --indigo: #818CF8;
+    --section-rule: #F59E0B;
+  }
+  :root[data-theme="light"] {
+    --bg: #FAFAF8;
+    --bg-card: #FFFFFF;
+    --bg-code: #F3F2EE;
+    --bg-accent: #FFF7ED;
+    --text: #1A1A18;
+    --text-secondary: #5C5C58;
+    --text-muted: #8A8A85;
+    --border: #E5E4E0;
+    --accent: #D97706;
+    --accent-dark: #B45309;
+    --green: #16A34A;
+    --yellow: #CA8A04;
+    --red: #DC2626;
+    --blue: #2563EB;
+    --indigo: #4F46E5;
+    --section-rule: #D97706;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DocSans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  /* --- COVER --- */
+  .cover {
+    text-align: center;
+    padding: 64px 0 48px;
+    border-bottom: 3px solid var(--section-rule);
+    margin-bottom: 48px;
+  }
+  .cover-eyebrow {
+    font-family: 'DocSans', sans-serif;
+    font-size: 11px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .cover h1 {
+    font-family: 'DocSerif', serif;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--text);
+    text-wrap: balance;
+    margin-bottom: 12px;
+  }
+  .cover-sub {
+    font-size: 16px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    max-width: 520px;
+    margin: 0 auto 24px;
+  }
+  .cover-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .cover-meta span { margin: 0 8px; }
+
+  /* --- VERSION BADGE --- */
+  .version-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 4px;
+    margin-top: 12px;
+    background: color-mix(in srgb, var(--accent) 15%, var(--bg-card));
+    color: var(--accent);
+  }
+
+  /* --- TOC --- */
+  .toc {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 32px;
+    margin-bottom: 48px;
+  }
+  .toc h2 {
+    font-family: 'DocSans', sans-serif;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .toc ol {
+    list-style: none;
+    counter-reset: toc-counter;
+  }
+  .toc li {
+    counter-increment: toc-counter;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    color: var(--text);
+  }
+  .toc li:last-child { border-bottom: none; }
+  .toc li::before {
+    content: counter(toc-counter, decimal-leading-zero);
+    font-family: 'DocMono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    margin-right: 12px;
+    font-weight: 600;
+  }
+  .toc li .new-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+    background: color-mix(in srgb, var(--green) 15%, var(--bg-card));
+    color: var(--green);
+  }
+  .toc li .updated-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+    background: color-mix(in srgb, var(--blue) 15%, var(--bg-card));
+    color: var(--blue);
+  }
+
+  /* --- SECTIONS --- */
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    border-bottom: 2px solid var(--section-rule);
+    padding-bottom: 8px;
+    margin-bottom: 24px;
+  }
+  .section-num {
+    font-family: 'DocMono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-family: 'DocSerif', serif;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.3;
+    text-wrap: balance;
+  }
+
+  .subsection {
+    margin-bottom: 28px;
+  }
+  .subsection h3 {
+    font-family: 'DocSans', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+    padding-left: 12px;
+    border-left: 3px solid var(--accent);
+  }
+
+  p {
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+  }
+
+  /* --- TABLES --- */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 16px 0 20px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  th {
+    background: var(--bg-code);
+    font-weight: 700;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+
+  /* --- CODE --- */
+  code {
+    font-family: 'DocMono', monospace;
+    font-size: 12.5px;
+    background: var(--bg-code);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--accent-dark);
+  }
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin: 12px 0 16px;
+    font-family: 'DocMono', monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text);
+  }
+
+  /* --- CALLOUTS --- */
+  .callout {
+    background: var(--bg-accent);
+    border-left: 4px solid var(--accent);
+    padding: 14px 18px;
+    border-radius: 0 6px 6px 0;
+    margin: 16px 0 20px;
+    font-size: 13.5px;
+    color: var(--text);
+  }
+  .callout strong {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .callout-red {
+    background: color-mix(in srgb, var(--red) 8%, var(--bg-card));
+    border-left-color: var(--red);
+  }
+  .callout-red strong { color: var(--red); }
+
+  .callout-green {
+    background: color-mix(in srgb, var(--green) 8%, var(--bg-card));
+    border-left-color: var(--green);
+  }
+  .callout-green strong { color: var(--green); }
+
+  .callout-blue {
+    background: color-mix(in srgb, var(--blue) 8%, var(--bg-card));
+    border-left-color: var(--blue);
+  }
+  .callout-blue strong { color: var(--blue); }
+
+  /* --- LISTS --- */
+  ul, ol {
+    margin: 8px 0 16px 20px;
+    color: var(--text-secondary);
+  }
+  li { margin-bottom: 4px; font-size: 14px; }
+
+  /* --- BADGES --- */
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+  }
+  .badge-green { background: color-mix(in srgb, var(--green) 15%, var(--bg-card)); color: var(--green); }
+  .badge-yellow { background: color-mix(in srgb, var(--yellow) 15%, var(--bg-card)); color: var(--yellow); }
+  .badge-red { background: color-mix(in srgb, var(--red) 15%, var(--bg-card)); color: var(--red); }
+  .badge-blue { background: color-mix(in srgb, var(--blue) 15%, var(--bg-card)); color: var(--blue); }
+  .badge-indigo { background: color-mix(in srgb, var(--indigo) 15%, var(--bg-card)); color: var(--indigo); }
+  .badge-gray { background: var(--bg-code); color: var(--text-muted); }
+
+  /* --- FORMULA BOX --- */
+  .formula {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 16px 0 20px;
+    text-align: center;
+  }
+  .formula-main {
+    font-family: 'DocMono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .formula-legend {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* --- PIPELINE DIAGRAM --- */
+  .pipeline {
+    display: flex;
+    gap: 4px;
+    margin: 16px 0 20px;
+    overflow-x: auto;
+  }
+  .pipeline-stage {
+    flex: 1;
+    min-width: 120px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 12px;
+    text-align: center;
+    position: relative;
+  }
+  .pipeline-stage::after {
+    content: '\2192';
+    position: absolute;
+    right: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--accent);
+    font-size: 16px;
+    font-weight: 700;
+    z-index: 1;
+  }
+  .pipeline-stage:last-child::after { display: none; }
+  .pipeline-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .pipeline-count {
+    font-family: 'DocMono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .pipeline-total {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* --- DIVIDER --- */
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+
+  /* --- STATUS DOT --- */
+  .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .dot-green { background: var(--green); }
+  .dot-yellow { background: var(--yellow); }
+  .dot-red { background: var(--red); }
+  .dot-blue { background: var(--blue); }
+  .dot-gray { background: var(--text-muted); }
+
+  /* --- CHANGELOG --- */
+  .changelog {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 48px;
+  }
+  .changelog h2 {
+    font-family: 'DocSans', sans-serif;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .changelog ul {
+    list-style: disc;
+    margin-left: 20px;
+  }
+  .changelog li {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+
+  /* Print */
+  @media print {
+    .page { padding: 24px 16px; }
+    .cover { padding: 32px 0 24px; }
+    pre, .callout, .table-wrap { page-break-inside: avoid; }
+  }
+</style>
+
+<div class="page">
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="cover-eyebrow">Internal Reference Document</div>
+    <h1>Finishing Pro<br>Business Logic Specification</h1>
+    <p class="cover-sub">
+      Complete documentation of all business rules, calculations, constraints, and decision logic implemented in the Finishing Pro construction management platform.
+    </p>
+    <p class="cover-meta">
+      Version 2.0 <span>|</span> August 9, 2026 <span>|</span> Confidential
+    </p>
+    <div class="version-badge">Updated from v1.0 (July 30)</div>
+  </div>
+
+  <!-- CHANGELOG -->
+  <div class="changelog">
+    <h2>What changed in v2.0</h2>
+    <ul>
+      <li><strong>Section 1</strong> — Added <code>resolveStatus()</code> logic and "Delayed" removal from filter dropdowns</li>
+      <li><strong>Section 2</strong> — Expanded from 2 roles to 3: added Management (Promoter) with full permission matrix</li>
+      <li><strong>Section 5</strong> — Added reversal date-clearing rule (actual_start/actual_end nulled on revert to not_started)</li>
+      <li><strong>Section 7</strong> — Added in-app notifications alongside email on reversals</li>
+      <li><strong>Section 13</strong> — Updated deactivation to cover Management role; added friendly login message for deactivated accounts</li>
+      <li><strong>Section 14 (NEW)</strong> — Notification System: email + in-app bell notifications</li>
+      <li><strong>Section 15 (NEW)</strong> — Account Lifecycle: activate/deactivate flow with email alerts</li>
+      <li><strong>Section 16 (NEW)</strong> — Stage Weights: configurable per-project weighting for progress calculation</li>
+      <li>Sections 17–19 renumbered from former 14–16 (Pipeline, SPI, Projection — still "Agreed — To Build")</li>
+    </ul>
+  </div>
+
+  <!-- TABLE OF CONTENTS -->
+  <div class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li>Activity Status System <span class="updated-badge">Updated</span></li>
+      <li>Role-Based Access &amp; Permissions <span class="updated-badge">Updated</span></li>
+      <li>Delay &amp; On-Hold Reason Logic</li>
+      <li>Photo Upload &amp; Evidence Rules</li>
+      <li>Date Handling &amp; Validation <span class="updated-badge">Updated</span></li>
+      <li>Overdue Calculation</li>
+      <li>Audit Trail &amp; Reversal Detection <span class="updated-badge">Updated</span></li>
+      <li>Project Health Score Formula</li>
+      <li>Floor Heatmap &amp; Rollup Logic</li>
+      <li>Bulk Update Rules</li>
+      <li>Excel Template Parsing</li>
+      <li>Refuge Floor &amp; Unit Logic</li>
+      <li>Authentication &amp; Session Management <span class="updated-badge">Updated</span></li>
+      <li>Notification System <span class="new-badge">New</span></li>
+      <li>Account Lifecycle <span class="new-badge">New</span></li>
+      <li>Stage Weights <span class="new-badge">New</span></li>
+      <li>Pipeline Funnel Logic (Agreed — To Build)</li>
+      <li>SPI-Based RAG Status (Agreed — To Build)</li>
+      <li>Floor Projection Logic (Agreed — To Build)</li>
+    </ol>
+  </div>
+
+  <!-- ========== SECTION 1 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <h2>Activity Status System</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>Canonical Statuses</h3>
+      <p>Every activity in the system has one of these statuses:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Status</th><th>Internal Value</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><span class="dot dot-gray"></span>Not Started</td><td><code>not_started</code></td><td>Work has not begun on this activity</td></tr>
+            <tr><td><span class="dot dot-blue"></span>In Progress</td><td><code>in_progress</code></td><td>Work is actively happening</td></tr>
+            <tr><td><span class="dot dot-green"></span>Completed</td><td><code>completed</code></td><td>Work is finished</td></tr>
+            <tr><td><span class="dot dot-red"></span>Delayed</td><td><code>delayed</code></td><td>Work is behind schedule</td></tr>
+            <tr><td><span class="dot dot-yellow"></span>On Hold</td><td><code>on_hold</code></td><td>Work is paused for a reason</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Extended Statuses (from Excel Import)</h3>
+      <p>The uploaded Excel template may contain extended status values. These are normalized on import:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Excel Value</th><th>Stored As</th><th>Displayed As</th></tr></thead>
+          <tbody>
+            <tr><td>"Yet to Start" or blank</td><td><code>not_started</code></td><td>Not Started</td></tr>
+            <tr><td>"In Progress"</td><td><code>in_progress</code></td><td>In Progress</td></tr>
+            <tr><td>"In Progress With Delay"</td><td><code>in_progress_delayed</code></td><td>Delayed (supervisor) / In Progress (admin)</td></tr>
+            <tr><td>"Completed"</td><td><code>completed</code></td><td>Completed</td></tr>
+            <tr><td>"Completed With Delay"</td><td><code>completed_delayed</code></td><td>Completed (both views)</td></tr>
+            <tr><td>"Not Applicable"</td><td><code>not_applicable</code></td><td>Skipped — not shown in app</td></tr>
+            <tr><td>"On Hold"</td><td><code>on_hold</code></td><td>On Hold</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>resolveStatus() — runtime status derivation</h3>
+      <p>The database stores the <em>user-chosen</em> status (e.g. <code>in_progress</code>). At read time, <code>resolveStatus(userStatus, expectedEnd)</code> derives the display status by comparing the expected end date against today:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>User Status</th><th>Expected End Passed?</th><th>Resolved Status</th></tr></thead>
+          <tbody>
+            <tr><td><code>in_progress</code></td><td>Yes</td><td><code>in_progress_delayed</code></td></tr>
+            <tr><td><code>not_started</code></td><td>Yes</td><td><code>delayed</code></td></tr>
+            <tr><td><code>completed</code></td><td>Yes</td><td><code>completed_delayed</code></td></tr>
+            <tr><td>Any</td><td>No / missing</td><td>Unchanged</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <strong>Why this matters</strong>
+        The <code>_delayed</code> variants are never stored directly by user action — they are computed dynamically. This means overdue status is always current as dates pass, without requiring batch updates.
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Filter dropdown — "Delayed" removed</h3>
+      <p>The filter dropdowns (admin + supervisor) show: <strong>All Statuses, Not Started, In Progress, Completed, On Hold</strong>. "Delayed" was removed from the filter because delayed status is a computed derivative of <code>in_progress</code> or <code>not_started</code> + overdue date — exposing it as a separate filter caused confusion.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>Status Rank (used for reversal detection)</h3>
+      <p>Each status has a rank number. A status change where the old rank is higher than the new rank is a "reversal" — going backwards.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Status</th><th>Rank</th></tr></thead>
+          <tbody>
+            <tr><td>On Hold</td><td><code>-1</code> (exempt from reversal checks)</td></tr>
+            <tr><td>Not Started</td><td><code>0</code></td></tr>
+            <tr><td>In Progress / In Progress Delayed</td><td><code>1</code></td></tr>
+            <tr><td>Completed / Completed Delayed</td><td><code>2</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <strong>Example</strong>
+        Changing from Completed (rank 2) to In Progress (rank 1) is a reversal. Changing from On Hold (rank -1) to anything is NOT a reversal — On Hold is exempt.
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 2 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <h2>Role-Based Access &amp; Permissions</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>Three Roles in the System</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Role</th><th>Login URL</th><th>Redirect if wrong role</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge badge-blue">Admin</span></td><td><code>/login</code></td><td>Non-admin → <code>/supervisor/home</code></td></tr>
+            <tr><td><span class="badge badge-indigo">Management</span></td><td><code>/login</code></td><td>Shares login with admin; sees management-specific pages</td></tr>
+            <tr><td><span class="badge badge-green">Supervisor</span></td><td><code>/supervisor/login</code></td><td>Admin → <code>/admin/dashboard</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Management (Promoter) Permissions</h3>
+      <p>The Management role is designed for the project promoter — a senior stakeholder who views project health, pipeline progress, and SPI status but does <strong>not</strong> modify activities or manage staff.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Feature</th><th>Desktop</th><th>Mobile</th></tr></thead>
+          <tbody>
+            <tr><td>View projects</td><td><span class="badge badge-green">VIEW</span></td><td><span class="badge badge-green">VIEW</span></td></tr>
+            <tr><td>View dashboard</td><td><span class="badge badge-green">VIEW</span></td><td><span class="badge badge-green">VIEW</span></td></tr>
+            <tr><td>Insights &amp; Reports</td><td><span class="badge badge-green">FULL</span></td><td><span class="badge badge-green">FULL</span></td></tr>
+            <tr><td>Export / Download</td><td><span class="badge badge-green">FULL</span></td><td><span class="badge badge-red">NO</span></td></tr>
+            <tr><td>Activity log (view only)</td><td><span class="badge badge-green">VIEW</span></td><td><span class="badge badge-green">VIEW</span></td></tr>
+            <tr><td>Photo review (view only)</td><td><span class="badge badge-green">VIEW</span></td><td><span class="badge badge-green">VIEW</span></td></tr>
+            <tr><td>Upload templates</td><td><span class="badge badge-red">NO</span></td><td><span class="badge badge-red">NO</span></td></tr>
+            <tr><td>Manage supervisors</td><td><span class="badge badge-red">NO</span></td><td><span class="badge badge-red">NO</span></td></tr>
+            <tr><td>Manage management users</td><td><span class="badge badge-red">NO</span></td><td><span class="badge badge-red">NO</span></td></tr>
+            <tr><td>Settings</td><td><span class="badge badge-red">NO</span></td><td><span class="badge badge-red">NO</span></td></tr>
+            <tr><td>Error log</td><td><span class="badge badge-red">NO</span></td><td><span class="badge badge-red">NO</span></td></tr>
+            <tr><td>Activity updates (status changes)</td><td><span class="badge badge-red">NO</span></td><td><span class="badge badge-red">NO</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Supervisor Permissions</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Action</th><th>Allowed?</th></tr></thead>
+          <tbody>
+            <tr><td>Change activity status</td><td><span class="badge badge-green">YES</span></td></tr>
+            <tr><td>Edit actual start/end dates</td><td><span class="badge badge-green">YES</span></td></tr>
+            <tr><td>Add remarks</td><td><span class="badge badge-green">YES</span></td></tr>
+            <tr><td>Upload/delete photos (max 3 per activity)</td><td><span class="badge badge-green">YES</span></td></tr>
+            <tr><td>Bulk start/complete activities</td><td><span class="badge badge-green">YES</span> (restricted on mobile)</td></tr>
+            <tr><td>Edit expected start/end dates</td><td><span class="badge badge-red">NO</span></td></tr>
+            <tr><td>Edit revised start/end dates</td><td><span class="badge badge-red">NO</span> (read-only display)</td></tr>
+            <tr><td>Reassign vendors</td><td><span class="badge badge-red">NO</span></td></tr>
+            <tr><td>See activities on unassigned floors</td><td><span class="badge badge-red">NO</span></td></tr>
+            <tr><td>Access admin pages</td><td><span class="badge badge-red">NO</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout-red callout">
+        <strong>Hard Constraint</strong>
+        Supervisors CANNOT edit expected dates or vendor. This rule must never be changed — it was a deliberate product decision to prevent field-level data tampering.
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Admin Permissions</h3>
+      <ul>
+        <li>Create, deactivate, and reset passwords for supervisor accounts</li>
+        <li>Create, deactivate, and reset passwords for management accounts</li>
+        <li>Assign supervisors to projects and specific floors</li>
+        <li>Upload, re-upload, and clear Excel templates</li>
+        <li>Inline edit: status, vendor, expected dates, revised dates</li>
+        <li>Bulk update: vendor reassignment, date changes</li>
+        <li>Export data to Excel and PDF</li>
+        <li>Manage delay/on-hold reasons (create, edit, activate/deactivate)</li>
+        <li>Configure refuge floors and refuge units</li>
+        <li>Configure stage weights per project</li>
+        <li>View audit log, error log, and photos</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Floor-Level Restriction</h3>
+      <p>A supervisor is assigned to specific floors within a project (e.g., Floors 1-5). They can only see and update activities on their assigned floors. If no floor assignment is configured, they see all floors.</p>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 3 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <h2>Delay &amp; On-Hold Reason Logic</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>When is a reason required?</h3>
+      <p>When a supervisor changes an activity status to <span class="badge badge-red">Delayed</span> or <span class="badge badge-yellow">On Hold</span>, they <strong>must</strong> select a reason from a dropdown. The dropdown is populated from admin-configured reasons.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>"Others" option</h3>
+      <p>The dropdown includes an "Others" option. When selected:</p>
+      <ul>
+        <li>The remarks text field becomes <strong>mandatory</strong></li>
+        <li>On save, the free-text remarks value is stored as the <code>delay_reason</code> (not the word "Others")</li>
+      </ul>
+      <div class="callout">
+        <strong>Example</strong>
+        Supervisor selects "Others" and types "Lift not working, material stuck on ground floor." This text is stored as the delay reason, not "Others."
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Reason configuration (Admin)</h3>
+      <p>Admins can create, edit, reorder, and deactivate reasons from Settings. Supervisors only see reasons marked as <code>is_active = true</code>. Deactivating a reason does not change activities that already use it.</p>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 4 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">04</span>
+      <h2>Photo Upload &amp; Evidence Rules</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>Constraints</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Rule</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Maximum photos per activity</td><td><strong>3</strong></td></tr>
+            <tr><td>Max image dimensions</td><td>1200 x 1200 pixels</td></tr>
+            <tr><td>JPEG quality</td><td>70% (iteratively reduced to 30% if still over size limit)</td></tr>
+            <tr><td>Max file size after compression</td><td>300 KB</td></tr>
+            <tr><td>Storage path pattern</td><td><code>{projectId}/{activityId}/{timestamp}_{index}.jpg</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Completion requires photo evidence</h3>
+      <div class="callout-red callout">
+        <strong>Mandatory Rule</strong>
+        An activity cannot be marked as <span class="badge badge-green">Completed</span> unless at least 1 photo has been uploaded. This applies to both supervisor and admin status changes.
+      </div>
+      <p>This ensures every completion has photographic evidence that can be reviewed later by the admin or promoter.</p>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 5 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">05</span>
+      <h2>Date Handling &amp; Validation</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>Four types of dates</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date Type</th><th>Set By</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Expected Start / End</strong></td><td>Admin (from Excel or inline edit)</td><td>The original planned schedule</td></tr>
+            <tr><td><strong>Revised Start / End</strong></td><td>Admin (inline edit or bulk update)</td><td>Updated schedule when plans change</td></tr>
+            <tr><td><strong>Actual Start / End</strong></td><td>Supervisor (on status change)</td><td>When work actually happened</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Validation rules</h3>
+      <ul>
+        <li><strong>Actual start cannot be in the future.</strong> Error: "Actual start date cannot be a future date."</li>
+        <li><strong>Actual end cannot be before actual start.</strong> Error: "Actual end date cannot be earlier than actual start date."</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Auto-population rules</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Action</th><th>What happens</th></tr></thead>
+          <tbody>
+            <tr><td>Quick "Start" button</td><td><code>actual_start = today</code>, status → <code>in_progress</code></td></tr>
+            <tr><td>Quick "Complete" button</td><td><code>actual_end = today</code>. If <code>actual_start</code> is empty, it's also set to today.</td></tr>
+            <tr><td>Trying to complete without actual_start</td><td>Detail sheet opens with error: "Please enter the Actual Start date before marking as completed."</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Reversal date-clearing rule</h3>
+      <p>When an activity is reverted to <code>not_started</code> (a reversal), both <code>actual_start</code> and <code>actual_end</code> are automatically cleared (set to <code>null</code>). This ensures the activity's dates are clean for when work restarts.</p>
+      <div class="callout-blue callout">
+        <strong>v2.0 Addition</strong>
+        Previously, reverting to <code>not_started</code> would leave stale actual dates in the database. The activity engine now explicitly clears them so downstream calculations (overdue, health score, projections) are not polluted.
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 6 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">06</span>
+      <h2>Overdue Calculation</h2>
+    </div>
+
+    <p>An activity is considered <strong>overdue</strong> when:</p>
+    <ul>
+      <li>Its status is NOT <code>completed</code></li>
+      <li>Its <code>expected_end</code> date has passed (is before today)</li>
+    </ul>
+
+    <div class="formula">
+      <div class="formula-main">Days Overdue = floor( (Today − Expected End) / 86,400,000 )</div>
+      <div class="formula-legend">Result in whole days. Only calculated when expected_end exists and is before today.</div>
+    </div>
+
+    <div class="subsection">
+      <h3>Supervisor priority categories</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Category</th><th>Condition</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge badge-red">Overdue</span></td><td>Not completed AND expected_end &lt; today. Sorted by most overdue first.</td></tr>
+            <tr><td><span class="badge badge-yellow">Due Today</span></td><td>Not completed AND expected_end = today</td></tr>
+            <tr><td><span class="badge badge-blue">Starting Today</span></td><td>Status is not_started AND expected_start = today</td></tr>
+            <tr><td><span class="badge badge-green">Done Today</span></td><td>Status is completed AND actual_end = today</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 7 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">07</span>
+      <h2>Audit Trail &amp; Reversal Detection</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>What is logged</h3>
+      <p>Every status change creates an audit log entry capturing:</p>
+      <ul>
+        <li>Activity ID, Project ID</li>
+        <li>Who made the change (user ID → resolved to name and role)</li>
+        <li>Old status → New status</li>
+        <li>Floor, Flat number, Stage, Sub-stage, Activity name</li>
+        <li>Timestamp</li>
+      </ul>
+      <p>Audit entries are only created when the old status is <strong>different</strong> from the new status.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>Reversal detection &amp; notification</h3>
+      <p>A <strong>reversal</strong> is when an activity moves backwards in the workflow:</p>
+      <ul>
+        <li>Completed → In Progress (rank 2 → 1) = <span class="badge badge-red">REVERSAL</span></li>
+        <li>Completed → Not Started (rank 2 → 0) = <span class="badge badge-red">REVERSAL</span></li>
+        <li>In Progress → Not Started (rank 1 → 0) = <span class="badge badge-red">REVERSAL</span></li>
+        <li>Any → On Hold = NOT a reversal (On Hold is exempt)</li>
+        <li>On Hold → Any = NOT a reversal (On Hold is exempt)</li>
+      </ul>
+      <p>When a reversal is detected, <strong>two</strong> things happen:</p>
+      <ol>
+        <li><strong>Email notification</strong> — Sent to all admin email addresses via the Resend API. Includes project name, floor, flat, activity details, and old/new statuses.</li>
+        <li><strong>In-app notification</strong> — Created for all active admin users. Shows as a bell icon alert with type <code>reversal</code>, title "Status Reversal — Floor X, Flat Y", and detailed message.</li>
+      </ol>
+      <div class="callout-blue callout">
+        <strong>v2.0 Addition</strong>
+        Previously, reversals only sent an email. Now they also create in-app notifications visible in the admin bell icon dropdown. See Section 14 for the full notification system.
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 8 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">08</span>
+      <h2>Project Health Score Formula</h2>
+    </div>
+
+    <p>The Health Score is a single number (0–100) displayed on the admin dashboard. It combines three factors:</p>
+
+    <div class="formula">
+      <div class="formula-main">Health Score = (Progress × 0.4) + (On-Time × 0.3) + (Low Risk × 0.3)</div>
+      <div class="formula-legend">Rounded to nearest integer</div>
+    </div>
+
+    <div class="subsection">
+      <h3>Component definitions</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Formula</th><th>What it measures</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Progress</strong> (40%)</td><td>(completed + completed_delayed) / total × 100</td><td>How much work is done overall</td></tr>
+            <tr><td><strong>On-Time</strong> (30%)</td><td>completed / (completed + completed_delayed) × 100</td><td>Of finished work, how much was on time</td></tr>
+            <tr><td><strong>Low Risk</strong> (30%)</td><td>100 − ((in_progress_delayed + on_hold) / total × 100)</td><td>How little work is at risk</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Activities with status <code>not_applicable</code> are excluded from the total count.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>Score thresholds</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Score Range</th><th>Label</th><th>Color</th></tr></thead>
+          <tbody>
+            <tr><td>80–100</td><td>Healthy</td><td><span class="badge badge-green">GREEN</span></td></tr>
+            <tr><td>60–79</td><td>Needs Attention</td><td><span class="badge badge-yellow">YELLOW</span></td></tr>
+            <tr><td>40–59</td><td>At Risk</td><td><span class="badge badge-yellow" style="color:var(--accent)">ORANGE</span></td></tr>
+            <tr><td>0–39</td><td>Critical</td><td><span class="badge badge-red">RED</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Example</strong>
+      A project with 1000 activities: 400 completed (350 on-time, 50 delayed), 100 in_progress_delayed, 50 on_hold, 450 other.<br><br>
+      Progress = 400/1000 × 100 = 40<br>
+      On-Time = 350/400 × 100 = 87.5<br>
+      Low Risk = 100 − (150/1000 × 100) = 85<br>
+      <strong>Score = (40 × 0.4) + (87.5 × 0.3) + (85 × 0.3) = 16 + 26.25 + 25.5 = 68</strong> → "Needs Attention"
+    </div>
+  </div>
+
+  <!-- ========== SECTION 9 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">09</span>
+      <h2>Floor Heatmap &amp; Rollup Logic</h2>
+    </div>
+
+    <p>The admin dashboard heatmap shows completion status using a 4-level rollup, from individual activities up to floor readiness.</p>
+
+    <div class="subsection">
+      <h3>Level 1: Activities → Sub-stage</h3>
+      <p>Group all activities by flat + stage + stage_gate (sub-stage). Count completed and total. A sub-stage is:</p>
+      <ul>
+        <li><span class="badge badge-green">Completed</span> — all activities completed</li>
+        <li><span class="badge badge-yellow">Running</span> — some activities in progress or completed, not all</li>
+        <li><span class="badge badge-red">Yet to Start</span> — all activities are not_started</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Level 2: Sub-stages → Flat's Stage</h3>
+      <p>For each flat, roll up all sub-stages within a stage. Same logic: all completed = Completed, none started = Yet to Start, otherwise = Running.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>Level 3: Flats → Floor's Stage</h3>
+      <p>For each floor, roll up all flats within a stage. Count how many flats have completed the stage vs total.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>Level 4: Floor Readiness</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Readiness</th><th>Condition</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge badge-green">Completed</span></td><td>All stages for this floor are completed</td></tr>
+            <tr><td><span class="badge badge-yellow">Running</span></td><td>At least one stage has started</td></tr>
+            <tr><td><span class="badge badge-red">Not Ready</span></td><td>No stage has started</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Hardcoded Stage Order</h3>
+      <p>Stages are displayed in this fixed order on the heatmap:</p>
+      <ol>
+        <li>Pre-Tiling</li>
+        <li>Tiling</li>
+        <li>Post Tiling</li>
+        <li>Pre Paint Activities</li>
+        <li>1st Coat Paint</li>
+        <li>Post First Coat Paint</li>
+        <li>Second Coat Paint</li>
+        <li>Post Second Coat Paint</li>
+        <li>Lobby Flooring</li>
+      </ol>
+      <p>Any stage not in this list sorts to the end.</p>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 10 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">10</span>
+      <h2>Bulk Update Rules</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>Supervisor bulk updates</h3>
+      <ul>
+        <li>Only available in <strong>Floor view</strong> or when a <strong>Stage filter</strong> is applied in All Floors view</li>
+        <li>Two actions: "Start All" and "Complete All"</li>
+        <li>Activities already marked Completed are <strong>skipped</strong></li>
+        <li>"Start" sets <code>actual_start = today</code>, status → <code>in_progress</code></li>
+        <li>"Complete" sets <code>actual_end = today</code>; if <code>actual_start</code> is missing, also sets it to today</li>
+        <li>Each activity is updated individually with full audit trail</li>
+        <li>On mobile: bulk updates are <strong>restricted</strong> (limited functionality)</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Admin bulk updates</h3>
+      <ul>
+        <li><strong>Vendor reassignment:</strong> updates all selected rows with a new vendor name</li>
+        <li><strong>Date update:</strong> can update any combination of expected_start, expected_end, revised_start, revised_end. Blank fields keep existing values.</li>
+        <li>Admin bulk updates do NOT create audit log entries (they use <code>bulkUpdateActivities</code>, not <code>updateActivityWithAudit</code>)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 11 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">11</span>
+      <h2>Excel Template Parsing</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>Sheet requirements</h3>
+      <ul>
+        <li>Sheet name must be exactly <code>"Sale Unit wise status"</code></li>
+        <li>Data starts at <strong>row 8</strong> (first 7 rows are headers)</li>
+        <li>Date columns contain Excel serial numbers, converted using: <code>new Date((serial - 25569) × 86400000)</code></li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Column mapping</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Column Index</th><th>Field</th><th>Column Index</th><th>Field</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Series</td><td>14</td><td>Status (raw text)</td></tr>
+            <tr><td>2</td><td>Floor number</td><td>16</td><td>Delay Reason</td></tr>
+            <tr><td>3</td><td>Flat number</td><td>17–24</td><td>Room columns (8 rooms)</td></tr>
+            <tr><td>4</td><td>Configuration</td><td>25</td><td>Remarks</td></tr>
+            <tr><td>5</td><td>Stage</td><td>26</td><td>Sort Order</td></tr>
+            <tr><td>6</td><td>Stage Gate (Sub Stage)</td><td>27</td><td>Sub Stage Status</td></tr>
+            <tr><td>7</td><td>Activity name</td><td>28</td><td>Revised Start</td></tr>
+            <tr><td>8</td><td>Vendor</td><td>29</td><td>Revised End</td></tr>
+            <tr><td>9</td><td>Applicable (yes/no)</td><td>34</td><td>Floor Status</td></tr>
+            <tr><td>10</td><td>Expected Start</td><td>36</td><td>Flat Status</td></tr>
+            <tr><td>11</td><td>Expected End</td><td>37</td><td>Delay Days</td></tr>
+            <tr><td>12</td><td>Actual Start</td><td>38</td><td>Risk Status</td></tr>
+            <tr><td>13</td><td>Actual End</td><td></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Row skip rules</h3>
+      <p>A row is skipped during import if any of these are true:</p>
+      <ul>
+        <li>Stage is empty or "X"</li>
+        <li>Activity name is empty or "X"</li>
+        <li>Configuration is "X"</li>
+        <li>Floor or flat number is not a valid number</li>
+        <li>Status maps to <code>not_applicable</code></li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Upload behavior</h3>
+      <p>Uploading a template <strong>deletes all existing activities</strong> for the project and inserts fresh rows in batches of 500. A warning is shown if any activities have been modified (status changed or actual dates entered) before clearing.</p>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 12 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">12</span>
+      <h2>Refuge Floor &amp; Unit Logic</h2>
+    </div>
+
+    <p>Certain floors and units are designated as "refuge" (fire safety / structural). These are configured per project by the admin.</p>
+    <ul>
+      <li>Refuge floors and units are stored as integer arrays on the <code>projects</code> table</li>
+      <li>In the Activity Table, refuge rows get an amber background and an "R" badge</li>
+      <li>A row is refuge if its floor is in <code>refuge_floors</code> OR its flat number is in <code>refuge_units</code></li>
+    </ul>
+  </div>
+
+  <!-- ========== SECTION 13 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">13</span>
+      <h2>Authentication &amp; Session Management</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>Idle timeout</h3>
+      <p>Sessions automatically expire after <strong>1 hour of inactivity</strong>. Activity is detected via mouse, keyboard, touch, and scroll events. On timeout, the user is signed out and redirected to the login page.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>Tab visibility check</h3>
+      <p>When the user switches back to the app's browser tab, the session is re-validated. If expired, the user is silently signed out.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>Account deactivation (Supervisor &amp; Management)</h3>
+      <p>When an admin deactivates a supervisor or management user:</p>
+      <ul>
+        <li><code>is_active</code> is set to <code>false</code> in the profiles table</li>
+        <li>A ban of ~100 years (<code>876000h</code>) is applied in Supabase Auth</li>
+        <li>Reactivation reverses both: <code>is_active = true</code> and ban duration set to <code>none</code></li>
+        <li>An email notification is sent to the user's email address (see Section 15)</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Password requirements</h3>
+      <p>Minimum 6 characters. Enforced by Zod validation on the API route.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>Login error messages</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Error Type</th><th>User-Facing Message</th></tr></thead>
+          <tbody>
+            <tr><td>Invalid credentials</td><td>"Incorrect email or password."</td></tr>
+            <tr><td>Email not confirmed</td><td>"Please verify your email before signing in."</td></tr>
+            <tr><td>Rate limited</td><td>"Too many login attempts. Please wait a moment."</td></tr>
+            <tr><td><strong>Deactivated account</strong></td><td><strong>"Your account has been deactivated. Please contact your administrator."</strong></td></tr>
+            <tr><td>Other errors</td><td>"Unable to sign in. Please try again."</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout-blue callout">
+        <strong>v2.0 Addition</strong>
+        Previously, Supabase's raw "User is banned (400)" error was shown to deactivated users. The auth context now detects the word "banned" in the error and replaces it with a friendly deactivation message.
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 14 — NEW ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">14</span>
+      <h2>Notification System</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>Overview</h3>
+      <p>The notification system has two channels: <strong>email</strong> (via Resend API) and <strong>in-app</strong> (bell icon dropdown). Not all notification types use both channels.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>Notification types</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Type</th><th>Icon</th><th>Email</th><th>In-App</th><th>Recipients</th><th>Trigger</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>reversal</code></td>
+              <td>↩</td>
+              <td><span class="badge badge-green">YES</span></td>
+              <td><span class="badge badge-green">YES</span></td>
+              <td>All active admins</td>
+              <td>Activity status reversed (rank decreases)</td>
+            </tr>
+            <tr>
+              <td><code>overdue_reminder</code></td>
+              <td>⚠</td>
+              <td><span class="badge badge-red">NO</span></td>
+              <td><span class="badge badge-green">YES</span></td>
+              <td>Supervisor on that project</td>
+              <td>"5 activities on Floor 2 are overdue" (future: automated trigger)</td>
+            </tr>
+            <tr>
+              <td><code>overdue_digest</code></td>
+              <td>⏰</td>
+              <td><span class="badge badge-red">NO</span></td>
+              <td><span class="badge badge-green">YES</span></td>
+              <td>Admin</td>
+              <td>Daily summary of overdue items (future: automated trigger)</td>
+            </tr>
+            <tr>
+              <td><code>supervisor_inactivity</code></td>
+              <td>💤</td>
+              <td><span class="badge badge-red">NO</span></td>
+              <td><span class="badge badge-green">YES</span></td>
+              <td>Admin</td>
+              <td>Supervisor has not updated in X days (future: automated trigger)</td>
+            </tr>
+            <tr>
+              <td><code>completion_milestone</code></td>
+              <td>✓</td>
+              <td><span class="badge badge-red">NO</span></td>
+              <td><span class="badge badge-green">YES</span></td>
+              <td>Admin</td>
+              <td>Floor/stage reaches 100% completion (future: automated trigger)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <strong>Currently active triggers</strong>
+        Only <code>reversal</code> notifications are automatically triggered today. The other types are defined in the type system and API routes, ready for future automated triggers (e.g. via a scheduled cron job).
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>In-app notification UI</h3>
+      <ul>
+        <li>Bell icon in the top bar (admin: light theme, supervisor: dark/navy theme)</li>
+        <li>Red badge with unread count (caps at "99+")</li>
+        <li>Dropdown shows latest 20 notifications, most recent first</li>
+        <li>Unread items have a blue tinted background and a dot indicator</li>
+        <li>Clicking a notification marks it as read</li>
+        <li>"Mark all read" button clears all unread</li>
+        <li>Polls <code>/api/notifications</code> every 60 seconds for new items</li>
+        <li>Time display: "Just now", "5m ago", "2h ago", "3d ago", or "09 Aug" for older</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Database schema</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>UUID (PK)</td><td>Auto-generated</td></tr>
+            <tr><td><code>user_id</code></td><td>UUID (FK → profiles)</td><td>Who receives the notification</td></tr>
+            <tr><td><code>type</code></td><td>text</td><td>One of the 5 types above</td></tr>
+            <tr><td><code>title</code></td><td>text</td><td>Short headline</td></tr>
+            <tr><td><code>message</code></td><td>text</td><td>Longer detail text</td></tr>
+            <tr><td><code>metadata</code></td><td>jsonb</td><td>Contextual data (projectName, floor, flat, etc.)</td></tr>
+            <tr><td><code>is_read</code></td><td>boolean</td><td>Default: false</td></tr>
+            <tr><td><code>created_at</code></td><td>timestamptz</td><td>Default: now()</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>RLS policies: Users can <code>SELECT</code> and <code>UPDATE</code> their own notifications. Only the service role can <code>INSERT</code> or <code>DELETE</code>.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>API routes</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Route</th><th>Method</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>/api/notifications</code></td><td>GET</td><td>Fetch notifications for authenticated user (query: <code>?limit=20</code>)</td></tr>
+            <tr><td><code>/api/notifications</code></td><td>PATCH</td><td>Mark one (<code>{ notificationId }</code>) or all (<code>{ markAll: true }</code>) as read</td></tr>
+            <tr><td><code>/api/notifications/create</code></td><td>POST</td><td>Create notifications (admin-only). Body: <code>{ userIds?, toAdmins?, type, title, message, metadata? }</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Email configuration</h3>
+      <ul>
+        <li>Provider: <strong>Resend</strong> (<code>api.resend.com</code>)</li>
+        <li>API key stored in <code>RESEND_API_KEY</code> environment variable</li>
+        <li>Current sender: <code>onboarding@resend.dev</code> (test — only delivers to the Resend signup email)</li>
+        <li>Production sender (after domain verification): <code>noreply@raghavgroup.in</code></li>
+        <li>Emails are sent non-blocking — a failure does not block the triggering operation</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 15 — NEW ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">15</span>
+      <h2>Account Lifecycle</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>Account creation</h3>
+      <p>Admins create supervisor and management accounts via the admin panel. The flow:</p>
+      <ol>
+        <li>Admin enters full name, email, phone, and password</li>
+        <li>A Supabase Auth user is created (via <code>supabaseAdmin.auth.admin.createUser</code>)</li>
+        <li>A profile row is created with the matching user ID, role, and <code>is_active = true</code></li>
+        <li>For supervisors: admin assigns project(s) and floor(s)</li>
+      </ol>
+    </div>
+
+    <div class="subsection">
+      <h3>Activate / Deactivate flow</h3>
+      <p>Both supervisors and management users are activated/deactivated via the same API endpoint: <code>POST /api/admin/deactivate-supervisor</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Step</th><th>Deactivate</th><th>Activate</th></tr></thead>
+          <tbody>
+            <tr><td>1. Profile update</td><td><code>is_active = false</code></td><td><code>is_active = true</code></td></tr>
+            <tr><td>2. Auth ban</td><td><code>ban_duration = '876000h'</code></td><td><code>ban_duration = 'none'</code></td></tr>
+            <tr><td>3. Email notification</td><td>Account Deactivated email</td><td>Account Activated email</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Deactivation email</h3>
+      <p>On activate/deactivate, the system sends a styled HTML email to the user's registered email address:</p>
+      <ul>
+        <li>Navy header bar with "Account Activated" or "Account Deactivated"</li>
+        <li>Personalized greeting with the user's name</li>
+        <li>Role label (Supervisor or Management) with colored status badge (green or red)</li>
+        <li>Contextual message: "You can now log in…" or "Your access has been suspended…"</li>
+        <li>Sent non-blocking — does not delay the toggle response</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Deactivated user login behavior</h3>
+      <p>When a deactivated user attempts to log in:</p>
+      <ul>
+        <li>Supabase returns a "User is banned" error internally</li>
+        <li>The auth context intercepts this and displays: <strong>"Your account has been deactivated. Please contact your administrator."</strong></li>
+        <li>No session is created; the user remains on the login page</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 16 — NEW ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">16</span>
+      <h2>Stage Weights</h2>
+    </div>
+
+    <div class="subsection">
+      <h3>Purpose</h3>
+      <p>Not all construction stages take the same effort. Pre-Tiling (a quick prep stage) is not equivalent to Tiling (a major effort). Stage weights let the admin configure how much each stage contributes to the overall project progress percentage.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>How weights work</h3>
+      <div class="formula">
+        <div class="formula-main">Weighted Progress = Σ (stage_weight × stage_completion%) / Σ stage_weights</div>
+        <div class="formula-legend">Where stage_completion% = completed activities in stage / total activities in stage × 100</div>
+      </div>
+      <ul>
+        <li>Weights are numbers (not percentages) — they represent relative importance</li>
+        <li>Example: Pre-Tiling = 1, Tiling = 5, Post-Tiling = 2 → Tiling counts 5× more than Pre-Tiling</li>
+        <li>If no weights are configured, all stages are equally weighted (fallback to simple average)</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Storage</h3>
+      <p>Weights are stored in the <code>app_settings</code> table as a JSON object under the key <code>'stage_weights'</code>:</p>
+      <pre>{
+  "Pre-Tiling": 1,
+  "Tiling": 5,
+  "Post Tiling": 2,
+  "Pre Paint Activities": 2,
+  "1st Coat Paint": 4,
+  "Post First Coat Paint": 1,
+  "Second Coat Paint": 3,
+  "Post Second Coat Paint": 1,
+  "Lobby Flooring": 1
+}</pre>
+      <p>The <code>app_settings</code> table uses a simple <code>key</code> (text, PK) / <code>value</code> (jsonb) / <code>updated_at</code> (timestamptz) schema. Reads and writes use <code>upsert</code> with <code>onConflict: 'key'</code>.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>Where weights are used</h3>
+      <ul>
+        <li><strong>Management (Promoter) view</strong> — The "Weighted Progress" metric in the insights dashboard uses stage weights to compute a more realistic overall project completion</li>
+        <li><strong>Future:</strong> Weights will also feed into the Health Score formula (Section 8) once wired in</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <h3>Admin configuration</h3>
+      <p>Stage weights are configurable from the admin Settings page. The UI shows each stage with a numeric input for its weight. Changes are saved immediately via the settings repository.</p>
+      <div class="callout">
+        <strong>Note</strong>
+        Stage weights are currently a global setting (same weights across all projects). Per-project weights may be added in a future version if needed.
+      </div>
+    </div>
+  </div>
+
+  <hr>
+  <p style="text-align:center; font-size:13px; color:var(--accent); font-weight:700; letter-spacing:1.5px; text-transform:uppercase; margin:32px 0;">
+    Agreed Logic — To Be Built
+  </p>
+  <hr>
+
+  <!-- ========== SECTION 17 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">17</span>
+      <h2>Pipeline Funnel Logic</h2>
+    </div>
+
+    <p>The Management (Promoter) view shows how many flats have completed each stage in the construction pipeline. This is the core metric a promoter cares about — not individual activities, but <strong>flat-level completion through stages</strong>.</p>
+
+    <div class="subsection">
+      <h3>The pipeline (fixed order)</h3>
+      <div class="pipeline">
+        <div class="pipeline-stage"><div class="pipeline-label">Pre-Tiling</div><div class="pipeline-count">138</div><div class="pipeline-total">/ 148</div></div>
+        <div class="pipeline-stage"><div class="pipeline-label">Tiling</div><div class="pipeline-count">112</div><div class="pipeline-total">/ 148</div></div>
+        <div class="pipeline-stage"><div class="pipeline-label">Post-Tiling</div><div class="pipeline-count">78</div><div class="pipeline-total">/ 148</div></div>
+        <div class="pipeline-stage"><div class="pipeline-label">Pre-Paint</div><div class="pipeline-count">45</div><div class="pipeline-total">/ 148</div></div>
+        <div class="pipeline-stage"><div class="pipeline-label">1st Coat</div><div class="pipeline-count">20</div><div class="pipeline-total">/ 148</div></div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Flat completion rule</h3>
+      <div class="callout">
+        <strong>Core Rule</strong>
+        A flat is "complete at stage X" if and only if ALL activities under that stage for that flat have status = <code>completed</code> or <code>completed_delayed</code>. Even if 7 out of 8 activities are done, the flat is NOT complete at that stage.
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Calculation method</h3>
+      <ol>
+        <li>Fetch all activities for the project</li>
+        <li>Group by <code>flat_number + stage</code></li>
+        <li>For each flat+stage group: check if ALL activities have completed status</li>
+        <li>Count how many flats have each stage completed</li>
+        <li>Display as a funnel with 5 horizontal bars</li>
+      </ol>
+    </div>
+
+    <div class="subsection">
+      <h3>Floor-level breakdown</h3>
+      <p>The same logic is also applied per floor. The promoter can see:</p>
+      <div class="callout">
+        <strong>Example</strong>
+        Floor 5 (10 flats): Pre-Tiling 10/10, Tiling 7/10, Post-Tiling 3/10, Pre-Paint 0/10, 1st Coat 0/10<br>
+        Floor 10 (10 flats): Pre-Tiling 8/10, Tiling 2/10, Post-Tiling 0/10, Pre-Paint 0/10, 1st Coat 0/10
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Data source</h3>
+      <p>Uses the existing <code>get_dashboard_data</code> heatmap output, which already provides per-flat, per-stage completion counts. Aggregated client-side — no new database function needed.</p>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 18 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">18</span>
+      <h2>SPI-Based RAG Status</h2>
+    </div>
+
+    <p>The Schedule Performance Index (SPI) measures how behind or ahead a floor/project is compared to the plan. This is the same methodology used by large Indian developers (Lodha, Hiranandani, Rustomjee) via their PMC consultants.</p>
+
+    <div class="subsection">
+      <h3>Formula</h3>
+      <div class="formula">
+        <div class="formula-main">SPI = Actual % ÷ Planned %</div>
+        <div class="formula-legend">Where Planned % = activities whose expected_end ≤ today / total activities<br>
+        Actual % = activities with status completed or completed_delayed / total activities</div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>RAG thresholds</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>SPI Range</th><th>Status</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>&gt; 0.95</td><td><span class="badge badge-green">GREEN</span></td><td>On track or ahead of schedule</td></tr>
+            <tr><td>0.80 – 0.95</td><td><span class="badge badge-yellow">YELLOW</span></td><td>Slightly behind, recoverable</td></tr>
+            <tr><td>&lt; 0.80</td><td><span class="badge badge-red">RED</span></td><td>Significantly behind schedule</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Example — Floor 5</strong>
+      Floor 5 has 500 total activities.<br>
+      By today, 300 activities should have been completed (their expected_end date has passed).<br>
+      Actually, 225 activities are completed.<br><br>
+      Planned % = 300/500 = 60%<br>
+      Actual % = 225/500 = 45%<br>
+      <strong>SPI = 45/60 = 0.75 → RED</strong><br><br>
+      This tells the promoter: "Floor 5 is at 75% efficiency — for every 4 days of planned work, only 3 days' worth is getting done."
+    </div>
+
+    <div class="subsection">
+      <h3>Why SPI, not projected vs deadline</h3>
+      <ul>
+        <li><strong>Expected dates are almost always crossed</strong> — comparing projected vs expected would show everything as red</li>
+        <li>SPI measures <strong>how behind you are right now</strong>, not a guess about the future</li>
+        <li>A promoter immediately understands "75% efficiency" — it's actionable</li>
+        <li>The same SPI number works at project level, floor level, or stage level</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ========== SECTION 19 ========== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">19</span>
+      <h2>Floor Projection Logic</h2>
+    </div>
+
+    <p>This logic answers the promoter's daily question: <strong>"When will Floor X finish?"</strong></p>
+
+    <div class="subsection">
+      <h3>The approach: Benchmark from completed floors</h3>
+      <p>Instead of guessing future timelines, we use data from floors that are ahead in the pipeline as benchmarks for floors that are behind.</p>
+      <div class="callout-green callout">
+        <strong>Core Idea</strong>
+        Floors that are AHEAD teach us about floors that are BEHIND. It's like being in a bank queue — the people ahead of you ARE the data for how long you'll wait.
+      </div>
+    </div>
+
+    <div class="subsection">
+      <h3>Algorithm</h3>
+      <p>For each remaining stage on Floor X:</p>
+      <ol>
+        <li><strong>Has any other floor completed this stage?</strong>
+          <ul>
+            <li><strong>YES →</strong> Average the number of days it took on all completed floors. This is the benchmark.</li>
+            <li><strong>NO →</strong> Fall back to counting: look at how many flats completed this stage in the last 14 days. Rate = flats completed / days. Remaining flats / rate = estimated days.</li>
+          </ul>
+        </li>
+        <li>If the stage is currently in progress on Floor X, subtract the days already spent.</li>
+        <li>Sum up all remaining stage durations.</li>
+        <li><strong>Projected finish date = Today + total remaining days</strong></li>
+      </ol>
+    </div>
+
+    <div class="subsection">
+      <h3>Worked example</h3>
+      <p>Project has 15 floors. Today is July 30, 2026.</p>
+
+      <p><strong>Current state of the project:</strong></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Floor</th><th>Pre-Tiling</th><th>Tiling</th><th>Post-Tiling</th><th>Pre-Paint</th><th>1st Coat</th></tr></thead>
+          <tbody>
+            <tr><td>Floor 1</td><td><span class="badge badge-green">Done</span></td><td><span class="badge badge-green">Done</span></td><td><span class="badge badge-green">Done</span></td><td><span class="badge badge-yellow">Doing</span></td><td><span class="badge badge-gray">—</span></td></tr>
+            <tr><td>Floor 2</td><td><span class="badge badge-green">Done</span></td><td><span class="badge badge-green">Done</span></td><td><span class="badge badge-yellow">Doing</span></td><td><span class="badge badge-gray">—</span></td><td><span class="badge badge-gray">—</span></td></tr>
+            <tr><td>Floor 3</td><td><span class="badge badge-green">Done</span></td><td><span class="badge badge-green">Done</span></td><td><span class="badge badge-yellow">Doing</span></td><td><span class="badge badge-gray">—</span></td><td><span class="badge badge-gray">—</span></td></tr>
+            <tr><td>Floor 5</td><td><span class="badge badge-green">Done</span></td><td><span class="badge badge-yellow">Doing</span></td><td><span class="badge badge-gray">—</span></td><td><span class="badge badge-gray">—</span></td><td><span class="badge badge-gray">—</span></td></tr>
+            <tr><td>Floor 10</td><td><span class="badge badge-yellow">Doing</span></td><td><span class="badge badge-gray">—</span></td><td><span class="badge badge-gray">—</span></td><td><span class="badge badge-gray">—</span></td><td><span class="badge badge-gray">—</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>Question: When will Floor 5 finish?</strong></p>
+
+      <p><strong>Step 1 — Tiling (in progress):</strong> Floors 1, 2, 3 finished Tiling in 21, 19, 23 days. Benchmark = 21 days average. Floor 5 started Tiling 8 days ago. Remaining = 21 − 8 = <strong>13 days</strong>.</p>
+
+      <p><strong>Step 2 — Post-Tiling:</strong> Floor 1 finished Post-Tiling in 14 days. Benchmark = <strong>14 days</strong>.</p>
+
+      <p><strong>Step 3 — Pre-Paint:</strong> No floor has finished Pre-Paint yet. Fallback: Floor 1 started 10 days ago, 40/148 flats done. Rate = 4 flats/day. 148/4 = <strong>37 days estimated</strong>.</p>
+
+      <p><strong>Step 4 — 1st Coat:</strong> No data at all. Display as "Insufficient data" or use Pre-Paint estimate as rough proxy.</p>
+
+      <p><strong>Result:</strong></p>
+      <pre>Tiling remaining:      13 days  (benchmark: 3 floors)
+Post-Tiling:           14 days  (benchmark: 1 floor)
+Pre-Paint:             37 days  (rate-based estimate)
+1st Coat:              ??       (insufficient data)
+────────────────────────────────
+Total remaining:       64+ days
+Projected finish:      ~October 2, 2026</pre>
+    </div>
+
+    <div class="subsection">
+      <h3>Why this approach improves over time</h3>
+      <ul>
+        <li><strong>Early in the project:</strong> Few floors have completed stages → most estimates are rate-based (rough)</li>
+        <li><strong>Mid-project:</strong> Multiple floors provide benchmarks → projections become accurate</li>
+        <li><strong>Late project:</strong> Most stages have been completed on some floor → projections are sharp</li>
+      </ul>
+      <p>The system automatically gets smarter as more data flows in — no manual calibration needed.</p>
+    </div>
+
+    <div class="subsection">
+      <h3>What the promoter sees</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Floor</th><th>Progress</th><th>Current Stage</th><th>Projected Finish</th><th>SPI Status</th></tr></thead>
+          <tbody>
+            <tr><td>Floor 1</td><td>82%</td><td>Pre-Paint</td><td>Sep 15, 2026</td><td><span class="badge badge-green">GREEN</span></td></tr>
+            <tr><td>Floor 2</td><td>65%</td><td>Post-Tiling</td><td>Oct 3, 2026</td><td><span class="badge badge-yellow">YELLOW</span></td></tr>
+            <tr><td>Floor 3</td><td>63%</td><td>Post-Tiling</td><td>Oct 8, 2026</td><td><span class="badge badge-yellow">YELLOW</span></td></tr>
+            <tr><td>Floor 5</td><td>41%</td><td>Tiling</td><td>Oct 2, 2026</td><td><span class="badge badge-green">GREEN</span></td></tr>
+            <tr><td>Floor 10</td><td>18%</td><td>Pre-Tiling</td><td>Dec 20, 2026</td><td><span class="badge badge-red">RED</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <hr>
+  <div style="text-align:center; padding:24px 0; color:var(--text-muted); font-size:12px;">
+    <p>Finishing Pro — Business Logic Specification v2.0</p>
+    <p style="margin-top:4px;">Document updated August 9, 2026. Reflects logic as implemented + agreed upon for next build phase.</p>
+  </div>
+
+</div>
