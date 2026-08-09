@@ -116,8 +116,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (error) {
+      // Supabase returns "User is banned" for deactivated accounts
+      const isBanned = error.message?.toLowerCase().includes('banned');
       return {
-        error: `${error.message} (${error.status ?? "no-status"})`,
+        error: isBanned
+          ? 'Your account has been deactivated. Please contact your administrator.'
+          : `${error.message} (${error.status ?? "no-status"})`,
       };
     }
 
