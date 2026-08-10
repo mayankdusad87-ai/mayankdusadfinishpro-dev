@@ -60,13 +60,13 @@ export default function AdminLoginPage() {
       <div className="absolute inset-0 bg-black/40" />
 
       {/* Raghav Realty logo — top-left */}
-      <div className="absolute top-5 left-6 z-20">
+      <div className="absolute top-4 left-5 z-20 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
         <Image
           src="/raghav-realty-logo.png"
           alt="Raghav Realty"
           width={160}
           height={60}
-          className="h-10 md:h-12 w-auto brightness-0 invert drop-shadow-lg"
+          className="h-10 md:h-12 w-auto"
           priority
         />
       </div>
