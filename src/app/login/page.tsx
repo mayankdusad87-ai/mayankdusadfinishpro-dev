@@ -9,10 +9,7 @@ import { useAuth } from '@/lib/auth-context';
 function BuildingIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Ground line */}
       <rect x="2" y="44" width="44" height="1.5" rx="0.75" fill="currentColor" opacity="0.3" />
-
-      {/* Left building — shorter, 3 floors */}
       <g className="build-floor-1">
         <rect x="4" y="32" width="16" height="12" rx="1" fill="currentColor" opacity="0.85" />
         <rect x="7" y="35" width="3" height="3" rx="0.5" fill="#162032" />
@@ -30,13 +27,10 @@ function BuildingIcon({ className }: { className?: string }) {
         <rect x="7" y="17.5" width="3" height="2.5" rx="0.5" fill="#162032" />
         <rect x="13" y="17.5" width="3" height="2.5" rx="0.5" fill="#162032" />
       </g>
-
-      {/* Right building — taller, 5 floors */}
       <g className="build-floor-1">
         <rect x="24" y="34" width="18" height="10" rx="1" fill="currentColor" opacity="0.9" />
         <rect x="27" y="37" width="3" height="3" rx="0.5" fill="#162032" />
         <rect x="33" y="37" width="3" height="3" rx="0.5" fill="#162032" />
-        <rect x="39" y="37" width="3" height="3" rx="0" fill="#162032" opacity="0" />
       </g>
       <g className="build-floor-2">
         <rect x="24" y="26" width="18" height="8" rx="1" fill="currentColor" opacity="0.8" />
@@ -58,8 +52,6 @@ function BuildingIcon({ className }: { className?: string }) {
         <rect x="27" y="5.5" width="3" height="2.5" rx="0.5" fill="#162032" />
         <rect x="33" y="5.5" width="3" height="2.5" rx="0.5" fill="#162032" />
       </g>
-
-      {/* Bridge connector */}
       <g className="build-floor-3">
         <rect x="18" y="24" width="8" height="3" rx="0.5" fill="currentColor" opacity="0.4" />
       </g>
@@ -109,58 +101,63 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
 
-      {/* ---- Left Branding Panel (desktop) / Top Banner (mobile) ---- */}
-      <div className="relative md:w-[48%] lg:w-[45%] bg-[#162032] overflow-hidden flex flex-col items-center justify-center px-8 py-14 md:py-0 md:min-h-screen">
-        {/* Subtle geometric pattern */}
-        <div className="absolute inset-0 opacity-[0.04]">
-          <div className="absolute top-[20%] left-[15%] w-64 h-64 border border-white/40 rounded-full" />
-          <div className="absolute bottom-[10%] right-[10%] w-96 h-96 border border-white/30 rounded-full" />
-          <div className="absolute top-[60%] left-[60%] w-40 h-40 border border-white/20 rounded-full" />
-        </div>
+      {/* ---- Left Branding Panel ---- */}
+      <div className="md:w-[48%] lg:w-[45%] flex flex-col md:min-h-screen">
 
-        {/* Gold accent line */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent" />
-
-        {/* Raghav Realty — top-left watermark badge */}
-        <div className="absolute top-4 left-5 z-10 flex items-center gap-2 opacity-60">
-          <Image
-            src="/raghav-realty-logo.png"
-            alt="Raghav Realty"
-            width={120}
-            height={44}
-            className="h-8 w-auto"
-            priority
-          />
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 flex flex-col items-center text-center max-w-sm">
-          {/* Animated building icon */}
-          <div className="mb-6 md:mb-8 build-glow">
-            <BuildingIcon className="w-16 h-16 md:w-20 md:h-20 text-primary" />
-          </div>
-
-          {/* App name */}
-          <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-            Finishing Pro
-          </h1>
-          <p className="text-sm md:text-base text-gray-400 mt-2 leading-relaxed">
-            Construction Finishing Management System
-          </p>
-
-          {/* Feature pills — desktop only */}
-          <div className="hidden md:flex flex-wrap justify-center gap-2 mt-10">
-            {['Real-time Tracking', 'Floor Analytics', 'Photo Documentation', 'Quality Control'].map(feat => (
-              <span key={feat} className="px-3 py-1.5 rounded-full text-[11px] font-medium text-gray-400 border border-gray-700 bg-white/[0.03]">
-                {feat}
-              </span>
-            ))}
+        {/* Top half — White with Raghav Realty logo */}
+        <div className="flex items-center justify-center bg-white px-8 py-10 md:py-0 md:flex-1">
+          <div className="flex flex-col items-center">
+            <Image
+              src="/raghav-realty-logo.png"
+              alt="Raghav Realty"
+              width={280}
+              height={110}
+              className="h-20 md:h-28 w-auto"
+              priority
+            />
+            <div className="w-16 h-[2px] bg-primary/40 rounded-full mt-5 hidden md:block" />
           </div>
         </div>
 
-        {/* Bottom copyright — desktop only */}
-        <div className="hidden md:block absolute bottom-6 text-center w-full">
-          <p className="text-[11px] text-gray-600">© 2026 Raghav Group. All rights reserved.</p>
+        {/* Bottom half — Navy with Finishing Pro + animated building */}
+        <div className="relative bg-[#162032] overflow-hidden flex flex-col items-center justify-center px-8 py-10 md:py-0 md:flex-1">
+          {/* Subtle geometric pattern */}
+          <div className="absolute inset-0 opacity-[0.04]">
+            <div className="absolute top-[20%] left-[15%] w-48 h-48 border border-white/40 rounded-full" />
+            <div className="absolute bottom-[10%] right-[10%] w-64 h-64 border border-white/30 rounded-full" />
+          </div>
+
+          {/* Gold accent line at join */}
+          <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent" />
+
+          {/* Content */}
+          <div className="relative z-10 flex flex-col items-center text-center">
+            {/* Animated building icon */}
+            <div className="mb-5 build-glow">
+              <BuildingIcon className="w-14 h-14 md:w-[72px] md:h-[72px] text-primary" />
+            </div>
+
+            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+              Finishing Pro
+            </h1>
+            <p className="text-xs md:text-sm text-gray-400 mt-1.5 leading-relaxed">
+              Construction Finishing Management System
+            </p>
+
+            {/* Feature pills — desktop only */}
+            <div className="hidden md:flex flex-wrap justify-center gap-2 mt-6">
+              {['Real-time Tracking', 'Floor Analytics', 'Photo Docs', 'Quality Control'].map(feat => (
+                <span key={feat} className="px-2.5 py-1 rounded-full text-[10px] font-medium text-gray-400 border border-gray-700 bg-white/[0.03]">
+                  {feat}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Bottom copyright — desktop only */}
+          <div className="hidden md:block absolute bottom-4 text-center w-full">
+            <p className="text-[10px] text-gray-600">© 2026 Raghav Group. All rights reserved.</p>
+          </div>
         </div>
       </div>
 
