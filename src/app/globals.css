@@ -34,11 +34,24 @@ body {
   border-radius: 3px;
 }
 
-/* Login page animated icon */
+/* Login page — building construct animation */
+@keyframes build-floor {
+  0% { transform: scaleY(0); opacity: 0; }
+  60% { transform: scaleY(1.05); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+@keyframes glow-settle {
+  0% { filter: drop-shadow(0 0 0px #C8922A); }
+  50% { filter: drop-shadow(0 0 12px #C8922A); }
+  100% { filter: drop-shadow(0 0 4px #C8922A); }
+}
 @keyframes glow-pulse {
-  0%, 100% { opacity: 1; filter: drop-shadow(0 0 0px #C8922A); }
-  50% { opacity: 0.85; filter: drop-shadow(0 0 8px #C8922A); }
+  0%, 100% { filter: drop-shadow(0 0 4px #C8922A); }
+  50% { filter: drop-shadow(0 0 10px #C8922A); }
 }
-.animate-glow {
-  animation: glow-pulse 3s ease-in-out infinite;
-}
+.build-floor-1 { transform-origin: bottom; animation: build-floor 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both; }
+.build-floor-2 { transform-origin: bottom; animation: build-floor 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.45s both; }
+.build-floor-3 { transform-origin: bottom; animation: build-floor 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.7s both; }
+.build-floor-4 { transform-origin: bottom; animation: build-floor 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.95s both; }
+.build-floor-5 { transform-origin: bottom; animation: build-floor 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 1.2s both; }
+.build-glow { animation: glow-settle 0.8s ease-out 1.6s both, glow-pulse 3s ease-in-out 2.4s infinite; }
