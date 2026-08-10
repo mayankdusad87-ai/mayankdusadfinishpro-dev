@@ -10,12 +10,6 @@ interface Props {
   reversals: RecentReversal[];
 }
 
-function ratingStyle(rating: 'Good' | 'Fair' | 'Poor') {
-  if (rating === 'Good') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  if (rating === 'Fair') return 'bg-amber-50 text-amber-700 border-amber-200';
-  return 'bg-red-50 text-red-700 border-red-200';
-}
-
 function severityDot(severity: ActionItem['severity']) {
   if (severity === 'critical') return 'bg-red-500';
   if (severity === 'warning') return 'bg-amber-400';
@@ -96,7 +90,7 @@ function formatStatus(status: string): string {
 }
 
 function OperationsView({ data, supervisors, reversals }: Props) {
-  const { vendors, delayReasons, bottlenecks, actionItems } = data;
+  const { delayReasons, bottlenecks, actionItems } = data;
   const maxReasonCount = delayReasons.length > 0 ? delayReasons[0].count : 1;
 
   return (
@@ -279,19 +273,39 @@ function OperationsView({ data, supervisors, reversals }: Props) {
             </div>
             <div className="space-y-1.5">
               {reversals.slice(0, 5).map((r, i) => (
-                <div key={i} className="flex items-center gap-3 py-2 px-3 rounded-md bg-red-50/40 text-xs">
-                  <span className="font-semibold text-gray-900 tabular-nums shrink-0 w-16">
-                    F{r.floor}-{r.flatNumber}
-                  </span>
-                  <span className="text-gray-600 truncate flex-1">{r.stage}</span>
-                  <span className="shrink-0 flex items-center gap-1">
-                    <span className="text-red-600 font-semibold">{formatStatus(r.oldStatus)}</span>
-                    <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                    </svg>
-                    <span className="text-amber-600 font-semibold">{formatStatus(r.newStatus)}</span>
-                  </span>
-                  <span className="text-gray-400 tabular-nums shrink-0 hidden md:inline">{r.changedByName}</span>
+                <div key={i} className="rounded-md bg-red-50/40 text-xs">
+                  {/* Desktop row */}
+                  <div className="hidden md:flex items-center gap-3 py-2 px-3">
+                    <span className="font-semibold text-gray-900 tabular-nums shrink-0 w-16">
+                      F{r.floor}-{r.flatNumber}
+                    </span>
+                    <span className="text-gray-600 truncate flex-1">{r.stage}</span>
+                    <span className="shrink-0 flex items-center gap-1">
+                      <span className="text-red-600 font-semibold">{formatStatus(r.oldStatus)}</span>
+                      <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                      </svg>
+                      <span className="text-amber-600 font-semibold">{formatStatus(r.newStatus)}</span>
+                    </span>
+                    <span className="text-gray-400 tabular-nums shrink-0">{r.changedByName}</span>
+                  </div>
+                  {/* Mobile stacked */}
+                  <div className="md:hidden py-2.5 px-3 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-gray-900 tabular-nums">F{r.floor}-{r.flatNumber}</span>
+                      <span className="flex items-center gap-1">
+                        <span className="text-red-600 font-semibold">{formatStatus(r.oldStatus)}</span>
+                        <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                        </svg>
+                        <span className="text-amber-600 font-semibold">{formatStatus(r.newStatus)}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-gray-500">
+                      <span className="truncate">{r.stage}</span>
+                      <span className="shrink-0 ml-2 tabular-nums">{r.changedByName}</span>
+                    </div>
+                  </div>
                 </div>
               ))}
               {reversals.length > 5 && (
@@ -301,113 +315,6 @@ function OperationsView({ data, supervisors, reversals }: Props) {
               )}
             </div>
           </div>
-        )}
-      </div>
-
-      {/* ---- VENDOR SCORECARD ---- */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
-        <div className="mb-4 md:mb-5">
-          <h3 className="text-base md:text-lg font-bold text-gray-900">Vendor Scorecard</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Performance based on on-time delivery of completed activities</p>
-        </div>
-
-        {vendors.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No vendor data available</p>
-        ) : (
-          <>
-            {/* Desktop: table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left py-2.5 px-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Vendor</th>
-                    <th className="text-center py-2.5 px-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Assigned</th>
-                    <th className="text-center py-2.5 px-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Completed</th>
-                    <th className="text-center py-2.5 px-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">On-Time %</th>
-                    <th className="text-center py-2.5 px-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Avg Delay</th>
-                    <th className="text-center py-2.5 px-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Pending</th>
-                    <th className="text-right py-2.5 px-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Rating</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendors.map(v => (
-                    <tr key={v.vendor} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                      <td className="py-3 px-3 font-semibold text-gray-900 max-w-[200px] truncate">{v.vendor}</td>
-                      <td className="py-3 px-3 text-center text-gray-600 tabular-nums">{v.assigned}</td>
-                      <td className="py-3 px-3 text-center text-gray-600 tabular-nums">{v.completed}</td>
-                      <td className="py-3 px-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="w-16 h-1.5 bg-gray-100 rounded-full">
-                            <div
-                              className="h-1.5 rounded-full"
-                              style={{
-                                width: `${v.onTimePct}%`,
-                                backgroundColor: v.onTimePct >= 80 ? '#10B981' : v.onTimePct >= 50 ? '#F59E0B' : '#EF4444',
-                              }}
-                            />
-                          </div>
-                          <span className="text-xs font-semibold tabular-nums w-8">{v.onTimePct}%</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 text-center tabular-nums text-gray-600">
-                        {v.avgDelayDays > 0 ? `${v.avgDelayDays}d` : '—'}
-                      </td>
-                      <td className="py-3 px-3 text-center tabular-nums text-gray-600">{v.pending}</td>
-                      <td className="py-3 px-3 text-right">
-                        <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold border ${ratingStyle(v.rating)}`}>
-                          {v.rating}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile: cards */}
-            <div className="md:hidden space-y-3">
-              {vendors.map(v => (
-                <div key={v.vendor} className="rounded-lg border border-gray-100 p-3.5">
-                  <div className="flex items-center justify-between mb-2.5">
-                    <span className="text-sm font-bold text-gray-900 truncate max-w-[200px]">{v.vendor}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${ratingStyle(v.rating)}`}>
-                      {v.rating}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <div className="flex-1 h-2 bg-gray-100 rounded-full">
-                      <div
-                        className="h-2 rounded-full"
-                        style={{
-                          width: `${v.onTimePct}%`,
-                          backgroundColor: v.onTimePct >= 80 ? '#10B981' : v.onTimePct >= 50 ? '#F59E0B' : '#EF4444',
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs font-bold tabular-nums">{v.onTimePct}% on-time</span>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2 text-center">
-                    <div>
-                      <div className="text-[10px] text-gray-400 uppercase">Assigned</div>
-                      <div className="text-sm font-bold text-gray-800 tabular-nums">{v.assigned}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-gray-400 uppercase">Done</div>
-                      <div className="text-sm font-bold text-gray-800 tabular-nums">{v.completed}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-gray-400 uppercase">Pending</div>
-                      <div className="text-sm font-bold text-gray-800 tabular-nums">{v.pending}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-gray-400 uppercase">Avg Delay</div>
-                      <div className="text-sm font-bold text-gray-800 tabular-nums">{v.avgDelayDays > 0 ? `${v.avgDelayDays}d` : '—'}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
         )}
       </div>
 
