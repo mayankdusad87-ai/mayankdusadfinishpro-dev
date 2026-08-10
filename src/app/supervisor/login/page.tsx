@@ -6,59 +6,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 
-function BuildingIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="2" y="44" width="44" height="1.5" rx="0.75" fill="currentColor" opacity="0.3" />
-      <g className="build-floor-1">
-        <rect x="4" y="32" width="16" height="12" rx="1" fill="currentColor" opacity="0.85" />
-        <rect x="7" y="35" width="3" height="3" rx="0.5" fill="#162032" />
-        <rect x="13" y="35" width="3" height="3" rx="0.5" fill="#162032" />
-        <rect x="7" y="40" width="3" height="3" rx="0.5" fill="#162032" />
-        <rect x="13" y="40" width="3" height="3" rx="0.5" fill="#162032" />
-      </g>
-      <g className="build-floor-2">
-        <rect x="4" y="22" width="16" height="10" rx="1" fill="currentColor" opacity="0.75" />
-        <rect x="7" y="25" width="3" height="3" rx="0.5" fill="#162032" />
-        <rect x="13" y="25" width="3" height="3" rx="0.5" fill="#162032" />
-      </g>
-      <g className="build-floor-3">
-        <rect x="4" y="16" width="16" height="6" rx="1" fill="currentColor" opacity="0.65" />
-        <rect x="7" y="17.5" width="3" height="2.5" rx="0.5" fill="#162032" />
-        <rect x="13" y="17.5" width="3" height="2.5" rx="0.5" fill="#162032" />
-      </g>
-      <g className="build-floor-1">
-        <rect x="24" y="34" width="18" height="10" rx="1" fill="currentColor" opacity="0.9" />
-        <rect x="27" y="37" width="3" height="3" rx="0.5" fill="#162032" />
-        <rect x="33" y="37" width="3" height="3" rx="0.5" fill="#162032" />
-      </g>
-      <g className="build-floor-2">
-        <rect x="24" y="26" width="18" height="8" rx="1" fill="currentColor" opacity="0.8" />
-        <rect x="27" y="29" width="3" height="3" rx="0.5" fill="#162032" />
-        <rect x="33" y="29" width="3" height="3" rx="0.5" fill="#162032" />
-      </g>
-      <g className="build-floor-3">
-        <rect x="24" y="18" width="18" height="8" rx="1" fill="currentColor" opacity="0.7" />
-        <rect x="27" y="21" width="3" height="3" rx="0.5" fill="#162032" />
-        <rect x="33" y="21" width="3" height="3" rx="0.5" fill="#162032" />
-      </g>
-      <g className="build-floor-4">
-        <rect x="24" y="10" width="18" height="8" rx="1" fill="currentColor" opacity="0.6" />
-        <rect x="27" y="13" width="3" height="3" rx="0.5" fill="#162032" />
-        <rect x="33" y="13" width="3" height="3" rx="0.5" fill="#162032" />
-      </g>
-      <g className="build-floor-5">
-        <rect x="24" y="4" width="18" height="6" rx="1" fill="currentColor" opacity="0.5" />
-        <rect x="27" y="5.5" width="3" height="2.5" rx="0.5" fill="#162032" />
-        <rect x="33" y="5.5" width="3" height="2.5" rx="0.5" fill="#162032" />
-      </g>
-      <g className="build-floor-3">
-        <rect x="18" y="24" width="8" height="3" rx="0.5" fill="currentColor" opacity="0.4" />
-      </g>
-    </svg>
-  );
-}
-
 export default function SupervisorLoginPage() {
   const router = useRouter();
   const { signIn, user, profile, loading } = useAuth();
@@ -101,87 +48,49 @@ export default function SupervisorLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
+    <div className="min-h-screen relative flex items-center justify-center px-4">
+      {/* Full-screen background image */}
+      <Image
+        src="/construction-bg.jpg"
+        alt=""
+        fill
+        className="object-cover"
+        priority
+        quality={80}
+      />
+      {/* Dark overlay for readability */}
+      <div className="absolute inset-0 bg-black/40" />
 
-      {/* ---- Left Branding Panel ---- */}
-      <div className="md:w-[48%] lg:w-[45%] flex flex-col md:min-h-screen">
-
-        {/* Top half — White with Raghav Realty logo */}
-        <div className="flex items-center justify-center bg-white px-8 py-10 md:py-0 md:flex-1">
-          <div className="flex flex-col items-center">
-            <Image
-              src="/raghav-realty-logo.png"
-              alt="Raghav Realty"
-              width={280}
-              height={110}
-              className="h-20 md:h-28 w-auto"
-              priority
-            />
-            <div className="w-16 h-[2px] bg-primary/40 rounded-full mt-5 hidden md:block" />
-          </div>
-        </div>
-
-        {/* Bottom half — Navy with Finishing Pro + animated building */}
-        <div className="relative bg-[#162032] overflow-hidden flex flex-col items-center justify-center px-8 py-10 md:py-0 md:flex-1">
-          {/* Subtle geometric pattern */}
-          <div className="absolute inset-0 opacity-[0.04]">
-            <div className="absolute top-[20%] right-[20%] w-48 h-48 border border-white/40 rounded-full" />
-            <div className="absolute bottom-[10%] left-[5%] w-64 h-64 border border-white/30 rounded-full" />
-          </div>
-
-          {/* Gold accent line at join */}
-          <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent" />
-
-          {/* Content */}
-          <div className="relative z-10 flex flex-col items-center text-center">
-            {/* Animated building icon */}
-            <div className="mb-5 build-glow">
-              <BuildingIcon className="w-14 h-14 md:w-[72px] md:h-[72px] text-primary" />
-            </div>
-
-            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-              Finishing Pro
-            </h1>
-            <p className="text-xs md:text-sm text-gray-400 mt-1.5 leading-relaxed">
-              Site Supervision & Quality Control
-            </p>
-
-            {/* Feature pills — desktop only */}
-            <div className="hidden md:flex flex-wrap justify-center gap-2 mt-6">
-              {['Daily Updates', 'Photo Logs', 'Floor Tracking', 'Quality Checks'].map(feat => (
-                <span key={feat} className="px-2.5 py-1 rounded-full text-[10px] font-medium text-gray-400 border border-gray-700 bg-white/[0.03]">
-                  {feat}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Bottom copyright — desktop only */}
-          <div className="hidden md:block absolute bottom-4 text-center w-full">
-            <p className="text-[10px] text-gray-600">© 2026 Raghav Group. All rights reserved.</p>
-          </div>
-        </div>
+      {/* Raghav Realty logo — top-left */}
+      <div className="absolute top-5 left-6 z-20">
+        <Image
+          src="/raghav-realty-logo.png"
+          alt="Raghav Realty"
+          width={160}
+          height={60}
+          className="h-10 md:h-12 w-auto brightness-0 invert drop-shadow-lg"
+          priority
+        />
       </div>
 
-      {/* ---- Right Login Form ---- */}
-      <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-10 md:py-0">
-        <div className="w-full max-w-sm">
+      {/* Glassmorphism login card */}
+      <div className="relative z-10 w-full max-w-md">
+        <div className="backdrop-blur-xl bg-white/15 border border-white/20 rounded-2xl shadow-2xl p-8 md:p-10">
           {/* Header */}
-          <div className="mb-8">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-4">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-primary/20 backdrop-blur-sm flex items-center justify-center border border-primary/30">
+              <svg className="w-7 h-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.049.58.024 1.194-.14 1.743" />
               </svg>
-              Site Supervisor
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
-            <p className="text-sm text-gray-500 mt-1">Track progress. Ensure quality. Deliver on time.</p>
+            <h2 className="text-2xl font-bold text-white">Site Supervisor</h2>
+            <p className="text-sm text-white/60 mt-1">Track progress. Ensure quality. Deliver on time.</p>
           </div>
 
           {/* Error */}
           {error && (
-            <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 flex items-start gap-2">
-              <svg className="w-5 h-5 text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="mb-5 p-3.5 bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-xl text-sm text-red-100 flex items-start gap-2">
+              <svg className="w-5 h-5 text-red-300 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
               </svg>
               <span>{error}</span>
@@ -191,9 +100,9 @@ export default function SupervisorLoginPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-1.5">Email Address</label>
+              <label className="block text-sm font-semibold text-white/90 mb-1.5">Email Address</label>
               <div className="relative">
-                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
                 </svg>
                 <input
@@ -202,15 +111,15 @@ export default function SupervisorLoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                  className="w-full pl-11 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all backdrop-blur-sm"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-1.5">Password</label>
+              <label className="block text-sm font-semibold text-white/90 mb-1.5">Password</label>
               <div className="relative">
-                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                 </svg>
                 <input
@@ -219,12 +128,12 @@ export default function SupervisorLoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                  className="w-full pl-11 pr-11 py-3 bg-white/10 border border-white/20 rounded-xl text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all backdrop-blur-sm"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors cursor-pointer"
                 >
                   {showPassword ? (
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -243,7 +152,7 @@ export default function SupervisorLoginPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 bg-primary hover:bg-primary-dark text-white font-semibold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg shadow-primary/30 cursor-pointer"
+              className="w-full py-3 bg-primary hover:bg-primary-dark text-white font-semibold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg cursor-pointer"
             >
               {submitting && (
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -256,18 +165,18 @@ export default function SupervisorLoginPage() {
           </form>
 
           {/* Admin link */}
-          <div className="mt-8 pt-5 border-t border-gray-200 text-center">
-            <Link href="/login" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary transition-colors">
+          <div className="mt-6 pt-5 border-t border-white/10 text-center">
+            <Link href="/login" className="inline-flex items-center gap-1.5 text-sm text-white/50 hover:text-primary transition-colors">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
               </svg>
               Head Office Portal Login
             </Link>
           </div>
-
-          {/* Mobile copyright */}
-          <p className="md:hidden text-[11px] text-gray-400 text-center mt-8">© 2026 Raghav Group</p>
         </div>
+
+        {/* Copyright */}
+        <p className="text-[11px] text-white/40 text-center mt-4">© 2026 Raghav Group. All rights reserved.</p>
       </div>
     </div>
   );

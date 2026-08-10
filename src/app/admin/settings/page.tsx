@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getReasons, createReason, updateReason, deleteReason, Reason } from '@/lib/supabase-data';
 import { getStageWeights, setStageWeights, getPaintDaysPerFlat, setPaintDaysPerFlat } from '@/repositories/settings-repo';
+import { getSupervisors, resetUserPassword } from '@/repositories/supervisor-repo';
 import { STAGE_WEIGHTS, PAINT_DAYS_PER_FLAT } from '@/lib/constants';
 import { useDataLoader } from '@/hooks/use-data-loader';
 
@@ -59,6 +60,44 @@ export default function SettingsPage() {
       setEditingId(null);
       await loadReasons();
     }
+  }
+
+  // ---- Password Reset state ----
+  const [supervisors, setSupervisors] = useState<Array<{ id: string; full_name: string; email: string | null }>>([]);
+  const [supervisorsLoading, setSupervisorsLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [resetMsg, setResetMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  const loadSupervisors = useCallback(async () => {
+    setSupervisorsLoading(true);
+    try {
+      const data = await getSupervisors();
+      setSupervisors(data.map(s => ({ id: s.id, full_name: s.full_name, email: s.email })));
+    } catch {
+      // ignore
+    }
+    setSupervisorsLoading(false);
+  }, []);
+
+  useEffect(() => { loadSupervisors(); }, [loadSupervisors]);
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedUser || !newPassword || newPassword.length < 6) return;
+    setResetting(true);
+    setResetMsg(null);
+    const { error: resetError } = await resetUserPassword(selectedUser, newPassword);
+    if (resetError) {
+      setResetMsg({ type: 'error', text: resetError });
+    } else {
+      const user = supervisors.find(s => s.id === selectedUser);
+      setResetMsg({ type: 'success', text: `Password reset successfully for ${user?.full_name || 'user'}.` });
+      setNewPassword('');
+      setSelectedUser('');
+    }
+    setResetting(false);
   }
 
   // ---- Stage Weights state ----
@@ -379,6 +418,81 @@ export default function SettingsPage() {
               </svg>
               Higher weight = more impact on overall progress %. Tiling is typically the heaviest stage in finishing work.
               Changes apply to the Management Insights dashboard immediately.
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ---- Reset User Password ---- */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Reset User Password</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Select a supervisor and set a new password. The supervisor will need to use the new password on next login.
+          </p>
+        </div>
+
+        {supervisorsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-6 h-6 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : supervisors.length === 0 ? (
+          <div className="text-center py-8 text-gray-400 text-sm">
+            No supervisors found.
+          </div>
+        ) : (
+          <>
+            {resetMsg && (
+              <div className={`mb-4 rounded-lg p-3 text-sm ${resetMsg.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+                {resetMsg.text}
+              </div>
+            )}
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Select User</label>
+                <select
+                  value={selectedUser}
+                  onChange={(e) => { setSelectedUser(e.target.value); setResetMsg(null); }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                >
+                  <option value="">Choose a supervisor...</option>
+                  {supervisors.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.full_name}{s.email ? ` (${s.email})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setResetMsg(null); }}
+                  placeholder="Minimum 6 characters"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+                {newPassword && newPassword.length < 6 && (
+                  <p className="text-xs text-red-500 mt-1">Password must be at least 6 characters.</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={!selectedUser || !newPassword || newPassword.length < 6 || resetting}
+                className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {resetting ? 'Resetting...' : 'Reset Password'}
+              </button>
+            </form>
+
+            <div className="mt-4 flex items-start gap-2 text-xs text-gray-500">
+              <svg className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              The new password is set immediately. Inform the supervisor of their new password — there is no email notification sent.
             </div>
           </>
         )}
