@@ -33,3 +33,12 @@ body {
   background: #cbd5e1;
   border-radius: 3px;
 }
+
+/* Login page animated icon */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 0px #C8922A); }
+  50% { opacity: 0.85; filter: drop-shadow(0 0 8px #C8922A); }
+}
+.animate-glow {
+  animation: glow-pulse 3s ease-in-out infinite;
+}

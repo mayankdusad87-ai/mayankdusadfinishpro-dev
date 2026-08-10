@@ -63,13 +63,13 @@ export default function AdminLoginPage() {
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-sm">
           {/* Logo */}
-          <div className="mb-6 md:mb-8">
+          <div className="mb-6 md:mb-8 bg-white/95 rounded-2xl px-6 py-3 shadow-lg shadow-black/10">
             <Image
               src="/raghav-realty-logo.png"
               alt="Raghav Realty"
               width={220}
               height={80}
-              className="h-16 md:h-20 w-auto brightness-0 invert"
+              className="h-14 md:h-16 w-auto"
               priority
             />
           </div>
@@ -77,10 +77,31 @@ export default function AdminLoginPage() {
           {/* Divider */}
           <div className="w-12 h-0.5 bg-primary rounded-full mb-6 md:mb-8" />
 
-          {/* App name */}
-          <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-            Finishing Pro
-          </h1>
+          {/* Animated building icon + App name */}
+          <div className="flex items-center gap-3 mb-1">
+            <svg className="w-8 h-8 md:w-9 md:h-9 text-primary animate-glow" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4" y="14" width="14" height="22" rx="1" fill="currentColor" opacity="0.9"/>
+              <rect x="22" y="6" width="14" height="30" rx="1" fill="currentColor" opacity="0.7"/>
+              <rect x="7" y="17" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="12" y="17" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="7" y="23" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="12" y="23" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="7" y="29" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="12" y="29" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="25" y="10" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="30" y="10" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="25" y="16" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="30" y="16" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="25" y="22" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="30" y="22" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="25" y="28" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="30" y="28" width="3" height="3" rx="0.5" fill="#162032"/>
+              <rect x="16" y="20" width="8" height="4" rx="0.5" fill="currentColor" opacity="0.5"/>
+            </svg>
+            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+              Finishing Pro
+            </h1>
+          </div>
           <p className="text-sm md:text-base text-gray-400 mt-2 leading-relaxed">
             Construction Finishing Management System
           </p>
