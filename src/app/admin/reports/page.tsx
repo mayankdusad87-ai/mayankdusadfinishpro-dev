@@ -7,6 +7,8 @@ import { computeHeatmapFromRollup } from '@/lib/floor-rollup';
 import type { HeatmapData } from '@/lib/floor-rollup';
 import { getInsightsData } from '@/lib/insights-data';
 import { getStageWeights, getPaintDaysPerFlat } from '@/repositories/settings-repo';
+import { getSupervisorActivity, getRecentReversals } from '@/repositories/audit-repo';
+import type { SupervisorPulse, RecentReversal } from '@/repositories/audit-repo';
 import type { ManagementData, OperationsData } from '@/lib/insights-data';
 import ManagementView from '@/components/admin/ManagementView';
 import OperationsView from '@/components/admin/OperationsView';
@@ -21,12 +23,16 @@ export default function InsightsPage() {
   const [mgmt, setMgmt] = useState<ManagementData | null>(null);
   const [ops, setOps] = useState<OperationsData | null>(null);
   const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null);
+  const [supervisors, setSupervisors] = useState<SupervisorPulse[]>([]);
+  const [reversals, setReversals] = useState<RecentReversal[]>([]);
 
   const loadData = useCallback(async () => {
     if (!currentProject) {
       setMgmt(null);
       setOps(null);
       setHeatmapData(null);
+      setSupervisors([]);
+      setReversals([]);
       setLoading(false);
       return;
     }
@@ -40,10 +46,15 @@ export default function InsightsPage() {
       console.log('[Insights]', currentProject.name, '— dashData heatmap rows:', dashData.heatmap.length, 'stages:', dashData.stages);
       const heatmap = computeHeatmapFromRollup(dashData.heatmap, dashData.stages);
       setHeatmapData(heatmap);
-      const [dbWeights, dbPaintDays] = await Promise.all([
+      const [dbWeights, dbPaintDays, supActivity, recentReversals] = await Promise.all([
         getStageWeights(),
         getPaintDaysPerFlat(),
+        getSupervisorActivity(currentProject.id),
+        getRecentReversals(currentProject.id),
       ]);
+      setSupervisors(supActivity);
+      setReversals(recentReversals);
+
       const insights = await getInsightsData(
         currentProject.id,
         heatmap,
@@ -53,6 +64,15 @@ export default function InsightsPage() {
       if (insights) {
         console.log('[Insights]', currentProject.name, '— management data loaded');
         setMgmt(insights.management);
+        // Inject reversal-based action items into operations data
+        if (recentReversals.length > 0 && insights.operations) {
+          insights.operations.actionItems.push({
+            severity: recentReversals.length >= 5 ? 'critical' : 'warning',
+            text: `${recentReversals.length} status reversal${recentReversals.length > 1 ? 's' : ''} in the last 7 days`,
+            meta: `Latest: F${recentReversals[0].floor}-${recentReversals[0].flatNumber} ${recentReversals[0].oldStatus} → ${recentReversals[0].newStatus}`,
+            type: 'reversal',
+          });
+        }
         setOps(insights.operations);
       } else {
         console.warn('[Insights]', currentProject.name, '— getInsightsData returned null (0 activity rows passed filter)');
@@ -64,6 +84,8 @@ export default function InsightsPage() {
       setMgmt(null);
       setOps(null);
       setHeatmapData(null);
+      setSupervisors([]);
+      setReversals([]);
     }
     setLoading(false);
   }, [currentProject]);
@@ -72,6 +94,8 @@ export default function InsightsPage() {
     setMgmt(null);
     setOps(null);
     setHeatmapData(null);
+    setSupervisors([]);
+    setReversals([]);
     loadData();
   }, [loadData]);
 
@@ -143,7 +167,7 @@ export default function InsightsPage() {
             <ManagementView data={mgmt} projectName={currentProject.name} heatmap={heatmapData} />
           )}
           {tab === 'operations' && ops && (
-            <OperationsView data={ops} />
+            <OperationsView data={ops} supervisors={supervisors} reversals={reversals} />
           )}
         </>
       )}

@@ -172,10 +172,20 @@ export interface FloorBottleneck {
   maxDaysBehind: number;
 }
 
+// ---- Action Items (Today's action list) ----
+
+export interface ActionItem {
+  severity: 'critical' | 'warning' | 'info';
+  text: string;
+  meta: string;       // supporting detail (e.g. "Floor 3 — 28d behind")
+  type: 'floor' | 'vendor' | 'stalled' | 'reversal';
+}
+
 export interface OperationsData {
   vendors: VendorScore[];
   delayReasons: DelayReason[];
   bottlenecks: FloorBottleneck[];
+  actionItems: ActionItem[];
 }
 
 // ---- SPI helper ----
@@ -808,7 +818,61 @@ export function computeOperations(rows: InsightRow[]): OperationsData {
   }
   bottlenecks.sort((a, b) => b.maxDaysBehind - a.maxDaysBehind);
 
-  return { vendors, delayReasons, bottlenecks };
+  // ---- Action items (derived from the data above) ----
+  const actionItems: ActionItem[] = [];
+
+  // 1. Worst floor bottleneck
+  if (bottlenecks.length > 0) {
+    const worst = bottlenecks[0];
+    actionItems.push({
+      severity: worst.maxDaysBehind >= 14 ? 'critical' : 'warning',
+      text: `Floor ${worst.floor} is ${worst.maxDaysBehind}d behind — stuck at ${worst.blockedStage}`,
+      meta: worst.blockedVendor ? `Vendor: ${worst.blockedVendor} · ${worst.overdueCount} overdue` : `${worst.overdueCount} overdue activities`,
+      type: 'floor',
+    });
+  }
+
+  // 2. Worst vendor (highest risk = most pending with poor on-time)
+  const riskyVendors = vendors
+    .filter(v => v.rating === 'Poor' && v.pending > 0)
+    .sort((a, b) => b.pending - a.pending);
+  if (riskyVendors.length > 0) {
+    const rv = riskyVendors[0];
+    actionItems.push({
+      severity: rv.onTimePct < 30 ? 'critical' : 'warning',
+      text: `${rv.vendor} has ${rv.pending} pending activities with only ${rv.onTimePct}% on-time rate`,
+      meta: `${rv.assigned} assigned · ${rv.completed} completed · Avg delay ${rv.avgDelayDays}d`,
+      type: 'vendor',
+    });
+  }
+
+  // 3. Stalled floors (zero completions this week)
+  const thisMonday = mondayOf(TODAY);
+  const floorCompletionsThisWeek = new Map<number, number>();
+  for (const r of rows) {
+    if (isComplete(r.status) && r.actual_end && r.actual_end >= thisMonday) {
+      floorCompletionsThisWeek.set(r.floor, (floorCompletionsThisWeek.get(r.floor) || 0) + 1);
+    }
+  }
+  // Find floors with activities but zero completions this week
+  const allFloors = [...floorOverdueMap.keys()].sort((a, b) => a - b);
+  const stalledFloors = allFloors.filter(f => {
+    const fo = floorOverdueMap.get(f)!;
+    return fo.done < fo.total && !floorCompletionsThisWeek.has(f);
+  });
+  if (stalledFloors.length > 0) {
+    const label = stalledFloors.length <= 3
+      ? stalledFloors.map(f => `Floor ${f}`).join(', ')
+      : `${stalledFloors.length} floors`;
+    actionItems.push({
+      severity: stalledFloors.length >= 3 ? 'warning' : 'info',
+      text: `${label} — zero completions this week`,
+      meta: 'No activity was marked complete since Monday',
+      type: 'stalled',
+    });
+  }
+
+  return { vendors, delayReasons, bottlenecks, actionItems };
 }
 
 // ---- Public API ----
