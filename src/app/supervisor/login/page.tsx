@@ -18,7 +18,7 @@ export default function SupervisorLoginPage() {
   useEffect(() => {
     if (!loading && user && profile) {
       if (profile.role === 'admin' || profile.role === 'management') {
-        router.replace('/admin/dashboard');
+        router.replace('/admin/reports');
       } else {
         router.replace('/supervisor/home');
       }

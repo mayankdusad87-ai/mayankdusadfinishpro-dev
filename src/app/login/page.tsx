@@ -18,7 +18,7 @@ export default function AdminLoginPage() {
   useEffect(() => {
     if (!loading && user && profile) {
       if (profile.role === 'admin' || profile.role === 'management') {
-        router.replace('/admin/dashboard');
+        router.replace('/admin/reports');
       }
     }
   }, [loading, user, profile, router]);
@@ -34,7 +34,7 @@ export default function AdminLoginPage() {
       setSubmitting(false);
       return;
     }
-    router.replace('/admin/dashboard');
+    router.replace('/admin/reports');
   }
 
   if (loading) {

@@ -16,12 +16,6 @@ function formatDate(d: string | null): string {
   return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const HEALTH_STYLES = {
-  on_track: { bg: 'bg-emerald-900', label: 'On Track', sub: 'Project progressing as planned' },
-  at_risk: { bg: 'bg-amber-800', label: 'At Risk', sub: 'Some areas need attention' },
-  critical: { bg: 'bg-red-900', label: 'Critical', sub: 'Immediate action required' },
-} as const;
-
 const REASON_COLORS = ['#EF4444', '#3B82F6', '#F59E0B'];
 
 function barColor(pct: number): string {
@@ -107,61 +101,14 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
 }
 
 function ManagementView({ data, projectName }: Props) {
-  const { health, pipeline, bottlenecks, stageFloorBreakdowns, sitePulse } = data;
+  const { pipeline, bottlenecks, stageFloorBreakdowns, sitePulse } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [pulseExpanded, setPulseExpanded] = useState(false);
-
-  const hs = HEALTH_STYLES[health.status];
 
   return (
     <div className="space-y-5">
 
-      {/* ---- SECTION 1: PROJECT HEALTH ---- */}
-      <div className={`${hs.bg} rounded-xl p-5 md:p-6`}>
-        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-          {/* Verdict */}
-          <div className="flex-shrink-0 text-center md:text-left md:min-w-[140px]">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-white/50">Project status</div>
-            <div className="text-2xl md:text-3xl font-bold text-white mt-0.5">{hs.label}</div>
-          </div>
-
-          {/* Divider */}
-          <div className="hidden md:block w-px self-stretch bg-white/15" />
-          <div className="md:hidden h-px bg-white/15" />
-
-          {/* Metrics */}
-          <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            <div className="text-center">
-              <div className="text-[11px] text-white/50">Progress</div>
-              <div className="text-xl md:text-2xl font-bold text-white tabular-nums">{health.overallProgressPct}%</div>
-              <div className="text-[10px] text-white/40">weighted across stages</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[11px] text-white/50">1st coat paint by</div>
-              <div className="text-base md:text-lg font-bold text-white tabular-nums">{formatDate(health.firstCoatDate)}</div>
-              <div className="text-[10px] text-white/40">projected</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[11px] text-white/50">Delayed</div>
-              <div className="text-xl md:text-2xl font-bold text-white tabular-nums">{health.delayedFlats}</div>
-              <div className="text-[10px] text-white/40">
-                {health.delayedFlats === 1 ? 'flat' : 'flats'} across {health.delayedFloors} {health.delayedFloors === 1 ? 'floor' : 'floors'}
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-[11px] text-white/50">Schedule (SPI)</div>
-              <div className="text-xl md:text-2xl font-bold text-white tabular-nums">{health.projectSpi.toFixed(2)}</div>
-              <div className="text-[10px] text-white/40">
-                {health.projectSpiStatus === 'green' && 'on track'}
-                {health.projectSpiStatus === 'yellow' && 'slightly behind'}
-                {health.projectSpiStatus === 'red' && 'significantly behind'}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ---- SECTION 2: PIPELINE FUNNEL ---- */}
+      {/* ---- SECTION 1: PIPELINE FUNNEL ---- */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
         <div className="flex items-center justify-between mb-4 md:mb-5">
           <div>

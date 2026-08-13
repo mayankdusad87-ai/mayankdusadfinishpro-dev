@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useProject } from '@/lib/project-context';
 import { useAuth } from '@/lib/auth-context';
 import NotificationDropdown from '@/components/shared/NotificationDropdown';
@@ -10,10 +11,13 @@ interface TopBarProps {
 }
 
 export default function TopBar({ onMenuClick }: TopBarProps) {
+  const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
   const { projects, currentProject, setCurrentProjectId } = useProject();
-  const { profile } = useAuth();
+  const { profile, user, signOut } = useAuth();
 
   const displayName = profile?.full_name || 'Admin';
   const initials = displayName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
@@ -22,6 +26,9 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -96,14 +103,55 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
       <div className="flex items-center gap-2 md:gap-3">
         <NotificationDropdown />
 
-        <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
-          <div className="w-8 h-8 rounded-full bg-navy text-white flex items-center justify-center text-xs font-semibold flex-shrink-0">
-            {initials}
-          </div>
-          <div className="hidden sm:block min-w-0">
-            <div className="text-sm font-medium text-gray-800 truncate leading-tight">{displayName}</div>
-            <div className="text-[11px] text-gray-400 leading-tight">Head Office</div>
-          </div>
+        {/* Profile dropdown */}
+        <div className="relative pl-2 border-l border-gray-200" ref={profileRef}>
+          <button
+            onClick={() => setProfileOpen(!profileOpen)}
+            className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-gray-100 transition-colors cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-full bg-navy text-white flex items-center justify-center text-xs font-semibold flex-shrink-0">
+              {initials}
+            </div>
+            <div className="hidden sm:block min-w-0">
+              <div className="text-sm font-medium text-gray-800 truncate leading-tight">{displayName}</div>
+              <div className="text-[11px] text-gray-400 leading-tight">Head Office</div>
+            </div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`w-3.5 h-3.5 text-gray-400 transition-transform hidden sm:block ${profileOpen ? 'rotate-180' : ''}`}>
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+
+          {profileOpen && (
+            <div className="absolute right-0 top-full mt-1.5 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-2 overflow-hidden">
+              {/* User info */}
+              <div className="px-4 py-2.5 border-b border-gray-100">
+                <div className="text-sm font-semibold text-gray-800 truncate">{displayName}</div>
+                <div className="text-xs text-gray-400 truncate mt-0.5">{user?.email || ''}</div>
+                <div className="text-[10px] uppercase tracking-wider text-primary font-medium mt-1">
+                  {profile?.role || 'admin'}
+                </div>
+              </div>
+
+              {/* Sign Out */}
+              <div className="px-2 pt-1.5 pb-0.5">
+                <button
+                  onClick={async () => {
+                    setProfileOpen(false);
+                    await signOut();
+                    router.replace('/login');
+                  }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
