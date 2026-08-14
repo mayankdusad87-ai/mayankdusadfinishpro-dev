@@ -61,8 +61,8 @@ export function passwordResetEmailHtml(fullName: string, newPassword: string): s
 
 export function reversalAlertEmailHtml(
   projectName: string,
-  floor: number,
-  flatNumber: number,
+  floor: string | number,
+  flatNumber: string | number,
   activity: string,
   stage: string,
   stageGate: string | null,
