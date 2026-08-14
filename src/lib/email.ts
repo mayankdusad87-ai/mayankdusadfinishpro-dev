@@ -1,0 +1,97 @@
+const RESEND_API_URL = 'https://api.resend.com/emails';
+const FROM_ADDRESS = 'Finishing Pro <noreply@raghavgroup.in>';
+
+interface SendEmailOptions {
+  to: string | string[];
+  subject: string;
+  html: string;
+}
+
+export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn('[email] RESEND_API_KEY not configured, skipping email');
+    return false;
+  }
+
+  try {
+    const res = await fetch(RESEND_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        from: FROM_ADDRESS,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error('[email] Send failed:', body);
+    }
+    return res.ok;
+  } catch (err) {
+    console.error('[email] Send error:', err);
+    return false;
+  }
+}
+
+export function passwordResetEmailHtml(fullName: string, newPassword: string): string {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">
+      <div style="background: #162032; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+        <h2 style="margin: 0; font-size: 18px; color: #C8922A;">Finishing Pro</h2>
+      </div>
+      <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
+        <p style="margin: 0 0 16px; color: #374151;">Hi <strong>${fullName}</strong>,</p>
+        <p style="margin: 0 0 16px; color: #374151;">Your password has been reset by the administrator. Here are your new login details:</p>
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 0 0 16px;">
+          <p style="margin: 0 0 8px; font-size: 14px; color: #6b7280;">New Password</p>
+          <p style="margin: 0; font-size: 18px; font-weight: 700; color: #111827; letter-spacing: 1px; font-family: monospace;">${newPassword}</p>
+        </div>
+        <p style="margin: 0 0 8px; color: #374151; font-size: 14px;">Please log in and change your password at your earliest convenience.</p>
+        <p style="margin: 16px 0 0; font-size: 12px; color: #9ca3af;">This is an automated notification from Finishing Pro.</p>
+      </div>
+    </div>
+  `;
+}
+
+export function reversalAlertEmailHtml(
+  projectName: string,
+  floor: number,
+  flatNumber: number,
+  activity: string,
+  stage: string,
+  stageGate: string | null,
+  oldLabel: string,
+  newLabel: string,
+): string {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">
+      <div style="background: #C8922A; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+        <h2 style="margin: 0; font-size: 18px;">Status Reversal Alert</h2>
+      </div>
+      <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
+        <p style="margin: 0 0 16px; color: #374151;">An activity status has been reversed in <strong>${projectName}</strong>:</p>
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+          <tr><td style="padding: 6px 0; color: #6b7280;">Floor</td><td style="padding: 6px 0; font-weight: 600;">${floor}</td></tr>
+          <tr><td style="padding: 6px 0; color: #6b7280;">Flat</td><td style="padding: 6px 0; font-weight: 600;">${flatNumber}</td></tr>
+          <tr><td style="padding: 6px 0; color: #6b7280;">Stage</td><td style="padding: 6px 0;">${stage}${stageGate ? ` / ${stageGate}` : ''}</td></tr>
+          <tr><td style="padding: 6px 0; color: #6b7280;">Activity</td><td style="padding: 6px 0;">${activity}</td></tr>
+          <tr>
+            <td style="padding: 6px 0; color: #6b7280;">Status Change</td>
+            <td style="padding: 6px 0;">
+              <span style="background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 4px; font-weight: 600;">${oldLabel}</span>
+              <span style="margin: 0 6px; color: #9ca3af;">&rarr;</span>
+              <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: 600;">${newLabel}</span>
+            </td>
+          </tr>
+        </table>
+        <p style="margin: 16px 0 0; font-size: 12px; color: #9ca3af;">This is an automated notification from Finishing Pro.</p>
+      </div>
+    </div>
+  `;
+}

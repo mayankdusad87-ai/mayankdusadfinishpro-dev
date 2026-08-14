@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyAdmin } from '@/lib/auth-guard';
 import { resetPasswordSchema } from '@/lib/validations';
+import { sendEmail, passwordResetEmailHtml } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   const auth = await verifyAdmin(req);
@@ -25,5 +26,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({ success: true });
+  // Send email to the user with their new password
+  let emailSent = false;
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', userId)
+      .single();
+
+    if (profile?.email) {
+      emailSent = await sendEmail({
+        to: profile.email,
+        subject: '[Finishing Pro] Your password has been reset',
+        html: passwordResetEmailHtml(profile.full_name || 'User', newPassword),
+      });
+    }
+  } catch {
+    // best-effort — password was already reset successfully
+  }
+
+  return NextResponse.json({ success: true, emailSent });
 }
