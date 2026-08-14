@@ -70,9 +70,10 @@ export function computeStatusUpdate(input: StatusChangeInput): StatusChangeResul
   const updates: ActivityUpdate = { status: resolved };
 
   if (input.userStatus === 'not_started') {
-    // Reversal — clear actual dates
+    // Reversal — clear actual dates and delay reason
     updates.actual_start = null;
     updates.actual_end = null;
+    updates.delay_reason = null;
   } else if (input.userStatus === 'completed') {
     if (!input.actualEnd) updates.actual_end = today;
     if (!input.actualStart) updates.actual_start = today;
@@ -105,7 +106,7 @@ export function computeSupervisorUpdate(input: {
   let actualEnd = input.actualEnd;
 
   if (input.status === 'not_started') {
-    // Reversal — clear actual dates
+    // Reversal — clear actual dates and delay reason
     actualStart = '';
     actualEnd = '';
   } else if (input.status === 'completed') {
@@ -119,8 +120,8 @@ export function computeSupervisorUpdate(input: {
     status: resolved,
     actual_start: actualStart || null,
     actual_end: actualEnd || null,
-    delay_reason: reasonValue,
-    remarks: input.delayReasonIsOther ? input.remarks.trim() : '',
+    delay_reason: input.status === 'not_started' ? null : reasonValue,
+    remarks: input.status === 'not_started' ? '' : (input.delayReasonIsOther ? input.remarks.trim() : ''),
   };
 
   return {

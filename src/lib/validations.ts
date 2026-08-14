@@ -25,7 +25,7 @@ export const resetPasswordSchema = z.object({
 });
 
 export const notifyReversalSchema = z.object({
-  adminEmails: z.array(z.string().email()).min(1, 'At least one admin email required'),
+  adminEmails: z.array(z.string().email()).optional(),
   projectName: z.string().min(1),
   floor: z.union([z.string(), z.number()]),
   flatNumber: z.union([z.string(), z.number()]),

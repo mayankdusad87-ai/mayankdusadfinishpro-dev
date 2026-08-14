@@ -12,7 +12,6 @@ import {
   updateActivityWithAudit,
   bulkUpdateActivities,
   getPhotoCount,
-  getAdminEmails,
 } from '@/repositories/activity-repo';
 import { friendlyError } from '@/repositories/errors';
 import { normalizeToDisplayStatus } from '@/lib/utils';
@@ -31,13 +30,11 @@ async function sendReversalNotification(
   newStatus: string
 ): Promise<void> {
   try {
-    const adminEmails = await getAdminEmails();
-    if (adminEmails.length === 0) return;
-    await fetch('/api/admin/notify-reversal', {
+    // Uses /api/notify-reversal (not /api/admin/) so supervisors can reach it
+    await fetch('/api/notify-reversal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        adminEmails,
         projectName,
         floor: row.floor,
         flatNumber: row.flat_number,

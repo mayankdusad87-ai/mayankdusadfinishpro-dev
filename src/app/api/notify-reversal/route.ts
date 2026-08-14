@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdmin } from '@/lib/auth-guard';
+import { verifyAuth } from '@/lib/auth-guard';
 import { notifyReversalSchema } from '@/lib/validations';
 import { STATUS_LABELS } from '@/lib/constants';
 import { createNotificationForUsers, getAdminUserIds } from '@/lib/notify';
@@ -7,7 +7,8 @@ import { sendEmail, reversalAlertEmailHtml } from '@/lib/email';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(req: NextRequest) {
-  const auth = await verifyAdmin(req);
+  // Any authenticated user (supervisor or admin) can trigger reversal notifications
+  const auth = await verifyAuth(req);
   if (auth.error) return auth.error;
 
   let body: unknown;
@@ -18,20 +19,17 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
-  const { adminEmails, projectName, floor, flatNumber, activity, stage, stageGate, oldStatus, newStatus } = parsed.data;
+  const { projectName, floor, flatNumber, activity, stage, stageGate, oldStatus, newStatus } = parsed.data;
 
-  // Use provided adminEmails or fetch server-side
-  let emails = adminEmails;
-  if (!emails || emails.length === 0) {
-    const { data: admins } = await supabaseAdmin
-      .from('profiles')
-      .select('email')
-      .eq('role', 'admin');
-    emails = (admins || []).map(r => r.email).filter((e): e is string => Boolean(e));
-  }
+  // Fetch admin emails server-side (bypasses RLS)
+  const { data: admins } = await supabaseAdmin
+    .from('profiles')
+    .select('email')
+    .eq('role', 'admin');
+  const adminEmails = (admins || []).map(r => r.email).filter((e): e is string => Boolean(e));
 
-  if (emails.length === 0) {
-    return NextResponse.json({ success: true, emailSent: false });
+  if (adminEmails.length === 0) {
+    return NextResponse.json({ success: true, emailSent: false, reason: 'No admin emails found' });
   }
 
   const oldLabel = STATUS_LABELS[oldStatus] || oldStatus;
@@ -39,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   // Send email notification via Resend
   const emailSent = await sendEmail({
-    to: emails,
+    to: adminEmails,
     subject: `[Finishing Pro] Status Reversal: ${activity} — Floor ${floor}, Flat ${flatNumber}`,
     html: reversalAlertEmailHtml(projectName, floor, flatNumber, activity, stage, stageGate, oldLabel, newLabel),
   });

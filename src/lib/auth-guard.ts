@@ -2,10 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from './supabase-admin';
 
-export async function verifyAdmin(req: NextRequest): Promise<
-  { userId: string; error?: never } | { userId?: never; error: NextResponse }
-> {
-  const supabase = createServerClient(
+function createRequestClient(req: NextRequest) {
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -15,6 +13,13 @@ export async function verifyAdmin(req: NextRequest): Promise<
       },
     }
   );
+}
+
+/** Verify caller is an admin. Returns userId on success, NextResponse error on failure. */
+export async function verifyAdmin(req: NextRequest): Promise<
+  { userId: string; error?: never } | { userId?: never; error: NextResponse }
+> {
+  const supabase = createRequestClient(req);
 
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) {
@@ -29,6 +34,20 @@ export async function verifyAdmin(req: NextRequest): Promise<
 
   if (profile?.role !== 'admin') {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  }
+
+  return { userId: user.id };
+}
+
+/** Verify caller is any authenticated user. Returns userId on success, NextResponse error on failure. */
+export async function verifyAuth(req: NextRequest): Promise<
+  { userId: string; error?: never } | { userId?: never; error: NextResponse }
+> {
+  const supabase = createRequestClient(req);
+
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 
   return { userId: user.id };
