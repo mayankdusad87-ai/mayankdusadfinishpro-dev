@@ -1,27 +1,38 @@
 'use client';
 
 import { memo, useState, useMemo } from 'react';
-import type { OperationsData, ActionItem } from '@/lib/insights-data';
+import type { OperationsData, ActionItem, InProgressDetail } from '@/lib/insights-data';
 import type { SupervisorPulse, RecentReversal, SiteActivityEntry } from '@/repositories/audit-repo';
 import { STATUS_RANK } from '@/lib/constants';
 
-// ---- Types for grouped site activity ----
+// ---- Types ----
 
 interface FloorActivityGroup {
   floor: number;
   activities: {
     activityName: string;
     stage: string;
-    started: number[];   // flat numbers
-    completed: number[]; // flat numbers
-    reversed: number[];  // flat numbers
+    started: number[];
+    completed: number[];
+    reversed: number[];
   }[];
   startedCount: number;
   completedCount: number;
   reversedCount: number;
 }
 
+interface InProgressFloorGroup {
+  floor: number;
+  activities: {
+    activityName: string;
+    stage: string;
+    units: number[];
+  }[];
+  totalUnits: number;
+}
+
 type TimeRange = 'today' | 'week' | 'month';
+type ExpandedTile = 'started' | 'completed' | 'inProgress' | null;
 
 // ---- Helpers ----
 
@@ -44,7 +55,7 @@ function firstOfMonth(): string {
 function isStartTransition(oldStatus: string, newStatus: string): boolean {
   const oldRank = STATUS_RANK[oldStatus] ?? 0;
   const newRank = STATUS_RANK[newStatus] ?? 0;
-  return oldRank === 0 && newRank >= 1; // not_started/delayed → in_progress+
+  return oldRank === 0 && newRank >= 1;
 }
 
 function isCompleteTransition(_oldStatus: string, newStatus: string): boolean {
@@ -63,7 +74,6 @@ function filterByRange(entries: SiteActivityEntry[], range: TimeRange): SiteActi
   if (range === 'today') since = todayDate();
   else if (range === 'week') since = mondayOfWeek();
   else since = firstOfMonth();
-
   return entries.filter(e => e.createdAt.slice(0, 10) >= since);
 }
 
@@ -116,6 +126,83 @@ function groupByFloor(entries: SiteActivityEntry[]): FloorActivityGroup[] {
   }
 
   return groups.sort((a, b) => a.floor - b.floor);
+}
+
+/** Group in-progress details (from current status, not audit) into floor groups */
+function groupInProgressByFloor(details: InProgressDetail[]): InProgressFloorGroup[] {
+  const floorMap = new Map<number, Map<string, { activityName: string; stage: string; units: Set<number> }>>();
+
+  for (const d of details) {
+    if (!floorMap.has(d.floor)) floorMap.set(d.floor, new Map());
+    const actMap = floorMap.get(d.floor)!;
+    const key = `${d.stage}|${d.activityName}`;
+    if (!actMap.has(key)) {
+      actMap.set(key, { activityName: d.activityName, stage: d.stage, units: new Set() });
+    }
+    actMap.get(key)!.units.add(d.flatNumber);
+  }
+
+  const groups: InProgressFloorGroup[] = [];
+  for (const [floor, actMap] of floorMap) {
+    const activities = [...actMap.values()].map(a => ({
+      activityName: a.activityName,
+      stage: a.stage,
+      units: [...a.units].sort((x, y) => x - y),
+    }));
+    groups.push({
+      floor,
+      activities,
+      totalUnits: activities.reduce((s, a) => s + a.units.length, 0),
+    });
+  }
+
+  return groups.sort((a, b) => a.floor - b.floor);
+}
+
+/** Build subtitle like "Plumbing (F5), Tiling (F7)" from entries */
+function buildActivitySubtitle(
+  entries: SiteActivityEntry[],
+  filterFn: (e: SiteActivityEntry) => boolean,
+  maxItems = 3,
+): string {
+  const filtered = entries.filter(filterFn);
+  if (filtered.length === 0) return 'No activity';
+
+  // Group by activity name → set of floors
+  const actFloors = new Map<string, Set<number>>();
+  for (const e of filtered) {
+    if (!actFloors.has(e.activityName)) actFloors.set(e.activityName, new Set());
+    actFloors.get(e.activityName)!.add(e.floor);
+  }
+
+  const items = [...actFloors.entries()].map(([name, floors]) => {
+    const fStr = [...floors].sort((a, b) => a - b).map(f => `F${f}`).join(', ');
+    return `${name} (${fStr})`;
+  });
+
+  if (items.length <= maxItems) return items.join(', ');
+  return items.slice(0, maxItems).join(', ') + ` +${items.length - maxItems} more`;
+}
+
+function buildInProgressSubtitle(details: InProgressDetail[]): string {
+  if (details.length === 0) return 'No activities in progress';
+  const uniqueFloors = new Set(details.map(d => d.floor));
+  const uniqueActivities = new Set(details.map(d => d.activityName));
+
+  if (uniqueActivities.size <= 3) {
+    // List activity names with floors
+    const actFloors = new Map<string, Set<number>>();
+    for (const d of details) {
+      if (!actFloors.has(d.activityName)) actFloors.set(d.activityName, new Set());
+      actFloors.get(d.activityName)!.add(d.floor);
+    }
+    return [...actFloors.entries()].map(([name, floors]) => {
+      const fStr = [...floors].sort((a, b) => a - b).slice(0, 4).map(f => `F${f}`).join(', ');
+      return `${name} (${fStr}${floors.size > 4 ? '…' : ''})`;
+    }).join(', ');
+  }
+
+  return `${uniqueActivities.size} activities across ${uniqueFloors.size} floors`;
 }
 
 function formatStatus(status: string): string {
@@ -191,25 +278,66 @@ function initials(name: string): string {
   return name.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 }
 
-// ---- KPI Tile ----
+// ---- KPI Tile (clickable, with subtitle + accordion) ----
 
-function KpiTile({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
+interface KpiTileProps {
+  label: string;
+  value: number;
+  subtitle: string;
+  icon: React.ReactNode;
+  gradient: string;
+  iconBg: string;
+  borderAccent: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+  children?: React.ReactNode;
+}
+
+function KpiTile({ label, value, subtitle, icon, gradient, iconBg, borderAccent, isExpanded, onToggle, children }: KpiTileProps) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
-          {icon}
+    <div className="col-span-1">
+      <button
+        onClick={onToggle}
+        className={`w-full text-left rounded-xl border-2 transition-all duration-200 cursor-pointer ${
+          isExpanded ? `${borderAccent} shadow-md` : 'border-gray-100 hover:border-gray-200 hover:shadow-sm'
+        }`}
+      >
+        <div className={`p-4 md:p-5 rounded-t-[10px] ${isExpanded ? '' : 'rounded-b-[10px]'} ${gradient}`}>
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="text-3xl md:text-4xl font-extrabold text-gray-900 tabular-nums leading-none">{value}</div>
+              <div className="text-xs font-semibold text-gray-600 mt-1.5 uppercase tracking-wider">{label}</div>
+              <p className="text-[11px] text-gray-500 mt-1 truncate leading-relaxed" title={subtitle}>{subtitle}</p>
+            </div>
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ml-3 ${iconBg}`}>
+              {icon}
+            </div>
+          </div>
+          {/* Expand indicator */}
+          {value > 0 && (
+            <div className="flex items-center gap-1 mt-2.5 pt-2 border-t border-black/5">
+              <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+                {isExpanded ? 'Collapse' : 'View detail'}
+              </span>
+              <svg className={`w-3 h-3 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+              </svg>
+            </div>
+          )}
         </div>
-        <div>
-          <div className="text-2xl font-bold text-gray-900 tabular-nums">{value}</div>
-          <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+      </button>
+
+      {/* Accordion content */}
+      {isExpanded && children && (
+        <div className={`border-2 border-t-0 rounded-b-xl ${borderAccent} bg-white overflow-hidden`}>
+          {children}
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
-// ---- Floor Accordion ----
+// ---- Floor Accordion (for Site Activity section) ----
 
 function FloorAccordion({ group }: { group: FloorActivityGroup }) {
   const [open, setOpen] = useState(false);
@@ -221,8 +349,8 @@ function FloorAccordion({ group }: { group: FloorActivityGroup }) {
         className="w-full flex items-center justify-between p-3.5 md:p-4 hover:bg-gray-50/50 transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center">
-            <span className="text-sm font-bold text-gray-700">F{group.floor}</span>
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#162032] to-[#1e2d45] flex items-center justify-center">
+            <span className="text-sm font-bold text-white">F{group.floor}</span>
           </div>
           <div className="text-left">
             <div className="text-sm font-semibold text-gray-900">Floor {group.floor}</div>
@@ -233,7 +361,6 @@ function FloorAccordion({ group }: { group: FloorActivityGroup }) {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Summary badges */}
           <div className="hidden md:flex items-center gap-2">
             {group.startedCount > 0 && (
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
@@ -254,14 +381,11 @@ function FloorAccordion({ group }: { group: FloorActivityGroup }) {
               </span>
             )}
           </div>
-
-          {/* Mobile: compact counts */}
           <div className="flex md:hidden items-center gap-1.5 text-[11px] font-semibold tabular-nums">
             {group.startedCount > 0 && <span className="text-blue-600">{group.startedCount}↗</span>}
             {group.completedCount > 0 && <span className="text-emerald-600">{group.completedCount}✓</span>}
             {group.reversedCount > 0 && <span className="text-red-600">{group.reversedCount}↩</span>}
           </div>
-
           <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
           </svg>
@@ -277,16 +401,13 @@ function FloorAccordion({ group }: { group: FloorActivityGroup }) {
                 <span className="text-gray-300">·</span>
                 <span className="text-sm font-semibold text-gray-800">{act.activityName}</span>
               </div>
-
               <div className="space-y-1.5 pl-0 md:pl-2">
                 {act.started.length > 0 && (
                   <div className="flex items-start gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />
                     <div>
                       <span className="text-xs font-semibold text-blue-700">Started: </span>
-                      <span className="text-xs text-gray-700">
-                        {act.started.map(f => `Flat ${f}`).join(', ')}
-                      </span>
+                      <span className="text-xs text-gray-700">{act.started.map(f => `Flat ${f}`).join(', ')}</span>
                     </div>
                   </div>
                 )}
@@ -295,9 +416,7 @@ function FloorAccordion({ group }: { group: FloorActivityGroup }) {
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
                     <div>
                       <span className="text-xs font-semibold text-emerald-700">Completed: </span>
-                      <span className="text-xs text-gray-700">
-                        {act.completed.map(f => `Flat ${f}`).join(', ')}
-                      </span>
+                      <span className="text-xs text-gray-700">{act.completed.map(f => `Flat ${f}`).join(', ')}</span>
                     </div>
                   </div>
                 )}
@@ -306,9 +425,7 @@ function FloorAccordion({ group }: { group: FloorActivityGroup }) {
                     <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
                     <div>
                       <span className="text-xs font-semibold text-red-700">Reversed: </span>
-                      <span className="text-xs text-gray-700">
-                        {act.reversed.map(f => `Flat ${f}`).join(', ')}
-                      </span>
+                      <span className="text-xs text-gray-700">{act.reversed.map(f => `Flat ${f}`).join(', ')}</span>
                     </div>
                   </div>
                 )}
@@ -317,6 +434,131 @@ function FloorAccordion({ group }: { group: FloorActivityGroup }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---- Drill-down content for KPI tiles ----
+
+/** Floor drill-down for Started / Completed tiles (from audit_log) */
+function AuditDrillDown({ floors, type }: { floors: FloorActivityGroup[]; type: 'started' | 'completed' }) {
+  if (floors.length === 0) {
+    return (
+      <div className="text-center py-6">
+        <p className="text-xs text-gray-400">No {type === 'started' ? 'starts' : 'completions'} recorded</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-gray-50 max-h-[340px] overflow-y-auto">
+      {floors.map(group => {
+        const relevantActivities = group.activities
+          .map(a => ({
+            ...a,
+            units: type === 'started' ? a.started : a.completed,
+          }))
+          .filter(a => a.units.length > 0);
+
+        if (relevantActivities.length === 0) return null;
+
+        return (
+          <div key={group.floor} className="px-4 py-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gradient-to-br from-[#162032] to-[#1e2d45] text-[10px] font-bold text-white">
+                F{group.floor}
+              </span>
+              <span className="text-sm font-bold text-gray-800">Floor {group.floor}</span>
+              <span className="text-[10px] text-gray-400 ml-auto tabular-nums">
+                {relevantActivities.reduce((s, a) => s + a.units.length, 0)} unit{relevantActivities.reduce((s, a) => s + a.units.length, 0) !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="space-y-1.5 pl-9">
+              {relevantActivities.map((act, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${type === 'started' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                  <div className="min-w-0">
+                    <span className="text-xs font-semibold text-gray-700">{act.activityName}</span>
+                    <span className="text-[10px] text-gray-400 ml-1">({act.stage})</span>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {act.units.map(u => (
+                        <span key={u} className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums ${
+                          type === 'started'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'bg-emerald-50 text-emerald-700'
+                        }`}>
+                          {u}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Floor drill-down for In Progress tile (from current activity status) */
+function InProgressDrillDown({ groups }: { groups: InProgressFloorGroup[] }) {
+  const [expandedFloor, setExpandedFloor] = useState<number | null>(null);
+
+  if (groups.length === 0) {
+    return (
+      <div className="text-center py-6">
+        <p className="text-xs text-gray-400">No activities in progress</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-gray-50 max-h-[340px] overflow-y-auto">
+      {groups.map(group => (
+        <div key={group.floor}>
+          <button
+            onClick={() => setExpandedFloor(expandedFloor === group.floor ? null : group.floor)}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50/60 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gradient-to-br from-[#162032] to-[#1e2d45] text-[10px] font-bold text-white">
+                F{group.floor}
+              </span>
+              <span className="text-sm font-bold text-gray-800">Floor {group.floor}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-amber-600 tabular-nums">
+                {group.totalUnits} unit{group.totalUnits !== 1 ? 's' : ''} · {group.activities.length} activit{group.activities.length === 1 ? 'y' : 'ies'}
+              </span>
+              <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expandedFloor === group.floor ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+              </svg>
+            </div>
+          </button>
+          {expandedFloor === group.floor && (
+            <div className="px-4 pb-3 space-y-1.5 pl-13">
+              {group.activities.map((act, i) => (
+                <div key={i} className="flex items-start gap-2 pl-9">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-xs font-semibold text-gray-700">{act.activityName}</span>
+                    <span className="text-[10px] text-gray-400 ml-1">({act.stage})</span>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {act.units.map(u => (
+                        <span key={u} className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums bg-amber-50 text-amber-700">
+                          {u}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -335,9 +577,12 @@ function OperationsView({ data, supervisors, reversals, siteActivity }: Props) {
   const maxReasonCount = delayReasons.length > 0 ? delayReasons[0].count : 1;
 
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
-  const rangeLabel = timeRange === 'today' ? 'Today' : timeRange === 'week' ? 'This Week' : 'This Month';
+  const [expandedTile, setExpandedTile] = useState<ExpandedTile>(null);
 
-  // Filter + group entries by selected time range
+  // Filter site activity to today for KPI subtitles
+  const todayEntries = useMemo(() => filterByRange(siteActivity, 'today'), [siteActivity]);
+
+  // Filter + group entries by selected time range for Site Activity section
   const { floors, startedTotal, completedTotal } = useMemo(() => {
     const filtered = filterByRange(siteActivity, timeRange);
     const grouped = groupByFloor(filtered);
@@ -348,43 +593,92 @@ function OperationsView({ data, supervisors, reversals, siteActivity }: Props) {
     };
   }, [siteActivity, timeRange]);
 
+  // Grouped floors for Started Today drill-down (audit-based, today only)
+  const startedTodayFloors = useMemo(() => {
+    const todayFiltered = filterByRange(siteActivity, 'today');
+    return groupByFloor(todayFiltered.filter(e => isStartTransition(e.oldStatus, e.newStatus)));
+  }, [siteActivity]);
+
+  // Grouped floors for Completed Today drill-down
+  const completedTodayFloors = useMemo(() => {
+    const todayFiltered = filterByRange(siteActivity, 'today');
+    return groupByFloor(todayFiltered.filter(e => isCompleteTransition(e.oldStatus, e.newStatus)));
+  }, [siteActivity]);
+
+  // In progress floor groups
+  const inProgressGroups = useMemo(() => groupInProgressByFloor(kpi.inProgressDetails), [kpi.inProgressDetails]);
+
+  // KPI counts for today
+  const startedTodayCount = useMemo(() => {
+    return todayEntries.filter(e => isStartTransition(e.oldStatus, e.newStatus)).length;
+  }, [todayEntries]);
+  const completedTodayCount = useMemo(() => {
+    return todayEntries.filter(e => isCompleteTransition(e.oldStatus, e.newStatus)).length;
+  }, [todayEntries]);
+
+  // Subtitles
+  const startedSubtitle = buildActivitySubtitle(todayEntries, e => isStartTransition(e.oldStatus, e.newStatus));
+  const completedSubtitle = buildActivitySubtitle(todayEntries, e => isCompleteTransition(e.oldStatus, e.newStatus));
+  const inProgressSubtitle = buildInProgressSubtitle(kpi.inProgressDetails);
+
+  function toggleTile(tile: ExpandedTile) {
+    setExpandedTile(prev => prev === tile ? null : tile);
+  }
+
   return (
     <div className="space-y-6">
 
-      {/* ---- KPI TILES ---- */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+      {/* ---- KPI TILES (3 tiles, clickable with accordion) ---- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KpiTile
-          label={`Started ${rangeLabel}`}
-          value={startedTotal}
-          color="bg-blue-50"
-          icon={<svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>}
-        />
+          label="Started Today"
+          value={startedTodayCount}
+          subtitle={startedSubtitle}
+          gradient="bg-gradient-to-br from-blue-50 via-white to-indigo-50/50"
+          iconBg="bg-gradient-to-br from-blue-500 to-indigo-600"
+          borderAccent="border-blue-400"
+          icon={<svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>}
+          isExpanded={expandedTile === 'started'}
+          onToggle={() => toggleTile('started')}
+        >
+          <AuditDrillDown floors={startedTodayFloors} type="started" />
+        </KpiTile>
+
         <KpiTile
-          label={`Completed ${rangeLabel}`}
-          value={completedTotal}
-          color="bg-emerald-50"
-          icon={<svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>}
-        />
+          label="Completed Today"
+          value={completedTodayCount}
+          subtitle={completedSubtitle}
+          gradient="bg-gradient-to-br from-emerald-50 via-white to-teal-50/50"
+          iconBg="bg-gradient-to-br from-emerald-500 to-teal-600"
+          borderAccent="border-emerald-400"
+          icon={<svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>}
+          isExpanded={expandedTile === 'completed'}
+          onToggle={() => toggleTile('completed')}
+        >
+          <AuditDrillDown floors={completedTodayFloors} type="completed" />
+        </KpiTile>
+
         <KpiTile
           label="In Progress"
           value={kpi.inProgress}
-          color="bg-amber-50"
-          icon={<svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>}
-        />
-        <KpiTile
-          label="Overdue"
-          value={kpi.overdue}
-          color="bg-red-50"
-          icon={<svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>}
-        />
+          subtitle={inProgressSubtitle}
+          gradient="bg-gradient-to-br from-amber-50 via-white to-orange-50/50"
+          iconBg="bg-gradient-to-br from-amber-500 to-orange-600"
+          borderAccent="border-amber-400"
+          icon={<svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>}
+          isExpanded={expandedTile === 'inProgress'}
+          onToggle={() => toggleTile('inProgress')}
+        >
+          <InProgressDrillDown groups={inProgressGroups} />
+        </KpiTile>
       </div>
 
       {/* ---- SITE ACTIVITY (tabbed) ---- */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4 md:mb-5">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <svg className="w-4 h-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#162032] to-[#1e2d45] flex items-center justify-center">
+              <svg className="w-4.5 h-4.5 text-[#C8922A]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" />
               </svg>
             </div>
@@ -394,7 +688,6 @@ function OperationsView({ data, supervisors, reversals, siteActivity }: Props) {
             </div>
           </div>
 
-          {/* Time range tabs */}
           <div className="flex bg-gray-100 rounded-lg p-0.5 self-start">
             {(['today', 'week', 'month'] as TimeRange[]).map(range => (
               <button
@@ -434,8 +727,8 @@ function OperationsView({ data, supervisors, reversals, siteActivity }: Props) {
       <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
         <div className="mb-4 md:mb-5">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
-              <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
               </svg>
             </div>
@@ -480,8 +773,8 @@ function OperationsView({ data, supervisors, reversals, siteActivity }: Props) {
       <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
         <div className="mb-4 md:mb-5">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
-              <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
               </svg>
             </div>
@@ -608,30 +901,22 @@ function OperationsView({ data, supervisors, reversals, siteActivity }: Props) {
             <div className="space-y-1.5">
               {reversals.slice(0, 5).map((r, i) => (
                 <div key={i} className="rounded-md bg-red-50/40 text-xs">
-                  {/* Desktop row */}
                   <div className="hidden md:flex items-center gap-3 py-2 px-3">
-                    <span className="font-semibold text-gray-900 tabular-nums shrink-0 w-16">
-                      F{r.floor}-{r.flatNumber}
-                    </span>
+                    <span className="font-semibold text-gray-900 tabular-nums shrink-0 w-16">F{r.floor}-{r.flatNumber}</span>
                     <span className="text-gray-600 truncate flex-1">{r.stage}</span>
                     <span className="shrink-0 flex items-center gap-1">
                       <span className="text-red-600 font-semibold">{formatStatus(r.oldStatus)}</span>
-                      <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                      </svg>
+                      <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
                       <span className="text-amber-600 font-semibold">{formatStatus(r.newStatus)}</span>
                     </span>
                     <span className="text-gray-400 tabular-nums shrink-0">{r.changedByName}</span>
                   </div>
-                  {/* Mobile stacked */}
                   <div className="md:hidden py-2.5 px-3 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-gray-900 tabular-nums">F{r.floor}-{r.flatNumber}</span>
                       <span className="flex items-center gap-1">
                         <span className="text-red-600 font-semibold">{formatStatus(r.oldStatus)}</span>
-                        <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                        </svg>
+                        <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
                         <span className="text-amber-600 font-semibold">{formatStatus(r.newStatus)}</span>
                       </span>
                     </div>
@@ -655,8 +940,17 @@ function OperationsView({ data, supervisors, reversals, siteActivity }: Props) {
       {/* ---- DELAY ROOT CAUSE ---- */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
         <div className="mb-4 md:mb-5">
-          <h3 className="text-base md:text-lg font-bold text-gray-900">Delay Root Cause</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Most common reasons for activity delays</p>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C8922A] to-[#a07520] flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base md:text-lg font-bold text-gray-900">Delay Root Cause</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Most common reasons for activity delays</p>
+            </div>
+          </div>
         </div>
 
         {delayReasons.length === 0 ? (

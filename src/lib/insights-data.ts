@@ -181,9 +181,17 @@ export interface ActionItem {
   type: 'floor' | 'vendor' | 'stalled' | 'reversal';
 }
 
+export interface InProgressDetail {
+  floor: number;
+  flatNumber: number;
+  stage: string;
+  activityName: string;
+}
+
 export interface OperationsKpi {
   inProgress: number;
   overdue: number;
+  inProgressDetails: InProgressDetail[];
 }
 
 export interface OperationsData {
@@ -725,6 +733,7 @@ export function computeOperations(rows: InsightRow[]): OperationsData {
   // --- KPI counters ---
   let kpiInProgress = 0;
   let kpiOverdue = 0;
+  const inProgressDetails: InProgressDetail[] = [];
 
   // --- Floor overdue tracking ---
   const floorOverdueMap = new Map<number, {
@@ -737,6 +746,7 @@ export function computeOperations(rows: InsightRow[]): OperationsData {
     // KPI: in progress
     if (r.status === 'in_progress' || r.status === 'in_progress_delayed') {
       kpiInProgress++;
+      inProgressDetails.push({ floor: r.floor, flatNumber: r.flat_number, stage: r.stage, activityName: r.activity });
     }
     // KPI: overdue (past expected_end, not completed)
     if (!isComplete(r.status) && r.expected_end && r.expected_end < TODAY) {
@@ -890,7 +900,7 @@ export function computeOperations(rows: InsightRow[]): OperationsData {
     });
   }
 
-  return { vendors, delayReasons, bottlenecks, actionItems, kpi: { inProgress: kpiInProgress, overdue: kpiOverdue } };
+  return { vendors, delayReasons, bottlenecks, actionItems, kpi: { inProgress: kpiInProgress, overdue: kpiOverdue, inProgressDetails } };
 }
 
 // ---- Public API ----
