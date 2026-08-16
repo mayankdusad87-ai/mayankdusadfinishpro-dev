@@ -118,29 +118,29 @@ export async function getSupervisorActivity(projectId: string): Promise<Supervis
   const supervisorIds = assignments.map(a => a.supervisor_id).filter(Boolean) as string[];
   if (supervisorIds.length === 0) return [];
 
-  // 2. Get profiles for these supervisors
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, full_name, is_active')
-    .in('id', supervisorIds);
-
-  const profileMap = new Map(
-    (profiles || []).map(p => [p.id, { name: p.full_name, isActive: p.is_active ?? true }])
-  );
-
-  // 3. Get audit_log entries for this project in the last 7 days by these supervisors
+  // 2+3. Fetch profiles and audit_log IN PARALLEL (both need supervisorIds only)
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const sevenDaysAgoISO = sevenDaysAgo.toISOString();
 
-  const { data: auditRows } = await supabase
-    .from('audit_log')
-    .select('changed_by, created_at')
-    .eq('project_id', projectId)
-    .in('changed_by', supervisorIds)
-    .gte('created_at', sevenDaysAgoISO)
-    .neq('stage', 'auth')
-    .order('created_at', { ascending: false });
+  const [{ data: profiles }, { data: auditRows }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, is_active')
+      .in('id', supervisorIds),
+    supabase
+      .from('audit_log')
+      .select('changed_by, created_at')
+      .eq('project_id', projectId)
+      .in('changed_by', supervisorIds)
+      .gte('created_at', sevenDaysAgoISO)
+      .neq('stage', 'auth')
+      .order('created_at', { ascending: false }),
+  ]);
+
+  const profileMap = new Map(
+    (profiles || []).map(p => [p.id, { name: p.full_name, isActive: p.is_active ?? true }])
+  );
 
   // Count updates per supervisor and find last update
   const updateCounts = new Map<string, { count: number; lastAt: string | null }>();

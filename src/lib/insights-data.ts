@@ -905,6 +905,27 @@ export function computeOperations(rows: InsightRow[]): OperationsData {
 
 // ---- Public API ----
 
+/**
+ * Compute insights from pre-fetched activity rows.
+ * Accepts rows directly so the caller can fetch them in parallel with other queries.
+ */
+export function computeInsights(
+  rows: InsightRow[],
+  heatmap: HeatmapData,
+  stageWeights?: Record<string, number>,
+  paintDaysPerFlat?: number,
+): { management: ManagementData; operations: OperationsData } | null {
+  if (rows.length === 0) return null;
+  return {
+    management: computeManagement(rows, heatmap, stageWeights, paintDaysPerFlat),
+    operations: computeOperations(rows),
+  };
+}
+
+/**
+ * @deprecated Use computeInsights() with pre-fetched rows for better parallelism.
+ * Kept for backward compatibility.
+ */
 export async function getInsightsData(
   projectId: string,
   heatmap: HeatmapData,
@@ -912,9 +933,5 @@ export async function getInsightsData(
   paintDaysPerFlat?: number,
 ): Promise<{ management: ManagementData; operations: OperationsData } | null> {
   const rows = await getInsightActivities(projectId);
-  if (rows.length === 0) return null;
-  return {
-    management: computeManagement(rows, heatmap, stageWeights, paintDaysPerFlat),
-    operations: computeOperations(rows),
-  };
+  return computeInsights(rows, heatmap, stageWeights, paintDaysPerFlat);
 }

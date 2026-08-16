@@ -345,7 +345,7 @@ export interface InsightRow {
 export async function getInsightActivities(projectId: string): Promise<InsightRow[]> {
   const all: InsightRow[] = [];
   let from = 0;
-  const PAGE = 1000;
+  const PAGE = 5000;
   while (true) {
     const { data, error } = await supabase
       .from('activities')

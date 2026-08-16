@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useProject } from '@/lib/project-context';
 import { getDashboardData } from '@/lib/supabase-data';
+import { getInsightActivities } from '@/repositories/activity-repo';
 import { computeHeatmapFromRollup } from '@/lib/floor-rollup';
 import type { HeatmapData } from '@/lib/floor-rollup';
-import { getInsightsData } from '@/lib/insights-data';
+import { computeInsights } from '@/lib/insights-data';
 import { getStageWeights, getPaintDaysPerFlat } from '@/repositories/settings-repo';
 import { getSupervisorActivity, getRecentReversals, getSiteActivity } from '@/repositories/audit-repo';
 import type { SupervisorPulse, RecentReversal, SiteActivityEntry } from '@/repositories/audit-repo';
@@ -29,44 +30,47 @@ export default function InsightsPage() {
 
   const loadData = useCallback(async () => {
     if (!currentProject) {
-      setMgmt(null);
-      setOps(null);
-      setHeatmapData(null);
-      setSupervisors([]);
-      setReversals([]);
-      setSiteActivity([]);
+      setMgmt(null); setOps(null); setHeatmapData(null);
+      setSupervisors([]); setReversals([]); setSiteActivity([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const dashData = await getDashboardData(currentProject.id);
-      if (!dashData) {
-        console.warn('[Insights] getDashboardData returned null for', currentProject.name, currentProject.id);
-        setMgmt(null); setOps(null); setHeatmapData(null); setLoading(false); return;
-      }
-      console.log('[Insights]', currentProject.name, '— dashData heatmap rows:', dashData.heatmap.length, 'stages:', dashData.stages);
-      const heatmap = computeHeatmapFromRollup(dashData.heatmap, dashData.stages);
-      setHeatmapData(heatmap);
-      const [dbWeights, dbPaintDays, supActivity, recentReversals, siteAct] = await Promise.all([
+      // Run ALL queries in parallel — flattened waterfall
+      const pid = currentProject.id;
+      const [dashData, activityRows, dbWeights, dbPaintDays, supActivity, recentReversals, siteAct] = await Promise.all([
+        getDashboardData(pid),
+        getInsightActivities(pid),
         getStageWeights(),
         getPaintDaysPerFlat(),
-        getSupervisorActivity(currentProject.id),
-        getRecentReversals(currentProject.id),
-        getSiteActivity(currentProject.id),
+        getSupervisorActivity(pid),
+        getRecentReversals(pid),
+        getSiteActivity(pid),
       ]);
+
       setSupervisors(supActivity);
       setReversals(recentReversals);
       setSiteActivity(siteAct);
 
-      const insights = await getInsightsData(
-        currentProject.id,
+      if (!dashData) {
+        console.warn('[Insights] getDashboardData returned null for', currentProject.name, pid);
+        setMgmt(null); setOps(null); setHeatmapData(null); setLoading(false);
+        return;
+      }
+
+      const heatmap = computeHeatmapFromRollup(dashData.heatmap, dashData.stages);
+      setHeatmapData(heatmap);
+
+      // Compute insights from pre-fetched rows (no additional DB call)
+      const insights = computeInsights(
+        activityRows,
         heatmap,
         dbWeights ?? undefined,
         dbPaintDays ?? undefined,
       );
+
       if (insights) {
-        console.log('[Insights]', currentProject.name, '— management data loaded');
         setMgmt(insights.management);
         // Inject reversal-based action items into operations data
         if (recentReversals.length > 0 && insights.operations) {
@@ -79,18 +83,14 @@ export default function InsightsPage() {
         }
         setOps(insights.operations);
       } else {
-        console.warn('[Insights]', currentProject.name, '— getInsightsData returned null (0 activity rows passed filter)');
+        console.warn('[Insights]', currentProject.name, '— computeInsights returned null (0 activity rows)');
         setMgmt(null);
         setOps(null);
       }
     } catch (err) {
       console.error('[Insights] Failed to load data:', err);
-      setMgmt(null);
-      setOps(null);
-      setHeatmapData(null);
-      setSupervisors([]);
-      setReversals([]);
-      setSiteActivity([]);
+      setMgmt(null); setOps(null); setHeatmapData(null);
+      setSupervisors([]); setReversals([]); setSiteActivity([]);
     }
     setLoading(false);
   }, [currentProject]);
