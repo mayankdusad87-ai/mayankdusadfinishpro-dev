@@ -181,11 +181,17 @@ export interface ActionItem {
   type: 'floor' | 'vendor' | 'stalled' | 'reversal';
 }
 
+export interface OperationsKpi {
+  inProgress: number;
+  overdue: number;
+}
+
 export interface OperationsData {
   vendors: VendorScore[];
   delayReasons: DelayReason[];
   bottlenecks: FloorBottleneck[];
   actionItems: ActionItem[];
+  kpi: OperationsKpi;
 }
 
 // ---- SPI helper ----
@@ -716,6 +722,10 @@ export function computeOperations(rows: InsightRow[]): OperationsData {
   // --- Delay reasons ---
   const reasonMap = new Map<string, number>();
 
+  // --- KPI counters ---
+  let kpiInProgress = 0;
+  let kpiOverdue = 0;
+
   // --- Floor overdue tracking ---
   const floorOverdueMap = new Map<number, {
     total: number;
@@ -724,6 +734,14 @@ export function computeOperations(rows: InsightRow[]): OperationsData {
   }>();
 
   for (const r of rows) {
+    // KPI: in progress
+    if (r.status === 'in_progress' || r.status === 'in_progress_delayed') {
+      kpiInProgress++;
+    }
+    // KPI: overdue (past expected_end, not completed)
+    if (!isComplete(r.status) && r.expected_end && r.expected_end < TODAY) {
+      kpiOverdue++;
+    }
     // Vendor
     if (r.vendor) {
       let v = vendorMap.get(r.vendor);
@@ -872,7 +890,7 @@ export function computeOperations(rows: InsightRow[]): OperationsData {
     });
   }
 
-  return { vendors, delayReasons, bottlenecks, actionItems };
+  return { vendors, delayReasons, bottlenecks, actionItems, kpi: { inProgress: kpiInProgress, overdue: kpiOverdue } };
 }
 
 // ---- Public API ----

@@ -244,3 +244,61 @@ export async function getRecentReversals(projectId: string): Promise<RecentRever
     createdAt: r.created_at || '',
   }));
 }
+
+// ---- Site Activity Feed for Operations Dashboard ----
+
+export interface SiteActivityEntry {
+  floor: number;
+  flatNumber: number;
+  stage: string;
+  activityName: string;
+  oldStatus: string;
+  newStatus: string;
+  changedBy: string;
+  createdAt: string;
+}
+
+/**
+ * Fetch all status-change audit entries for the last 30 days.
+ * Client-side code filters by today/week/month tabs.
+ */
+export async function getSiteActivity(projectId: string): Promise<SiteActivityEntry[]> {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const sinceISO = thirtyDaysAgo.toISOString();
+
+  const { data: rows, error } = await supabase
+    .from('audit_log')
+    .select('floor, flat_number, stage, activity_name, old_status, new_status, changed_by, created_at')
+    .eq('project_id', projectId)
+    .gte('created_at', sinceISO)
+    .neq('stage', 'auth')
+    .not('old_status', 'is', null)
+    .not('new_status', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1000);
+
+  if (error || !rows) return [];
+
+  // Get names
+  const userIds = [...new Set(rows.map(r => r.changed_by).filter(Boolean) as string[])];
+  let nameMap: Record<string, string> = {};
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', userIds);
+    nameMap = Object.fromEntries((profiles || []).map(p => [p.id, p.full_name]));
+  }
+
+  return rows.map(r => ({
+    floor: r.floor ?? 0,
+    flatNumber: r.flat_number ?? 0,
+    stage: r.stage || '',
+    activityName: r.activity_name || '',
+    oldStatus: r.old_status || '',
+    newStatus: r.new_status || '',
+    changedBy: r.changed_by ? (nameMap[r.changed_by] || 'Unknown') : 'System',
+    createdAt: r.created_at || '',
+  }));
+}

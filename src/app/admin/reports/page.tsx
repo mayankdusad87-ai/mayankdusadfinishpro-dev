@@ -7,8 +7,8 @@ import { computeHeatmapFromRollup } from '@/lib/floor-rollup';
 import type { HeatmapData } from '@/lib/floor-rollup';
 import { getInsightsData } from '@/lib/insights-data';
 import { getStageWeights, getPaintDaysPerFlat } from '@/repositories/settings-repo';
-import { getSupervisorActivity, getRecentReversals } from '@/repositories/audit-repo';
-import type { SupervisorPulse, RecentReversal } from '@/repositories/audit-repo';
+import { getSupervisorActivity, getRecentReversals, getSiteActivity } from '@/repositories/audit-repo';
+import type { SupervisorPulse, RecentReversal, SiteActivityEntry } from '@/repositories/audit-repo';
 import type { ManagementData, OperationsData } from '@/lib/insights-data';
 import ManagementView from '@/components/admin/ManagementView';
 import OperationsView from '@/components/admin/OperationsView';
@@ -25,6 +25,7 @@ export default function InsightsPage() {
   const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null);
   const [supervisors, setSupervisors] = useState<SupervisorPulse[]>([]);
   const [reversals, setReversals] = useState<RecentReversal[]>([]);
+  const [siteActivity, setSiteActivity] = useState<SiteActivityEntry[]>([]);
 
   const loadData = useCallback(async () => {
     if (!currentProject) {
@@ -33,6 +34,7 @@ export default function InsightsPage() {
       setHeatmapData(null);
       setSupervisors([]);
       setReversals([]);
+      setSiteActivity([]);
       setLoading(false);
       return;
     }
@@ -46,14 +48,16 @@ export default function InsightsPage() {
       console.log('[Insights]', currentProject.name, '— dashData heatmap rows:', dashData.heatmap.length, 'stages:', dashData.stages);
       const heatmap = computeHeatmapFromRollup(dashData.heatmap, dashData.stages);
       setHeatmapData(heatmap);
-      const [dbWeights, dbPaintDays, supActivity, recentReversals] = await Promise.all([
+      const [dbWeights, dbPaintDays, supActivity, recentReversals, siteAct] = await Promise.all([
         getStageWeights(),
         getPaintDaysPerFlat(),
         getSupervisorActivity(currentProject.id),
         getRecentReversals(currentProject.id),
+        getSiteActivity(currentProject.id),
       ]);
       setSupervisors(supActivity);
       setReversals(recentReversals);
+      setSiteActivity(siteAct);
 
       const insights = await getInsightsData(
         currentProject.id,
@@ -86,6 +90,7 @@ export default function InsightsPage() {
       setHeatmapData(null);
       setSupervisors([]);
       setReversals([]);
+      setSiteActivity([]);
     }
     setLoading(false);
   }, [currentProject]);
@@ -96,6 +101,7 @@ export default function InsightsPage() {
     setHeatmapData(null);
     setSupervisors([]);
     setReversals([]);
+    setSiteActivity([]);
     loadData();
   }, [loadData]);
 
@@ -167,7 +173,7 @@ export default function InsightsPage() {
             <ManagementView data={mgmt} projectName={currentProject.name} heatmap={heatmapData} />
           )}
           {tab === 'operations' && ops && (
-            <OperationsView data={ops} supervisors={supervisors} reversals={reversals} />
+            <OperationsView data={ops} supervisors={supervisors} reversals={reversals} siteActivity={siteActivity} />
           )}
         </>
       )}
