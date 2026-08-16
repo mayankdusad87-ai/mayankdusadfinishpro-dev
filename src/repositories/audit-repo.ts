@@ -267,18 +267,33 @@ export async function getSiteActivity(projectId: string): Promise<SiteActivityEn
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const sinceISO = thirtyDaysAgo.toISOString();
 
-  const { data: rows, error } = await supabase
-    .from('audit_log')
-    .select('floor, flat_number, stage, activity_name, old_status, new_status, changed_by, created_at')
-    .eq('project_id', projectId)
-    .gte('created_at', sinceISO)
-    .neq('stage', 'auth')
-    .not('old_status', 'is', null)
-    .not('new_status', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(1000);
+  // Paginated fetch — 30 days of status changes can exceed Supabase's 1000-row cap
+  const PAGE = 1000;
+  const allRows: typeof rows = [];
+  let from = 0;
+  type AuditRow = { floor: number | null; flat_number: number | null; stage: string | null; activity_name: string | null; old_status: string | null; new_status: string | null; changed_by: string | null; created_at: string | null };
+  let rows: AuditRow[] = [];
 
-  if (error || !rows) return [];
+  while (true) {
+    const { data, error } = await supabase
+      .from('audit_log')
+      .select('floor, flat_number, stage, activity_name, old_status, new_status, changed_by, created_at')
+      .eq('project_id', projectId)
+      .gte('created_at', sinceISO)
+      .neq('stage', 'auth')
+      .not('old_status', 'is', null)
+      .not('new_status', 'is', null)
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE - 1);
+
+    if (error || !data || data.length === 0) break;
+    allRows.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  rows = allRows;
+
+  if (rows.length === 0) return [];
 
   // Get names
   const userIds = [...new Set(rows.map(r => r.changed_by).filter(Boolean) as string[])];
