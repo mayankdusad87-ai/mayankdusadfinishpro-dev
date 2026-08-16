@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import WhatsNewModal from '@/components/WhatsNewModal';
 
 export default function SupervisorLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
@@ -35,6 +36,7 @@ export default function SupervisorLayout({ children }: { children: React.ReactNo
   return (
     <div className="min-h-screen bg-navy-dark">
       {children}
+      {!isLoginPage && user && <WhatsNewModal />}
     </div>
   );
 }

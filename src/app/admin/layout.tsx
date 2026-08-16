@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/admin/Sidebar';
 import TopBar from '@/components/admin/TopBar';
+import WhatsNewModal from '@/components/WhatsNewModal';
 import { ProjectProvider } from '@/lib/project-context';
 import { useAuth } from '@/lib/auth-context';
 
@@ -44,6 +45,7 @@ export default function AdminLayout({
           </main>
         </div>
       </div>
+      <WhatsNewModal />
     </ProjectProvider>
   );
 }
