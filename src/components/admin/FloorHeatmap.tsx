@@ -75,21 +75,21 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
       </div>
 
       {/* Summary Cards */}
-      <div className="flex items-center gap-4 px-1">
-        <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-3 md:gap-4 px-1">
+        <div className="hidden md:flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Floor Readiness</span>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg px-5 py-3 shadow-sm text-center min-w-[100px]">
-          <div className="text-3xl font-bold text-gray-900">{data.floorsFullyReady}</div>
-          <div className="text-xs text-gray-500 mt-0.5">Floors Fully Ready</div>
+        <div className="bg-white border border-gray-200 rounded-lg px-4 md:px-5 py-3 shadow-sm text-center min-w-[90px]">
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsFullyReady}</div>
+          <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">Fully Ready</div>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg px-5 py-3 shadow-sm text-center min-w-[100px]">
-          <div className="text-3xl font-bold text-gray-900">{data.floorsInProgress}</div>
-          <div className="text-xs text-gray-500 mt-0.5">Floors In Progress</div>
+        <div className="bg-white border border-gray-200 rounded-lg px-4 md:px-5 py-3 shadow-sm text-center min-w-[90px]">
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsInProgress}</div>
+          <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">In Progress</div>
         </div>
 
         {/* Legend */}
-        <div className="ml-auto flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs md:ml-auto">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded bg-green-100 border border-green-300" /> Completed
           </span>

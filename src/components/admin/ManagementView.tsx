@@ -2,14 +2,12 @@
 
 import { memo, useState } from 'react';
 import type { ManagementData, StageFloorBreakdown } from '@/lib/insights-data';
-import type { HeatmapData } from '@/lib/floor-rollup';
 import type { UnitStore } from '@/repositories/store-repo';
 import MaterialStores from '@/components/admin/MaterialStores';
 
 interface Props {
   data: ManagementData;
   projectName: string;
-  heatmap: HeatmapData;
   stores?: UnitStore[];
 }
 

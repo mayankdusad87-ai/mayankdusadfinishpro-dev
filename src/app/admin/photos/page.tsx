@@ -6,6 +6,7 @@ import { useProject } from '@/lib/project-context';
 import { getPhotosForProject, ActivityPhoto, getProjectDataFromSupabase } from '@/lib/supabase-data';
 import { useDataLoader } from '@/hooks/use-data-loader';
 import { useCanAccess } from '@/hooks';
+import { useManagementAccess } from '@/lib/management-access-context';
 
 interface ProjectMeta {
   floors: number[];
@@ -16,12 +17,13 @@ interface ProjectMeta {
 const EMPTY_META: ProjectMeta = { floors: [], stages: [], stageGates: {} };
 
 export default function PhotoReviewPage() {
+  const { loading: accessLoading } = useManagementAccess();
   const hasPhotoAccess = useCanAccess('photo-review');
   const router = useRouter();
 
   useEffect(() => {
-    if (!hasPhotoAccess) router.replace('/admin/manage');
-  }, [hasPhotoAccess, router]);
+    if (!accessLoading && !hasPhotoAccess) router.replace('/admin/manage');
+  }, [accessLoading, hasPhotoAccess, router]);
 
   const { currentProject } = useProject();
   const [floorFilter, setFloorFilter] = useState<number | ''>('');

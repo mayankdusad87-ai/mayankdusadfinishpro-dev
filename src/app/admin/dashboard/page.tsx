@@ -12,17 +12,19 @@ import { computeHeatmapFromRollup, HeatmapData } from '@/lib/floor-rollup';
 import { ActivityStatus } from '@/lib/types';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { useCanAccess } from '@/hooks';
+import { useManagementAccess } from '@/lib/management-access-context';
 import { useRouter } from 'next/navigation';
 
 type DashboardView = 'heatmap' | 'table';
 
 export default function DashboardPage() {
+  const { loading: accessLoading } = useManagementAccess();
   const hasDashboardAccess = useCanAccess('dashboard');
   const router = useRouter();
 
   useEffect(() => {
-    if (!hasDashboardAccess) router.replace('/admin/manage');
-  }, [hasDashboardAccess, router]);
+    if (!accessLoading && !hasDashboardAccess) router.replace('/admin/manage');
+  }, [accessLoading, hasDashboardAccess, router]);
 
   const { projects, currentProject } = useProject();
   const [dashData, setDashData] = useState<DashboardData | null>(null);

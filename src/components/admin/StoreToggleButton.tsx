@@ -42,6 +42,12 @@ export default function StoreToggleButton({ projectId, floors, flats, onStoreCha
     setLoading(false);
   }, [projectId]);
 
+  // Load on mount so badge count is visible without opening modal
+  useEffect(() => {
+    loadStores();
+  }, [loadStores]);
+
+  // Reload when modal opens (in case stores changed elsewhere)
   useEffect(() => {
     if (showModal) {
       loadStores();

@@ -75,7 +75,7 @@ function MaterialStores({ stores, onUnmark, showActions = false }: Props) {
             </svg>
           </div>
           <p className="text-sm text-gray-500">No units currently marked as stores</p>
-          <p className="text-xs text-gray-400 mt-1">Mark units from the Dashboard → Activity Table</p>
+          <p className="text-xs text-gray-400 mt-1">Mark units from the Dashboard → Stores button</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

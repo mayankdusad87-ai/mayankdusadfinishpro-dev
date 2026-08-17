@@ -17,17 +17,19 @@ import ManagementView from '@/components/admin/ManagementView';
 import OperationsView from '@/components/admin/OperationsView';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import { useCanAccess } from '@/hooks';
+import { useManagementAccess } from '@/lib/management-access-context';
 import { useRouter } from 'next/navigation';
 
 type Tab = 'management' | 'operations';
 
 export default function InsightsPage() {
+  const { loading: accessLoading } = useManagementAccess();
   const hasInsightsAccess = useCanAccess('insights-view');
   const router = useRouter();
 
   useEffect(() => {
-    if (!hasInsightsAccess) router.replace('/admin/manage');
-  }, [hasInsightsAccess, router]);
+    if (!accessLoading && !hasInsightsAccess) router.replace('/admin/manage');
+  }, [accessLoading, hasInsightsAccess, router]);
 
   const { currentProject } = useProject();
   const [tab, setTab] = useState<Tab>('management');
@@ -184,8 +186,8 @@ export default function InsightsPage() {
         </div>
       ) : (
         <>
-          {tab === 'management' && mgmt && heatmapData && (
-            <ManagementView data={mgmt} projectName={currentProject.name} heatmap={heatmapData} stores={unitStores} />
+          {tab === 'management' && mgmt && (
+            <ManagementView data={mgmt} projectName={currentProject.name} stores={unitStores} />
           )}
           {tab === 'operations' && ops && (
             <OperationsView data={ops} supervisors={supervisors} reversals={reversals} siteActivity={siteActivity} />
