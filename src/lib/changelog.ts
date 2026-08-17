@@ -27,6 +27,31 @@ export interface ChangelogEntry {
 // Newest entry first — the modal always shows CHANGELOG[0]
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.18',
+    headline: "Here's what's new in FinishPro",
+    date: 'August 18, 2026',
+    features: [
+      {
+        emoji: '🎯',
+        title: 'Milestone Tracker',
+        description:
+          'Set target dates for each stage and floor range, and track progress with SPI scores. See at a glance which milestones are on track, at risk, or critical.',
+      },
+      {
+        emoji: '✉️',
+        title: 'Welcome Email',
+        description:
+          'New management users now receive a welcome email with their login credentials automatically when their account is created.',
+      },
+      {
+        emoji: '⚡',
+        title: 'Faster Insights',
+        description:
+          'The Insights page now loads significantly faster — data is cached so returning visits are instant, and Operations data loads only when you need it.',
+      },
+    ],
+  },
+  {
     version: '2026.08.16',
     headline: "Here's what's new in FinishPro",
     date: 'August 16, 2026',
