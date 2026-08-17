@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useDevice } from '@/hooks';
 import { canAccess, type Feature, type Role } from '@/lib/permissions';
+import { useManagementAccess } from '@/lib/management-access-context';
 
 interface NavItem {
   label: string;
@@ -103,9 +104,26 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const { signOut, profile, user } = useAuth();
   const device = useDevice();
   const role = (profile?.role ?? 'supervisor') as Role;
+  const { access: mgmtAccess } = useManagementAccess();
   const [collapsed, setCollapsed] = useState(false);
 
-  const visibleItems = navItems.filter(item => canAccess(role, device, item.feature));
+  // Map sidebar features to management access keys for dynamic override
+  const mgmtFeatureKey: Partial<Record<Feature, 'dashboard' | 'insights' | 'photos'>> = {
+    dashboard: 'dashboard',
+    'insights-view': 'insights',
+    'photo-review': 'photos',
+  };
+
+  const visibleItems = navItems.filter(item => {
+    // Static permission check
+    if (!canAccess(role, device, item.feature)) return false;
+    // Dynamic management access override
+    if (role === 'management') {
+      const accessKey = mgmtFeatureKey[item.feature];
+      if (accessKey && !mgmtAccess[accessKey]) return false;
+    }
+    return true;
+  });
 
   async function handleLogout() {
     await signOut();

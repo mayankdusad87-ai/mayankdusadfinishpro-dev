@@ -33,3 +33,30 @@ export async function getPaintDaysPerFlat(): Promise<number | null> {
 export async function setPaintDaysPerFlat(days: number): Promise<void> {
   return setAppSetting('paint_days_per_flat', days);
 }
+
+// ---- Management Access Control ----
+
+export interface ManagementAccess {
+  dashboard: boolean;
+  insights: boolean;
+  photos: boolean;
+}
+
+const DEFAULT_MANAGEMENT_ACCESS: ManagementAccess = {
+  dashboard: true,
+  insights: true,
+  photos: true,
+};
+
+export async function getManagementAccess(): Promise<ManagementAccess> {
+  const stored = await getAppSetting<ManagementAccess>('management_access');
+  if (!stored) return DEFAULT_MANAGEMENT_ACCESS;
+  // Merge with defaults in case new keys are added later
+  return { ...DEFAULT_MANAGEMENT_ACCESS, ...stored };
+}
+
+export async function setManagementAccess(access: ManagementAccess): Promise<void> {
+  return setAppSetting('management_access', access);
+}
+
+export { DEFAULT_MANAGEMENT_ACCESS };

@@ -11,10 +11,19 @@ import { getDashboardData, DashboardData, getRefugeConfig } from '@/lib/supabase
 import { computeHeatmapFromRollup, HeatmapData } from '@/lib/floor-rollup';
 import { ActivityStatus } from '@/lib/types';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
+import { useCanAccess } from '@/hooks';
+import { useRouter } from 'next/navigation';
 
 type DashboardView = 'heatmap' | 'table';
 
 export default function DashboardPage() {
+  const hasDashboardAccess = useCanAccess('dashboard');
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!hasDashboardAccess) router.replace('/admin/manage');
+  }, [hasDashboardAccess, router]);
+
   const { projects, currentProject } = useProject();
   const [dashData, setDashData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);

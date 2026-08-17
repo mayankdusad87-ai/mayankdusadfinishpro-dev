@@ -5,12 +5,13 @@ import dynamic from 'next/dynamic';
 import { useRoleDevice } from '@/hooks';
 import { canAccess, type Feature } from '@/lib/permissions';
 
-type Tab = 'projects' | 'supervisors' | 'management' | 'activity-log' | 'error-log';
+type Tab = 'projects' | 'supervisors' | 'management' | 'access-control' | 'activity-log' | 'error-log';
 
 const tabFeatureMap: Record<Tab, Feature> = {
   projects: 'manage-projects',
   supervisors: 'manage-supervisors',
   management: 'manage-management',
+  'access-control': 'manage-management', // admin-only
   'activity-log': 'activity-log',
   'error-log': 'error-log',
 };
@@ -55,6 +56,15 @@ const tabs: TabDef[] = [
         <circle cx="9" cy="7" r="4" />
         <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+  },
+  {
+    id: 'access-control',
+    label: 'Access Control',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+        <path d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
       </svg>
     ),
   },
@@ -113,10 +123,16 @@ const ErrorLogPanel = dynamic(
   { loading: () => <TabSkeleton /> },
 );
 
+const AccessControlPanelLazy = dynamic(
+  () => import('@/components/admin/AccessControlPanel'),
+  { loading: () => <TabSkeleton /> },
+);
+
 const panelMap: Record<Tab, React.ComponentType> = {
   projects: ProjectsPanel,
   supervisors: SupervisorsPanel,
   management: ManagementPanel,
+  'access-control': AccessControlPanelLazy,
   'activity-log': AuditLogPanel,
   'error-log': ErrorLogPanel,
 };

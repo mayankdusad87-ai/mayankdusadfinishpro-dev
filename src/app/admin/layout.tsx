@@ -6,6 +6,7 @@ import Sidebar from '@/components/admin/Sidebar';
 import TopBar from '@/components/admin/TopBar';
 import WhatsNewModal from '@/components/WhatsNewModal';
 import { ProjectProvider } from '@/lib/project-context';
+import { ManagementAccessProvider } from '@/lib/management-access-context';
 import { useAuth } from '@/lib/auth-context';
 
 export default function AdminLayout({
@@ -35,6 +36,7 @@ export default function AdminLayout({
   }
 
   return (
+    <ManagementAccessProvider>
     <ProjectProvider>
       <div className="flex h-screen overflow-hidden">
         <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
@@ -47,5 +49,6 @@ export default function AdminLayout({
       </div>
       <WhatsNewModal />
     </ProjectProvider>
+    </ManagementAccessProvider>
   );
 }

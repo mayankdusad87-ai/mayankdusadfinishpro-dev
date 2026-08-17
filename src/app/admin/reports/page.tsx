@@ -16,10 +16,19 @@ import type { ManagementData, OperationsData } from '@/lib/insights-data';
 import ManagementView from '@/components/admin/ManagementView';
 import OperationsView from '@/components/admin/OperationsView';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
+import { useCanAccess } from '@/hooks';
+import { useRouter } from 'next/navigation';
 
 type Tab = 'management' | 'operations';
 
 export default function InsightsPage() {
+  const hasInsightsAccess = useCanAccess('insights-view');
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!hasInsightsAccess) router.replace('/admin/manage');
+  }, [hasInsightsAccess, router]);
+
   const { currentProject } = useProject();
   const [tab, setTab] = useState<Tab>('management');
   const [loading, setLoading] = useState(true);
