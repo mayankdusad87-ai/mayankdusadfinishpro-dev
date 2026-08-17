@@ -138,10 +138,31 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Loading dashboard...</p>
+      <div className="space-y-5 animate-pulse">
+        {/* Health score skeleton */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-20 h-20 rounded-full bg-gray-200" />
+            <div className="flex flex-wrap gap-2">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-8 w-24 rounded-full bg-gray-200" />
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* View toggle skeleton */}
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-64 rounded-lg bg-gray-200" />
+          <div className="h-10 w-28 rounded-lg bg-gray-200" />
+        </div>
+        {/* Heatmap grid skeleton */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+          <div className="h-5 w-40 bg-gray-200 rounded mb-4" />
+          <div className="grid grid-cols-6 gap-2">
+            {[...Array(24)].map((_, i) => (
+              <div key={i} className="h-10 rounded bg-gray-200" />
+            ))}
+          </div>
         </div>
       </div>
     );

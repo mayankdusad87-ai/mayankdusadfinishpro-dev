@@ -113,8 +113,16 @@ export default function PhotoReviewPage() {
 
       {/* Photo Grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 animate-pulse">
+          {[...Array(10)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-gray-200 overflow-hidden">
+              <div className="aspect-square bg-gray-200" />
+              <div className="px-3 py-2 space-y-1.5">
+                <div className="h-3 w-3/4 bg-gray-200 rounded" />
+                <div className="h-2.5 w-1/2 bg-gray-200 rounded" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : photos.length === 0 ? (
         <div className="text-center py-20">

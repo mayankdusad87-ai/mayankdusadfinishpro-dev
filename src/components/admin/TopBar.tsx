@@ -60,7 +60,7 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
               <path d="M5 20V8l7-5 7 5v12" />
               <path d="M9 20v-4h6v4" />
             </svg>
-            <span className="truncate max-w-[100px] sm:max-w-[200px]">
+            <span className="truncate max-w-[160px] sm:max-w-[200px]">
               {currentProject ? currentProject.name : projects.length === 0 ? 'No Projects' : 'Select Project'}
             </span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`w-3.5 h-3.5 text-gray-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}>

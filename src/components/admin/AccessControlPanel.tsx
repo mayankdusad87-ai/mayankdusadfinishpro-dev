@@ -59,17 +59,23 @@ const ALWAYS_HIDDEN_SCREENS = [
 
 export default function AccessControlPanel() {
   const [access, setAccess] = useState<ManagementAccess>({ dashboard: true, insights: true, photos: true });
+  const [savedAccess, setSavedAccess] = useState<ManagementAccess>({ dashboard: true, insights: true, photos: true });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const { refresh: refreshContext } = useManagementAccess();
 
+  const isDirty = access.dashboard !== savedAccess.dashboard
+    || access.insights !== savedAccess.insights
+    || access.photos !== savedAccess.photos;
+
   const loadAccess = useCallback(async () => {
     setLoading(true);
     try {
       const data = await getManagementAccess();
       setAccess(data);
+      setSavedAccess(data);
     } catch {
       setError('Failed to load access settings');
     }
@@ -91,6 +97,7 @@ export default function AccessControlPanel() {
     setSaved(false);
     try {
       await setManagementAccess(access);
+      setSavedAccess(access);
       await refreshContext(); // Update the global context so sidebar/pages react immediately
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -202,8 +209,12 @@ export default function AccessControlPanel() {
       <div className="flex items-center gap-3">
         <button
           onClick={handleSave}
-          disabled={saving}
-          className="px-6 py-2.5 bg-primary hover:bg-primary-dark text-white text-sm font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+          disabled={saving || !isDirty}
+          className={`px-6 py-2.5 text-sm font-semibold rounded-lg transition-colors cursor-pointer disabled:cursor-not-allowed ${
+            isDirty
+              ? 'bg-primary hover:bg-primary-dark text-white'
+              : 'bg-gray-200 text-gray-400'
+          }`}
         >
           {saving ? (
             <span className="flex items-center gap-2">
@@ -212,6 +223,12 @@ export default function AccessControlPanel() {
             </span>
           ) : 'Save Changes'}
         </button>
+        {isDirty && !saving && (
+          <span className="flex items-center gap-1.5 text-sm text-amber-600 font-medium">
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+            Unsaved changes
+          </span>
+        )}
         {saved && (
           <span className="flex items-center gap-1.5 text-sm text-emerald-600 font-medium">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
