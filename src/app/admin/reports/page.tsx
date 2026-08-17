@@ -48,6 +48,40 @@ export default function InsightsPage() {
   // Track whether ops data has been loaded for current project
   const opsLoadedForProject = useRef<string | null>(null);
 
+  // ---- Session cache helpers (stale-while-revalidate) ----
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  const cacheKey = useCallback((pid: string) => `insights_cache_${pid}`, []);
+
+  const readCache = useCallback((pid: string) => {
+    try {
+      const raw = sessionStorage.getItem(cacheKey(pid));
+      if (!raw) return null;
+      const cached = JSON.parse(raw);
+      if (Date.now() - cached.ts > CACHE_TTL) {
+        sessionStorage.removeItem(cacheKey(pid));
+        return null;
+      }
+      return cached as {
+        ts: number;
+        mgmt: ManagementData;
+        activityRows: InsightRow[];
+        stageList: string[];
+        stores: UnitStore[];
+      };
+    } catch { return null; }
+  }, [cacheKey]);
+
+  const writeCache = useCallback((pid: string, data: {
+    mgmt: ManagementData;
+    activityRows: InsightRow[];
+    stageList: string[];
+    stores: UnitStore[];
+  }) => {
+    try {
+      sessionStorage.setItem(cacheKey(pid), JSON.stringify({ ...data, ts: Date.now() }));
+    } catch { /* storage full — ignore */ }
+  }, [cacheKey]);
+
   // ---- Load core data (Management tab — the default) ----
   const loadData = useCallback(async () => {
     if (!currentProject) {
@@ -58,11 +92,24 @@ export default function InsightsPage() {
       opsLoadedForProject.current = null;
       return;
     }
-    setLoading(true);
+
+    const pid = currentProject.id;
     opsLoadedForProject.current = null;
+
+    // Stale-while-revalidate: show cached data instantly, fetch fresh in background
+    const cached = readCache(pid);
+    if (cached) {
+      setMgmt(cached.mgmt);
+      setActivityRows(cached.activityRows);
+      setStageList(cached.stageList);
+      setUnitStores(cached.stores);
+      setLoading(false);
+      // Don't return — fall through to fetch fresh data in background
+    } else {
+      setLoading(true);
+    }
+
     try {
-      // Only fetch Management-essential data upfront (5 queries instead of 8)
-      const pid = currentProject.id;
       const [dashData, rows, settings, stores] = await Promise.all([
         getDashboardData(pid),
         getInsightActivities(pid),
@@ -84,24 +131,30 @@ export default function InsightsPage() {
       setStageList(dashData.stages || []);
 
       if (rows.length > 0) {
-        setMgmt(computeManagement(
+        const mgmtData = computeManagement(
           rows,
           heatmap,
           settings.stageWeights ?? undefined,
           settings.paintDaysPerFlat ?? undefined,
-        ));
+        );
+        setMgmt(mgmtData);
+        // Cache for instant load next time
+        writeCache(pid, { mgmt: mgmtData, activityRows: rows, stageList: dashData.stages || [], stores });
       } else {
         console.warn('[Insights]', currentProject.name, '— 0 activity rows');
         setMgmt(null);
       }
     } catch (err) {
       console.error('[Insights] Failed to load data:', err);
-      setMgmt(null); setOps(null); setHeatmapData(null);
-      setSupervisors([]); setReversals([]); setSiteActivity([]); setUnitStores([]);
-      setActivityRows([]); setStageList([]);
+      // Only clear state if we don't have cached data showing
+      if (!cached) {
+        setMgmt(null); setOps(null); setHeatmapData(null);
+        setSupervisors([]); setReversals([]); setSiteActivity([]); setUnitStores([]);
+        setActivityRows([]); setStageList([]);
+      }
     }
     setLoading(false);
-  }, [currentProject]);
+  }, [currentProject, readCache, writeCache]);
 
   // ---- Lazy-load Operations data only when user switches to that tab ----
   const loadOpsData = useCallback(async () => {
@@ -141,15 +194,12 @@ export default function InsightsPage() {
   }, [currentProject, activityRows]);
 
   useEffect(() => {
-    setMgmt(null);
+    // Reset ops-only state; mgmt state is handled by loadData (cache-aware)
     setOps(null);
     setHeatmapData(null);
     setSupervisors([]);
     setReversals([]);
     setSiteActivity([]);
-    setUnitStores([]);
-    setActivityRows([]);
-    setStageList([]);
     loadData();
   }, [loadData]);
 
