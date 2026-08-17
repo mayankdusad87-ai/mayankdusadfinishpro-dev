@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -181,24 +181,6 @@ export type Database = {
           },
         ]
       }
-      app_settings: {
-        Row: {
-          key: string
-          value: Json
-          updated_at: string | null
-        }
-        Insert: {
-          key: string
-          value: Json
-          updated_at?: string | null
-        }
-        Update: {
-          key?: string
-          value?: Json
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       app_errors: {
         Row: {
           action: string
@@ -232,6 +214,24 @@ export type Database = {
           raw_error?: string
           user_email?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          value?: Json
         }
         Relationships: []
       }
@@ -272,9 +272,9 @@ export type Database = {
           flat_number?: number | null
           floor?: number | null
           id?: string
-          new_status?: string
-          old_status?: string
-          project_id?: string
+          new_status?: string | null
+          old_status?: string | null
+          project_id?: string | null
           stage?: string | null
           stage_gate?: string | null
         }
@@ -291,6 +291,47 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          metadata: Json | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          metadata?: Json | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          metadata?: Json | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -327,47 +368,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
-      }
-      notifications: {
-        Row: {
-          id: string
-          user_id: string
-          type: string
-          title: string
-          message: string
-          metadata: Json | null
-          is_read: boolean
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          type: string
-          title: string
-          message: string
-          metadata?: Json | null
-          is_read?: boolean
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          type?: string
-          title?: string
-          message?: string
-          metadata?: Json | null
-          is_read?: boolean
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       projects: {
         Row: {
@@ -480,6 +480,53 @@ export type Database = {
           },
         ]
       }
+      unit_stores: {
+        Row: {
+          created_at: string
+          flat_number: number
+          floor: number
+          id: string
+          marked_at: string
+          marked_by: string | null
+          notes: string | null
+          project_id: string
+          unmarked_at: string | null
+          unmarked_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          flat_number: number
+          floor: number
+          id?: string
+          marked_at?: string
+          marked_by?: string | null
+          notes?: string | null
+          project_id: string
+          unmarked_at?: string | null
+          unmarked_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          flat_number?: number
+          floor?: number
+          id?: string
+          marked_at?: string
+          marked_by?: string | null
+          notes?: string | null
+          project_id?: string
+          unmarked_at?: string | null
+          unmarked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_stores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uploads: {
         Row: {
           file_name: string
@@ -521,7 +568,14 @@ export type Database = {
     }
     Functions: {
       get_dashboard_data: { Args: { p_project_id: string }; Returns: Json }
+      get_distinct_floors: {
+        Args: { p_project_id: string }
+        Returns: {
+          floor: number
+        }[]
+      }
       is_admin: { Args: never; Returns: boolean }
+      is_management: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
@@ -671,3 +725,6 @@ export type SupervisorAssignmentRow = DbTables['supervisor_assignments']['Row'];
 export type UploadRow = DbTables['uploads']['Row'];
 export type NotificationRow = DbTables['notifications']['Row'];
 export type NotificationInsert = DbTables['notifications']['Insert'];
+export type UnitStoreRow = DbTables['unit_stores']['Row'];
+export type UnitStoreInsert = DbTables['unit_stores']['Insert'];
+export type UnitStoreUpdate = DbTables['unit_stores']['Update'];

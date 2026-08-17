@@ -10,6 +10,8 @@ import { computeInsights } from '@/lib/insights-data';
 import { getStageWeights, getPaintDaysPerFlat } from '@/repositories/settings-repo';
 import { getSupervisorActivity, getRecentReversals, getSiteActivity } from '@/repositories/audit-repo';
 import type { SupervisorPulse, RecentReversal, SiteActivityEntry } from '@/repositories/audit-repo';
+import { getUnitStores } from '@/repositories/store-repo';
+import type { UnitStore } from '@/repositories/store-repo';
 import type { ManagementData, OperationsData } from '@/lib/insights-data';
 import ManagementView from '@/components/admin/ManagementView';
 import OperationsView from '@/components/admin/OperationsView';
@@ -27,6 +29,7 @@ export default function InsightsPage() {
   const [supervisors, setSupervisors] = useState<SupervisorPulse[]>([]);
   const [reversals, setReversals] = useState<RecentReversal[]>([]);
   const [siteActivity, setSiteActivity] = useState<SiteActivityEntry[]>([]);
+  const [unitStores, setUnitStores] = useState<UnitStore[]>([]);
 
   const loadData = useCallback(async () => {
     if (!currentProject) {
@@ -39,7 +42,7 @@ export default function InsightsPage() {
     try {
       // Run ALL queries in parallel — flattened waterfall
       const pid = currentProject.id;
-      const [dashData, activityRows, dbWeights, dbPaintDays, supActivity, recentReversals, siteAct] = await Promise.all([
+      const [dashData, activityRows, dbWeights, dbPaintDays, supActivity, recentReversals, siteAct, stores] = await Promise.all([
         getDashboardData(pid),
         getInsightActivities(pid),
         getStageWeights(),
@@ -47,11 +50,13 @@ export default function InsightsPage() {
         getSupervisorActivity(pid),
         getRecentReversals(pid),
         getSiteActivity(pid),
+        getUnitStores(pid),
       ]);
 
       setSupervisors(supActivity);
       setReversals(recentReversals);
       setSiteActivity(siteAct);
+      setUnitStores(stores);
 
       if (!dashData) {
         console.warn('[Insights] getDashboardData returned null for', currentProject.name, pid);
@@ -90,7 +95,7 @@ export default function InsightsPage() {
     } catch (err) {
       console.error('[Insights] Failed to load data:', err);
       setMgmt(null); setOps(null); setHeatmapData(null);
-      setSupervisors([]); setReversals([]); setSiteActivity([]);
+      setSupervisors([]); setReversals([]); setSiteActivity([]); setUnitStores([]);
     }
     setLoading(false);
   }, [currentProject]);
@@ -102,6 +107,7 @@ export default function InsightsPage() {
     setSupervisors([]);
     setReversals([]);
     setSiteActivity([]);
+    setUnitStores([]);
     loadData();
   }, [loadData]);
 
@@ -170,7 +176,7 @@ export default function InsightsPage() {
       ) : (
         <>
           {tab === 'management' && mgmt && heatmapData && (
-            <ManagementView data={mgmt} projectName={currentProject.name} heatmap={heatmapData} />
+            <ManagementView data={mgmt} projectName={currentProject.name} heatmap={heatmapData} stores={unitStores} />
           )}
           {tab === 'operations' && ops && (
             <OperationsView data={ops} supervisors={supervisors} reversals={reversals} siteActivity={siteActivity} />

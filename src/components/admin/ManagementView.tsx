@@ -3,11 +3,14 @@
 import { memo, useState } from 'react';
 import type { ManagementData, StageFloorBreakdown } from '@/lib/insights-data';
 import type { HeatmapData } from '@/lib/floor-rollup';
+import type { UnitStore } from '@/repositories/store-repo';
+import MaterialStores from '@/components/admin/MaterialStores';
 
 interface Props {
   data: ManagementData;
   projectName: string;
   heatmap: HeatmapData;
+  stores?: UnitStore[];
 }
 
 function formatDate(d: string | null): string {
@@ -100,7 +103,7 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
   );
 }
 
-function ManagementView({ data, projectName }: Props) {
+function ManagementView({ data, projectName, stores = [] }: Props) {
   const { pipeline, bottlenecks, stageFloorBreakdowns, sitePulse } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [pulseExpanded, setPulseExpanded] = useState(false);
@@ -404,6 +407,9 @@ function ManagementView({ data, projectName }: Props) {
           </div>
         )}
       </div>
+
+      {/* ---- SECTION 6: MATERIAL STORES ---- */}
+      <MaterialStores stores={stores} />
     </div>
   );
 }

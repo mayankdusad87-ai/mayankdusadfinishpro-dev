@@ -5,6 +5,7 @@ import HealthScore from '@/components/admin/HealthScore';
 import FilterBar, { Filters } from '@/components/admin/FilterBar';
 import FloorHeatmap from '@/components/admin/FloorHeatmap';
 import ActivityTable from '@/components/admin/ActivityTable';
+import StoreToggleButton from '@/components/admin/StoreToggleButton';
 import { useProject } from '@/lib/project-context';
 import { getDashboardData, DashboardData, getRefugeConfig } from '@/lib/supabase-data';
 import { computeHeatmapFromRollup, HeatmapData } from '@/lib/floor-rollup';
@@ -174,7 +175,8 @@ export default function DashboardPage() {
       {/* Health Score + Status Chips */}
       <HealthScore {...healthCounts} activeFilter={statusFilter} onFilterChange={(s) => { setStatusFilter(s); }} />
 
-      {/* View Toggle */}
+      {/* View Toggle + Store Button */}
+      <div className="flex items-center gap-3 flex-wrap">
       <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
         <button
           onClick={() => setView('heatmap')}
@@ -202,6 +204,13 @@ export default function DashboardPage() {
             Activity Table
           </span>
         </button>
+      </div>
+      <StoreToggleButton
+        projectId={currentProject.id}
+        floors={floors.map(f => parseInt(f.replace('Floor ', ''), 10))}
+        flats={flats.map(f => parseInt(f.replace('Flat ', ''), 10))}
+        onStoreChanged={() => { setTableRefreshKey(k => k + 1); }}
+      />
       </div>
 
       {/* Heatmap View */}
