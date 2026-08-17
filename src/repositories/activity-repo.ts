@@ -332,6 +332,7 @@ export interface InsightRow {
   floor: number;
   flat_number: number;
   stage: string;
+  stage_gate: string;
   activity: string;
   status: string;
   expected_start: string;
@@ -349,7 +350,7 @@ export async function getInsightActivities(projectId: string): Promise<InsightRo
   while (true) {
     const { data, error } = await supabase
       .from('activities')
-      .select('floor, flat_number, stage, activity, status, expected_start, expected_end, actual_start, actual_end, vendor, delay_reason')
+      .select('floor, flat_number, stage, stage_gate, activity, status, expected_start, expected_end, actual_start, actual_end, vendor, delay_reason')
       .eq('project_id', projectId)
       .neq('status', 'not_applicable')
       .range(from, from + PAGE - 1);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyAdmin } from '@/lib/auth-guard';
 import { createManagementSchema } from '@/lib/validations';
+import { sendEmail, welcomeManagementEmailHtml } from '@/lib/email';
 
 function gotrueHeaders() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -152,6 +153,13 @@ export async function POST(req: NextRequest) {
         }, { status: 500 });
       }
     }
+
+    // Send welcome email (non-blocking — don't fail the request if email fails)
+    sendEmail({
+      to: email,
+      subject: 'Welcome to Finishing Pro — Your Account is Ready',
+      html: welcomeManagementEmailHtml(fullName, email, password),
+    }).catch(err => console.error('[create-management] Welcome email failed:', err));
 
     return NextResponse.json({ userId });
   } catch (err) {

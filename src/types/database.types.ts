@@ -527,6 +527,59 @@ export type Database = {
           },
         ]
       }
+      project_milestones: {
+        Row: {
+          id: string
+          project_id: string
+          title: string
+          stage: string
+          stage_gate: string | null
+          floor_from: number
+          floor_to: number
+          target_date: string
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          title: string
+          stage: string
+          stage_gate?: string | null
+          floor_from: number
+          floor_to: number
+          target_date: string
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          title?: string
+          stage?: string
+          stage_gate?: string | null
+          floor_from?: number
+          floor_to?: number
+          target_date?: string
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uploads: {
         Row: {
           file_name: string

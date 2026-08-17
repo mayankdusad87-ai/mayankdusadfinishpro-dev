@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useProject } from '@/lib/project-context';
 import { getDashboardData } from '@/lib/supabase-data';
 import { getInsightActivities } from '@/repositories/activity-repo';
+import type { InsightRow } from '@/repositories/activity-repo';
 import { computeHeatmapFromRollup } from '@/lib/floor-rollup';
 import type { HeatmapData } from '@/lib/floor-rollup';
 import { computeInsights } from '@/lib/insights-data';
@@ -41,11 +42,14 @@ export default function InsightsPage() {
   const [reversals, setReversals] = useState<RecentReversal[]>([]);
   const [siteActivity, setSiteActivity] = useState<SiteActivityEntry[]>([]);
   const [unitStores, setUnitStores] = useState<UnitStore[]>([]);
+  const [activityRows, setActivityRows] = useState<InsightRow[]>([]);
+  const [stageList, setStageList] = useState<string[]>([]);
 
   const loadData = useCallback(async () => {
     if (!currentProject) {
       setMgmt(null); setOps(null); setHeatmapData(null);
       setSupervisors([]); setReversals([]); setSiteActivity([]);
+      setActivityRows([]); setStageList([]);
       setLoading(false);
       return;
     }
@@ -68,6 +72,7 @@ export default function InsightsPage() {
       setReversals(recentReversals);
       setSiteActivity(siteAct);
       setUnitStores(stores);
+      setActivityRows(activityRows);
 
       if (!dashData) {
         console.warn('[Insights] getDashboardData returned null for', currentProject.name, pid);
@@ -77,6 +82,7 @@ export default function InsightsPage() {
 
       const heatmap = computeHeatmapFromRollup(dashData.heatmap, dashData.stages);
       setHeatmapData(heatmap);
+      setStageList(dashData.stages || []);
 
       // Compute insights from pre-fetched rows (no additional DB call)
       const insights = computeInsights(
@@ -107,6 +113,7 @@ export default function InsightsPage() {
       console.error('[Insights] Failed to load data:', err);
       setMgmt(null); setOps(null); setHeatmapData(null);
       setSupervisors([]); setReversals([]); setSiteActivity([]); setUnitStores([]);
+      setActivityRows([]); setStageList([]);
     }
     setLoading(false);
   }, [currentProject]);
@@ -119,10 +126,17 @@ export default function InsightsPage() {
     setReversals([]);
     setSiteActivity([]);
     setUnitStores([]);
+    setActivityRows([]);
+    setStageList([]);
     loadData();
   }, [loadData]);
 
   useAutoRefresh(loadData, 90000, !!currentProject);
+
+  const uniqueFloors = useMemo(() => {
+    const set = new Set(activityRows.map(a => a.floor));
+    return [...set].sort((a, b) => a - b);
+  }, [activityRows]);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -215,7 +229,15 @@ export default function InsightsPage() {
       ) : (
         <>
           {tab === 'management' && mgmt && (
-            <ManagementView data={mgmt} projectName={currentProject.name} stores={unitStores} />
+            <ManagementView
+              data={mgmt}
+              projectName={currentProject.name}
+              projectId={currentProject.id}
+              stores={unitStores}
+              activities={activityRows}
+              stages={stageList}
+              floors={uniqueFloors}
+            />
           )}
           {tab === 'operations' && ops && (
             <OperationsView data={ops} supervisors={supervisors} reversals={reversals} siteActivity={siteActivity} />

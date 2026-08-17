@@ -4,11 +4,24 @@ import { memo, useState } from 'react';
 import type { ManagementData, StageFloorBreakdown } from '@/lib/insights-data';
 import type { UnitStore } from '@/repositories/store-repo';
 import MaterialStores from '@/components/admin/MaterialStores';
+import MilestoneTracker from '@/components/admin/MilestoneTracker';
+
+interface ActivityForMilestone {
+  floor: number;
+  flat_number: number;
+  stage: string;
+  stage_gate: string | null;
+  status: string;
+}
 
 interface Props {
   data: ManagementData;
   projectName: string;
+  projectId: string;
   stores?: UnitStore[];
+  activities?: ActivityForMilestone[];
+  stages?: string[];
+  floors?: number[];
 }
 
 function formatDate(d: string | null): string {
@@ -101,7 +114,7 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
   );
 }
 
-function ManagementView({ data, projectName, stores = [] }: Props) {
+function ManagementView({ data, projectName, projectId, stores = [], activities = [], stages = [], floors = [] }: Props) {
   const { pipeline, bottlenecks, stageFloorBreakdowns, sitePulse } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [pulseExpanded, setPulseExpanded] = useState(false);
@@ -206,6 +219,17 @@ function ManagementView({ data, projectName, stores = [] }: Props) {
           stage={selectedStage}
           breakdowns={stageFloorBreakdowns[selectedStage]}
           onClose={() => setSelectedStage(null)}
+        />
+      )}
+
+      {/* ---- SECTION 3b: MILESTONE TRACKER ---- */}
+      {projectId && (
+        <MilestoneTracker
+          projectId={projectId}
+          projectName={projectName}
+          activities={activities}
+          stages={stages}
+          floors={floors}
         />
       )}
 
