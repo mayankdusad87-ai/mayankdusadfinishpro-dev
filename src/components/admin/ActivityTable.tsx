@@ -5,7 +5,6 @@ import StatusPill from '@/components/shared/StatusPill';
 import Modal from '@/components/shared/Modal';
 import {
   getActivitiesPage,
-  getCriticalDelays,
 } from '@/lib/supabase-data';
 import type { ActivityRow, ActivityUpdate } from '@/types/database.types';
 import type { ActivityStatus } from '@/lib/types';
@@ -37,7 +36,6 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   const [tableRows, setTableRows] = useState<ActivityRow[]>([]);
   const [tableTotal, setTableTotal] = useState(0);
   const [tableLoading, setTableLoading] = useState(false);
-  const [criticalDelays, setCriticalDelays] = useState<Array<Pick<ActivityRow, 'id' | 'floor' | 'flat_number' | 'stage' | 'stage_gate' | 'activity' | 'vendor' | 'delay_days'>>>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
@@ -79,14 +77,10 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     const timer = setTimeout(() => {
       async function load() {
         setTableLoading(true);
-        const [pageResult, delays] = await Promise.all([
-          getActivitiesPage(projectId, activeFilters, currentPage, DEFAULT_PAGE_SIZE),
-          getCriticalDelays(projectId),
-        ]);
+        const pageResult = await getActivitiesPage(projectId, activeFilters, currentPage, DEFAULT_PAGE_SIZE);
         if (cancelled) return;
         setTableRows(pageResult.rows);
         setTableTotal(pageResult.totalCount);
-        setCriticalDelays(delays);
         setTableLoading(false);
       }
       load();
@@ -331,8 +325,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   }
 
   return (
-    <div className="flex gap-6">
-      <div className="flex-1 min-w-0 space-y-5">
+    <div className="space-y-5">
         {/* Toast */}
         {toast && (
           <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium animate-in fade-in slide-in-from-top-2 ${
@@ -472,9 +465,9 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                           </span>
                         </td>
                         <td className="px-3 py-2.5 text-gray-600">{row.configuration || ''}</td>
-                        <td className="px-3 py-2.5 text-gray-600 max-w-[100px] truncate">{row.stage}</td>
-                        <td className="px-3 py-2.5 text-gray-600 max-w-[90px] truncate">{row.stage_gate || ''}</td>
-                        <td className="px-3 py-2.5 text-gray-600 max-w-[120px] truncate">{row.activity}</td>
+                        <td className="px-3 py-2.5 text-gray-600">{row.stage}</td>
+                        <td className="px-3 py-2.5 text-gray-600">{row.stage_gate || ''}</td>
+                        <td className="px-3 py-2.5 text-gray-600">{row.activity}</td>
                         <td className="px-3 py-2.5 text-gray-600 max-w-[90px]">
                           {renderEditableCell(row, 'vendor', row.vendor || '', 'text-gray-600 truncate')}
                         </td>
@@ -540,39 +533,6 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
             </>
           )}
         </div>
-      </div>
-
-      {/* Critical Delays Panel */}
-      <aside className="w-72 shrink-0 hidden xl:block">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sticky top-6">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-900">Critical Delays</h3>
-            <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-            </svg>
-          </div>
-          <p className="text-xs text-gray-500 mb-4">Top 5 overdue activities</p>
-
-          {criticalDelays.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">No delayed activities</p>
-          ) : (
-            <div className="space-y-3">
-              {criticalDelays.map((d) => (
-                <div key={d.id} className="border border-gray-100 rounded-lg p-3 hover:border-gray-200 transition-colors">
-                  <div className="flex items-start justify-between mb-1">
-                    <span className="text-xs font-bold text-gray-900">Flat {d.flat_number}</span>
-                    <StatusPill status="delayed" />
-                  </div>
-                  <div className="text-xs text-gray-600 mb-0.5">{d.activity}</div>
-                  <div className="text-[11px] text-gray-400">Floor {d.floor} &bull; {d.stage_gate}</div>
-                  <div className="text-[11px] text-gray-400">Vendor: {d.vendor}</div>
-                  <div className="text-xs font-semibold text-red-600 mt-1">Overdue by {d.delay_days} day{(d.delay_days ?? 0) > 1 ? 's' : ''}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </aside>
 
       {/* Reassign Vendor Modal */}
       {showVendorModal && (
