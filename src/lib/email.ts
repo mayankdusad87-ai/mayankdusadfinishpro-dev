@@ -1,4 +1,5 @@
-const RESEND_API_URL = 'https://api.resend.com/emails';
+import { Resend } from 'resend';
+
 const FROM_ADDRESS = 'Finishing Pro <noreply@raghavgroup.in>';
 
 interface SendEmailOptions {
@@ -14,29 +15,28 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions): Promis
     return false;
   }
 
-  const payload = {
-    from: FROM_ADDRESS,
-    to: Array.isArray(to) ? to : [to],
-    subject,
-    html,
-  };
+  const resend = new Resend(apiKey);
 
-  // Retry up to 3 times with exponential backoff (handles cold-start ECONNRESET)
+  // Retry up to 3 times with exponential backoff (handles cold-start socket errors)
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const res = await fetch(RESEND_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(payload),
+      const { data, error } = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        html,
       });
-      if (!res.ok) {
-        const body = await res.text();
-        console.error(`[email] Send failed (attempt ${attempt}):`, body);
+
+      if (error) {
+        console.error(`[email] Send failed (attempt ${attempt}):`, error.message);
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, attempt * 1000));
+          continue;
+        }
         return false;
       }
+
+      console.log('[email] Sent successfully, id:', data?.id);
       return true;
     } catch (err) {
       console.error(`[email] Send error (attempt ${attempt}/${3}):`, err);
@@ -84,7 +84,7 @@ export function welcomeManagementEmailHtml(fullName: string, email: string, pass
             <tr><td style="padding: 4px 0; color: #6b7280;">Password</td><td style="padding: 4px 0; font-weight: 700; color: #111827; letter-spacing: 1px; font-family: monospace;">${password}</td></tr>
           </table>
         </div>
-        <a href="https://mayankdusadfinishpro-dev-theta.vercel.app/login" style="display: inline-block; background: #C8922A; color: white; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-weight: 600; font-size: 14px;">Log In to Finishing Pro</a>
+        <a href="https://finishpro-dev.vercel.app/login" style="display: inline-block; background: #C8922A; color: white; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-weight: 600; font-size: 14px;">Log In to Finishing Pro</a>
         <p style="margin: 16px 0 0; font-size: 12px; color: #9ca3af;">This is an automated notification from Finishing Pro. Please change your password after your first login.</p>
       </div>
     </div>
