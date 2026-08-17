@@ -30,6 +30,23 @@ export async function getPaintDaysPerFlat(): Promise<number | null> {
   return getAppSetting<number>('paint_days_per_flat');
 }
 
+/** Fetch stage weights + paint days in a single DB call */
+export async function getInsightsSettings(): Promise<{
+  stageWeights: Record<string, number> | null;
+  paintDaysPerFlat: number | null;
+}> {
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('key, value')
+    .in('key', ['stage_weights', 'paint_days_per_flat']);
+  if (error || !data) return { stageWeights: null, paintDaysPerFlat: null };
+  const map = Object.fromEntries(data.map(r => [r.key, r.value]));
+  return {
+    stageWeights: (map['stage_weights'] as Record<string, number>) || null,
+    paintDaysPerFlat: (map['paint_days_per_flat'] as number) || null,
+  };
+}
+
 export async function setPaintDaysPerFlat(days: number): Promise<void> {
   return setAppSetting('paint_days_per_flat', days);
 }

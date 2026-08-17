@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useProject } from '@/lib/project-context';
 import { getDashboardData } from '@/lib/supabase-data';
 import { getInsightActivities } from '@/repositories/activity-repo';
 import type { InsightRow } from '@/repositories/activity-repo';
 import { computeHeatmapFromRollup } from '@/lib/floor-rollup';
 import type { HeatmapData } from '@/lib/floor-rollup';
-import { computeInsights } from '@/lib/insights-data';
-import { getStageWeights, getPaintDaysPerFlat } from '@/repositories/settings-repo';
+import { computeManagement, computeOperations } from '@/lib/insights-data';
+import { getInsightsSettings } from '@/repositories/settings-repo';
 import { getSupervisorActivity, getRecentReversals, getSiteActivity } from '@/repositories/audit-repo';
 import type { SupervisorPulse, RecentReversal, SiteActivityEntry } from '@/repositories/audit-repo';
 import { getUnitStores } from '@/repositories/store-repo';
@@ -37,6 +37,7 @@ export default function InsightsPage() {
   const [loading, setLoading] = useState(true);
   const [mgmt, setMgmt] = useState<ManagementData | null>(null);
   const [ops, setOps] = useState<OperationsData | null>(null);
+  const [opsLoading, setOpsLoading] = useState(false);
   const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null);
   const [supervisors, setSupervisors] = useState<SupervisorPulse[]>([]);
   const [reversals, setReversals] = useState<RecentReversal[]>([]);
@@ -44,35 +45,33 @@ export default function InsightsPage() {
   const [unitStores, setUnitStores] = useState<UnitStore[]>([]);
   const [activityRows, setActivityRows] = useState<InsightRow[]>([]);
   const [stageList, setStageList] = useState<string[]>([]);
+  // Track whether ops data has been loaded for current project
+  const opsLoadedForProject = useRef<string | null>(null);
 
+  // ---- Load core data (Management tab — the default) ----
   const loadData = useCallback(async () => {
     if (!currentProject) {
       setMgmt(null); setOps(null); setHeatmapData(null);
       setSupervisors([]); setReversals([]); setSiteActivity([]);
       setActivityRows([]); setStageList([]);
       setLoading(false);
+      opsLoadedForProject.current = null;
       return;
     }
     setLoading(true);
+    opsLoadedForProject.current = null;
     try {
-      // Run ALL queries in parallel — flattened waterfall
+      // Only fetch Management-essential data upfront (5 queries instead of 8)
       const pid = currentProject.id;
-      const [dashData, activityRows, dbWeights, dbPaintDays, supActivity, recentReversals, siteAct, stores] = await Promise.all([
+      const [dashData, rows, settings, stores] = await Promise.all([
         getDashboardData(pid),
         getInsightActivities(pid),
-        getStageWeights(),
-        getPaintDaysPerFlat(),
-        getSupervisorActivity(pid),
-        getRecentReversals(pid),
-        getSiteActivity(pid),
+        getInsightsSettings(),
         getUnitStores(pid),
       ]);
 
-      setSupervisors(supActivity);
-      setReversals(recentReversals);
-      setSiteActivity(siteAct);
       setUnitStores(stores);
-      setActivityRows(activityRows);
+      setActivityRows(rows);
 
       if (!dashData) {
         console.warn('[Insights] getDashboardData returned null for', currentProject.name, pid);
@@ -84,30 +83,16 @@ export default function InsightsPage() {
       setHeatmapData(heatmap);
       setStageList(dashData.stages || []);
 
-      // Compute insights from pre-fetched rows (no additional DB call)
-      const insights = computeInsights(
-        activityRows,
-        heatmap,
-        dbWeights ?? undefined,
-        dbPaintDays ?? undefined,
-      );
-
-      if (insights) {
-        setMgmt(insights.management);
-        // Inject reversal-based action items into operations data
-        if (recentReversals.length > 0 && insights.operations) {
-          insights.operations.actionItems.push({
-            severity: recentReversals.length >= 5 ? 'critical' : 'warning',
-            text: `${recentReversals.length} status reversal${recentReversals.length > 1 ? 's' : ''} in the last 7 days`,
-            meta: `Latest: F${recentReversals[0].floor}-${recentReversals[0].flatNumber} ${recentReversals[0].oldStatus} → ${recentReversals[0].newStatus}`,
-            type: 'reversal',
-          });
-        }
-        setOps(insights.operations);
+      if (rows.length > 0) {
+        setMgmt(computeManagement(
+          rows,
+          heatmap,
+          settings.stageWeights ?? undefined,
+          settings.paintDaysPerFlat ?? undefined,
+        ));
       } else {
-        console.warn('[Insights]', currentProject.name, '— computeInsights returned null (0 activity rows)');
+        console.warn('[Insights]', currentProject.name, '— 0 activity rows');
         setMgmt(null);
-        setOps(null);
       }
     } catch (err) {
       console.error('[Insights] Failed to load data:', err);
@@ -117,6 +102,43 @@ export default function InsightsPage() {
     }
     setLoading(false);
   }, [currentProject]);
+
+  // ---- Lazy-load Operations data only when user switches to that tab ----
+  const loadOpsData = useCallback(async () => {
+    if (!currentProject || opsLoadedForProject.current === currentProject.id) return;
+    setOpsLoading(true);
+    try {
+      const pid = currentProject.id;
+      const [supActivity, recentReversals, siteAct] = await Promise.all([
+        getSupervisorActivity(pid),
+        getRecentReversals(pid),
+        getSiteActivity(pid),
+      ]);
+
+      setSupervisors(supActivity);
+      setReversals(recentReversals);
+      setSiteActivity(siteAct);
+
+      // Compute operations insights from the already-loaded activity rows
+      if (activityRows.length > 0) {
+        const opsData = computeOperations(activityRows);
+        // Inject reversal-based action items
+        if (recentReversals.length > 0) {
+          opsData.actionItems.push({
+            severity: recentReversals.length >= 5 ? 'critical' : 'warning',
+            text: `${recentReversals.length} status reversal${recentReversals.length > 1 ? 's' : ''} in the last 7 days`,
+            meta: `Latest: F${recentReversals[0].floor}-${recentReversals[0].flatNumber} ${recentReversals[0].oldStatus} → ${recentReversals[0].newStatus}`,
+            type: 'reversal',
+          });
+        }
+        setOps(opsData);
+      }
+      opsLoadedForProject.current = pid;
+    } catch (err) {
+      console.error('[Insights] Failed to load ops data:', err);
+    }
+    setOpsLoading(false);
+  }, [currentProject, activityRows]);
 
   useEffect(() => {
     setMgmt(null);
@@ -130,6 +152,13 @@ export default function InsightsPage() {
     setStageList([]);
     loadData();
   }, [loadData]);
+
+  // Load ops data when user switches to operations tab
+  useEffect(() => {
+    if (tab === 'operations' && !loading) {
+      loadOpsData();
+    }
+  }, [tab, loading, loadOpsData]);
 
   useAutoRefresh(loadData, 90000, !!currentProject);
 
@@ -239,9 +268,33 @@ export default function InsightsPage() {
               floors={uniqueFloors}
             />
           )}
-          {tab === 'operations' && ops && (
+          {tab === 'operations' && (opsLoading ? (
+            <div className="space-y-5 animate-pulse">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-xl border border-gray-200 p-4">
+                    <div className="h-3 w-20 bg-gray-200 rounded mb-3" />
+                    <div className="h-8 w-16 bg-gray-200 rounded mb-2" />
+                    <div className="h-2 w-full bg-gray-200 rounded" />
+                  </div>
+                ))}
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+                <div className="h-5 w-48 bg-gray-200 rounded mb-4" />
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <div className="h-4 w-32 bg-gray-200 rounded" />
+                      <div className="h-4 flex-1 bg-gray-200 rounded" />
+                      <div className="h-4 w-20 bg-gray-200 rounded" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : ops ? (
             <OperationsView data={ops} supervisors={supervisors} reversals={reversals} siteActivity={siteActivity} />
-          )}
+          ) : null)}
         </>
       )}
     </div>
