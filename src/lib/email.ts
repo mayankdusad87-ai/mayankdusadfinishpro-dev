@@ -14,29 +14,38 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions): Promis
     return false;
   }
 
-  try {
-    const res = await fetch(RESEND_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        from: FROM_ADDRESS,
-        to: Array.isArray(to) ? to : [to],
-        subject,
-        html,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      console.error('[email] Send failed:', body);
+  const payload = {
+    from: FROM_ADDRESS,
+    to: Array.isArray(to) ? to : [to],
+    subject,
+    html,
+  };
+
+  // Retry up to 3 times with exponential backoff (handles cold-start ECONNRESET)
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(RESEND_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        console.error(`[email] Send failed (attempt ${attempt}):`, body);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error(`[email] Send error (attempt ${attempt}/${3}):`, err);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, attempt * 1000));
+      }
     }
-    return res.ok;
-  } catch (err) {
-    console.error('[email] Send error:', err);
-    return false;
   }
+  return false;
 }
 
 export function passwordResetEmailHtml(fullName: string, newPassword: string): string {
