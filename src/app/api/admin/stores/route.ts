@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/auth-guard';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /**
  * POST /api/admin/stores — mark a unit as store
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Check if already active store
-  const { data: existing } = await supabase
+  const { data: existing } = await supabaseAdmin
     .from('unit_stores')
     .select('id')
     .eq('project_id', projectId)
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unit is already marked as a store' }, { status: 409 });
   }
 
-  const { error } = await supabase.from('unit_stores').insert({
+  const { error } = await supabaseAdmin.from('unit_stores').insert({
     project_id: projectId,
     floor,
     flat_number: flatNumber,
@@ -61,7 +61,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'storeId is required' }, { status: 400 });
   }
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('unit_stores')
     .update({
       unmarked_at: new Date().toISOString(),

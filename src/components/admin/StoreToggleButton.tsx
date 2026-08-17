@@ -10,13 +10,13 @@ interface Props {
   projectId: string;
   /** Available floors from the project data */
   floors: number[];
-  /** Available flats from the project data */
-  flats: number[];
+  /** Map of floor number → flat numbers on that floor */
+  floorFlats: Record<number, number[]>;
   /** Callback after store changes so parent can refresh data */
   onStoreChanged?: () => void;
 }
 
-export default function StoreToggleButton({ projectId, floors, flats, onStoreChanged }: Props) {
+export default function StoreToggleButton({ projectId, floors, floorFlats, onStoreChanged }: Props) {
   const { user } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [activeStores, setActiveStores] = useState<UnitStore[]>([]);
@@ -148,7 +148,11 @@ export default function StoreToggleButton({ projectId, floors, flats, onStoreCha
                 <label className="block text-xs font-medium text-gray-600 mb-1">Floor</label>
                 <select
                   value={selectedFloor}
-                  onChange={e => setSelectedFloor(e.target.value ? Number(e.target.value) : '')}
+                  onChange={e => {
+                    const v = e.target.value ? Number(e.target.value) : '' as const;
+                    setSelectedFloor(v);
+                    setSelectedFlat(''); // reset flat when floor changes
+                  }}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 >
                   <option value="">Select floor</option>
@@ -162,10 +166,11 @@ export default function StoreToggleButton({ projectId, floors, flats, onStoreCha
                 <select
                   value={selectedFlat}
                   onChange={e => setSelectedFlat(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  disabled={selectedFloor === ''}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select flat</option>
-                  {flats.map(f => (
+                  <option value="">{selectedFloor === '' ? 'Select floor first' : 'Select flat'}</option>
+                  {selectedFloor !== '' && (floorFlats[selectedFloor] || []).map(f => (
                     <option key={f} value={f}>Flat {f}</option>
                   ))}
                 </select>

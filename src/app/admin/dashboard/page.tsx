@@ -123,6 +123,21 @@ export default function DashboardPage() {
     return [...set].sort((a, b) => a - b).map(f => `Flat ${f}`);
   }, [dashData]);
 
+  // Floor → flat numbers map for store toggle
+  const floorFlats = useMemo(() => {
+    if (!dashData) return {} as Record<number, number[]>;
+    const map: Record<number, Set<number>> = {};
+    for (const r of dashData.heatmap) {
+      if (!map[r.floor]) map[r.floor] = new Set();
+      map[r.floor].add(r.flat_number);
+    }
+    const result: Record<number, number[]> = {};
+    for (const [floor, flatSet] of Object.entries(map)) {
+      result[Number(floor)] = [...flatSet].sort((a, b) => a - b);
+    }
+    return result;
+  }, [dashData]);
+
   const stages = useMemo(() => dashData?.stages || [], [dashData]);
   const stageGates = useMemo(() => {
     if (!dashData) return [];
@@ -240,7 +255,7 @@ export default function DashboardPage() {
       <StoreToggleButton
         projectId={currentProject.id}
         floors={floors.map(f => parseInt(f.replace('Floor ', ''), 10))}
-        flats={flats.map(f => parseInt(f.replace('Flat ', ''), 10))}
+        floorFlats={floorFlats}
         onStoreChanged={() => { setTableRefreshKey(k => k + 1); }}
       />
       </div>
