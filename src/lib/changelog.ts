@@ -27,6 +27,31 @@ export interface ChangelogEntry {
 // Newest entry first — the modal always shows CHANGELOG[0]
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.19b',
+    headline: "Smoother, Faster Experience",
+    date: 'August 19, 2026',
+    features: [
+      {
+        emoji: '📱',
+        title: 'Load More Activities',
+        description:
+          'No more hidden activities — floors with 20+ items now show a "Load More" button so supervisors can see every activity without filtering.',
+      },
+      {
+        emoji: '⚡',
+        title: 'Quick Action Feedback',
+        description:
+          'Tapping Start or Complete now shows a spinner and success toast, so you always know the action went through. Double-tap protection prevents accidental duplicates.',
+      },
+      {
+        emoji: '🔄',
+        title: 'Refresh & Photo Lightbox',
+        description:
+          'Supervisors can tap the refresh icon to pull latest data. Photo thumbnails now open full-size when tapped. Admin sidebar remembers its collapsed state.',
+      },
+    ],
+  },
+  {
     version: '2026.08.19',
     headline: "Here's what's new in FinishPro",
     date: 'August 19, 2026',
