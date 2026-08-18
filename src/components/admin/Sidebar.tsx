@@ -105,7 +105,20 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const device = useDevice();
   const role = (profile?.role ?? 'supervisor') as Role;
   const { access: mgmtAccess } = useManagementAccess();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebar_collapsed') === 'true';
+    }
+    return false;
+  });
+
+  function toggleCollapsed() {
+    setCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebar_collapsed', String(next));
+      return next;
+    });
+  }
 
   // Map sidebar features to management access keys for dynamic override
   const mgmtFeatureKey: Partial<Record<Feature, 'dashboard' | 'insights' | 'photos'>> = {
@@ -228,7 +241,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
       {/* Collapse toggle - desktop only */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={toggleCollapsed}
         className="hidden md:flex items-center justify-center gap-2 px-3 py-3 text-gray-400 hover:text-white hover:bg-sidebar-hover transition-colors border-t border-white/10 cursor-pointer"
       >
         <svg

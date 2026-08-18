@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/admin/Sidebar';
 import TopBar from '@/components/admin/TopBar';
@@ -26,6 +26,20 @@ export default function AdminLayout({
       router.replace('/supervisor/home');
     }
   }, [loading, user, profile, router]);
+
+  // Keyboard shortcut: "/" focuses the first search input on the page
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) {
+      e.preventDefault();
+      const searchInput = document.querySelector<HTMLInputElement>('[data-search-input]');
+      if (searchInput) searchInput.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   if (loading || !user) {
     return (

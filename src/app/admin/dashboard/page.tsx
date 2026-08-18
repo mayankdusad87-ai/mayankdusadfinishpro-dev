@@ -74,7 +74,7 @@ export default function DashboardPage() {
     refreshDashboard();
     setTableRefreshKey(k => k + 1);
   }, [refreshDashboard]);
-  useAutoRefresh(autoRefreshCb, 60000, !!currentProject);
+  useAutoRefresh(autoRefreshCb, 120000, !!currentProject);
 
   // Build active filters for table query
   const activeFilters = useMemo(() => {

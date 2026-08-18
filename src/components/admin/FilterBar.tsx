@@ -73,6 +73,7 @@ function FilterBar({
         <div className="flex flex-col gap-1 w-[calc(50%-4px)] sm:w-auto">
           <label className="text-xs font-medium text-gray-500">Floor</label>
           <select
+            data-search-input
             className={selectClass}
             value={filters.floor}
             onChange={(e) => update('floor', e.target.value)}

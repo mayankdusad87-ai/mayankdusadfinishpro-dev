@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
 import { getProjectsFromSupabase, getProjectDataFromSupabase, getActiveReasons, getSupervisorAssignments, updateActivityWithAudit } from '@/lib/supabase-data';
@@ -49,6 +49,14 @@ export default function SupervisorHomePage() {
   const [assignedFloors, setAssignedFloors] = useState<number[] | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  // UI optimization states
+  const [floorDisplayCount, setFloorDisplayCount] = useState(20);
+  const [priorityDisplayCount, setPriorityDisplayCount] = useState(30);
+  const [savingActionId, setSavingActionId] = useState<string | null>(null);
+  const [actionToast, setActionToast] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const pullStartY = useRef<number | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getProjectsFromSupabase().then(projects => {
@@ -206,7 +214,23 @@ export default function SupervisorHomePage() {
     setStatusDropdown('');
     setStatusFilter(null);
     setSearch('');
+    setFloorDisplayCount(20);
   }
+
+  // Show toast helper
+  function showActionToast(msg: string) {
+    setActionToast(msg);
+    setTimeout(() => setActionToast(null), 2500);
+  }
+
+  // Pull-to-refresh handler
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setRefreshKey(k => k + 1);
+    // Wait a minimum of 600ms so the spinner is visible
+    await new Promise(r => setTimeout(r, 600));
+    setRefreshing(false);
+  }, []);
 
   /** Gate: if activity is overdue in-progress with no delay_reason, capture reason first */
   function openDetail(row: UploadedActivity) {
@@ -222,6 +246,7 @@ export default function SupervisorHomePage() {
   }
 
   async function handleQuickAction(row: UploadedActivity, action: 'start' | 'complete') {
+    if (savingActionId) return; // prevent double-tap
     if (action === 'complete') {
       if (!row.actual_start) {
         setSelectedDetail(row);
@@ -247,6 +272,7 @@ export default function SupervisorHomePage() {
       setDelayPromptMode('overdue_start');
       return;
     }
+    setSavingActionId(row.id);
     const updates: ActivityUpdate = { status: 'in_progress', actual_start: TODAY };
     await updateActivityWithAudit(row.id, updates, {
       projectId: selectedProjectId,
@@ -259,6 +285,8 @@ export default function SupervisorHomePage() {
       stageGate: row.stage_gate,
       activityName: row.activity,
     });
+    setSavingActionId(null);
+    showActionToast('Activity started ✓');
     setRefreshKey(k => k + 1);
   }
 
@@ -276,6 +304,7 @@ export default function SupervisorHomePage() {
     }
 
     if (delayPromptMode === 'overdue_start') {
+      setSavingActionId(row.id);
       // Start the overdue activity with delay reason in one save
       const updates: ActivityUpdate = { status: 'in_progress', actual_start: TODAY, delay_reason: reason };
       await updateActivityWithAudit(row.id, updates, {
@@ -289,8 +318,10 @@ export default function SupervisorHomePage() {
         stageGate: row.stage_gate,
         activityName: row.activity,
       });
+      setSavingActionId(null);
       setDelayPromptRow(null);
       setDelayPromptMode('overdue_capture');
+      showActionToast('Activity started ✓');
       setRefreshKey(k => k + 1);
       return;
     }
@@ -382,6 +413,26 @@ export default function SupervisorHomePage() {
 
   return (
     <div className="min-h-screen bg-navy-dark flex flex-col max-w-md mx-auto">
+      {/* Action toast */}
+      {actionToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] max-w-xs">
+          <div className="bg-green-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+            </svg>
+            {actionToast}
+          </div>
+        </div>
+      )}
+
+      {/* Pull-to-refresh indicator */}
+      {refreshing && (
+        <div className="flex items-center justify-center py-2 bg-navy-dark">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs text-gray-400 ml-2">Refreshing...</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center justify-between mb-3">
@@ -394,6 +445,16 @@ export default function SupervisorHomePage() {
             <span className="text-lg font-bold text-white">Finishing <span className="text-primary">Pro</span></span>
           </div>
           <div className="flex items-center gap-1">
+            {/* Refresh button */}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <svg className={`w-4.5 h-4.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182" />
+              </svg>
+            </button>
             <NotificationDropdown variant="dark" />
             {/* Profile avatar */}
             <button
@@ -522,26 +583,32 @@ export default function SupervisorHomePage() {
 
         {/* Floor Tabs */}
         {(activeView === 'floor' || activeView === 'all') && (
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            <button
-              onClick={() => { setActiveView('all'); clearFilters(); setSelectedIds(new Set()); setBulkMode(false); }}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
-                activeView === 'all' ? 'bg-primary text-white' : 'bg-navy-light text-gray-300 hover:bg-navy-light/80'
-              }`}
-            >
-              All
-            </button>
-            {floors.map(f => (
+          <div className="relative">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
               <button
-                key={f}
-                onClick={() => { setActiveView('floor'); setActiveFloor(f); clearFilters(); setSelectedIds(new Set()); setBulkMode(false); }}
+                onClick={() => { setActiveView('all'); clearFilters(); setSelectedIds(new Set()); setBulkMode(false); }}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
-                  activeView === 'floor' && activeFloor === f ? 'bg-primary text-white' : 'bg-navy-light text-gray-300 hover:bg-navy-light/80'
+                  activeView === 'all' ? 'bg-primary text-white' : 'bg-navy-light text-gray-300 hover:bg-navy-light/80'
                 }`}
               >
-                Floor {f}
+                All
               </button>
-            ))}
+              {floors.map(f => (
+                <button
+                  key={f}
+                  onClick={() => { setActiveView('floor'); setActiveFloor(f); clearFilters(); setSelectedIds(new Set()); setBulkMode(false); setFloorDisplayCount(20); }}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
+                    activeView === 'floor' && activeFloor === f ? 'bg-primary text-white' : 'bg-navy-light text-gray-300 hover:bg-navy-light/80'
+                  }`}
+                >
+                  Floor {f}
+                </button>
+              ))}
+            </div>
+            {/* Scroll fade indicator for many floors */}
+            {floors.length > 5 && (
+              <div className="absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-navy-dark to-transparent pointer-events-none" />
+            )}
           </div>
         )}
 
@@ -567,7 +634,7 @@ export default function SupervisorHomePage() {
       </div>
 
       {/* Content area */}
-      <div className="flex-1 bg-gray-50 rounded-t-3xl px-4 pt-4 pb-24">
+      <div ref={contentRef} className="flex-1 bg-gray-50 rounded-t-3xl px-4 pt-4 pb-24">
 
         {/* Priority view content */}
         {(activeView === 'overdue' || activeView === 'due_today' || activeView === 'starting_today') && (
@@ -583,14 +650,25 @@ export default function SupervisorHomePage() {
                 </p>
               </div>
             ) : (
-              getPriorityRows().slice(0, 30).map(row => (
-                <PriorityCard
-                  key={row.id}
-                  row={row}
-                  onDetail={() => openDetail(row)}
-                  onQuickAction={(action) => handleQuickAction(row, action)}
-                />
-              ))
+              <>
+                {getPriorityRows().slice(0, priorityDisplayCount).map(row => (
+                  <PriorityCard
+                    key={row.id}
+                    row={row}
+                    savingId={savingActionId}
+                    onDetail={() => openDetail(row)}
+                    onQuickAction={(action) => handleQuickAction(row, action)}
+                  />
+                ))}
+                {getPriorityRows().length > priorityDisplayCount && (
+                  <button
+                    onClick={() => setPriorityDisplayCount(c => c + 30)}
+                    className="w-full py-3 text-sm font-semibold text-primary bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors"
+                  >
+                    Load More ({getPriorityRows().length - priorityDisplayCount} remaining)
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
@@ -811,22 +889,28 @@ export default function SupervisorHomePage() {
                   <p className="text-sm text-gray-500 mt-1">Try changing the filters or search keyword.</p>
                 </div>
               ) : (
-                floorRows.slice(0, 20).map(row => (
-                  <ActivityCard
-                    key={row.id}
-                    row={row}
-                    bulkMode={bulkMode}
-                    isSelected={selectedIds.has(row.id)}
-                    onToggleSelect={toggleSelection}
-                    onOpenDetail={openDetail}
-                    onQuickAction={handleQuickAction}
-                  />
-                ))
-              )}
-              {floorRows.length > 20 && (
-                <div className="text-center py-3 text-sm text-gray-500">
-                  Showing 20 of {floorRows.length} activities. Use filters to narrow down.
-                </div>
+                <>
+                  {floorRows.slice(0, floorDisplayCount).map(row => (
+                    <ActivityCard
+                      key={row.id}
+                      row={row}
+                      bulkMode={bulkMode}
+                      isSelected={selectedIds.has(row.id)}
+                      savingId={savingActionId}
+                      onToggleSelect={toggleSelection}
+                      onOpenDetail={openDetail}
+                      onQuickAction={handleQuickAction}
+                    />
+                  ))}
+                  {floorRows.length > floorDisplayCount && (
+                    <button
+                      onClick={() => setFloorDisplayCount(c => c + 20)}
+                      className="w-full py-3 text-sm font-semibold text-primary bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors"
+                    >
+                      Load More ({floorRows.length - floorDisplayCount} remaining)
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </>

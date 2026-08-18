@@ -35,6 +35,7 @@ export default function ActivityDetailSheet({
   const [pendingPhotos, setPendingPhotos] = useState<{ file: Blob; preview: string; fileName: string }[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const existingReason = activity.delay_reason || '';
   const isPresetReason = reasons.some(r => r.label === existingReason);
@@ -265,8 +266,10 @@ export default function ActivityDetailSheet({
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   {detailStatus === 'not_started'
-                    ? <>Reason for Non-Start <span className="text-gray-400 font-normal">(optional)</span></>
-                    : <>Delay Reason <span className="text-red-500">*</span></>
+                    ? <>Reason for Non-Start {isDelayReasonRequired(detailStatus, activity.expected_end) ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal">(optional)</span>}</>
+                    : detailStatus === 'on_hold'
+                      ? <>Hold Reason <span className="text-red-500">*</span></>
+                      : <>Delay Reason <span className="text-red-500">*</span></>
                   }
                 </label>
                 <select
@@ -350,7 +353,8 @@ export default function ActivityDetailSheet({
                       <img
                         src={photo.url}
                         alt={photo.file_name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => setLightboxUrl(photo.url || null)}
                       />
                       <button
                         onClick={() => handleDeletePhoto(photo)}
@@ -366,7 +370,8 @@ export default function ActivityDetailSheet({
                       <img
                         src={pending.preview}
                         alt={pending.fileName}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => setLightboxUrl(pending.preview)}
                       />
                       <div className="absolute bottom-0 left-0 right-0 bg-amber-500 text-white text-[9px] text-center py-0.5 font-medium">
                         Unsaved
@@ -425,6 +430,29 @@ export default function ActivityDetailSheet({
           </button>
         </div>
       </div>
+
+      {/* Photo lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center bg-white/20 rounded-full text-white hover:bg-white/30 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Photo"
+            className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

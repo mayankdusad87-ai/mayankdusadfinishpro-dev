@@ -6,11 +6,13 @@ import { STATUS_CONFIG, normalizeStatus, daysOverdue, TODAY } from './supervisor
 
 interface PriorityCardProps {
   row: UploadedActivity;
+  savingId?: string | null;
   onDetail: () => void;
   onQuickAction: (action: 'start' | 'complete') => void;
 }
 
-function PriorityCard({ row, onDetail, onQuickAction }: PriorityCardProps) {
+function PriorityCard({ row, savingId, onDetail, onQuickAction }: PriorityCardProps) {
+  const isSaving = savingId === row.id;
   const status = normalizeStatus(row.status);
   const sc = STATUS_CONFIG[status];
   const overdueDays = row.expected_end && row.expected_end < TODAY ? daysOverdue(row.expected_end) : 0;
@@ -41,17 +43,27 @@ function PriorityCard({ row, onDetail, onQuickAction }: PriorityCardProps) {
           {status === 'not_started' && (
             <button
               onClick={() => onQuickAction('start')}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-colors"
+              disabled={isSaving}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                isSaving ? 'bg-blue-100 text-blue-400 cursor-not-allowed' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+              }`}
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-              </svg>
-              Start
+              {isSaving ? (
+                <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                </svg>
+              )}
+              {isSaving ? 'Starting...' : 'Start'}
             </button>
           )}
           <button
             onClick={() => onQuickAction('complete')}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-50 text-green-700 text-xs font-semibold hover:bg-green-100 transition-colors"
+            disabled={isSaving}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+              isSaving ? 'bg-green-100 text-green-400 cursor-not-allowed' : 'bg-green-50 text-green-700 hover:bg-green-100'
+            }`}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
