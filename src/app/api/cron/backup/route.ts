@@ -171,8 +171,16 @@ export async function GET(req: NextRequest) {
   try {
     serviceKey = JSON.parse(serviceKeyRaw);
   } catch {
-    console.error('[backup] Invalid GOOGLE_SERVICE_ACCOUNT_KEY JSON');
-    return NextResponse.json({ error: 'Invalid service account key' }, { status: 500 });
+    // Vercel may convert literal \n to real newlines inside strings, breaking JSON.
+    // Try replacing real newlines (except those inside the PEM block) back to \n.
+    try {
+      const fixed = serviceKeyRaw.replace(/\n/g, '\\n').replace(/\\\\n/g, '\\n');
+      serviceKey = JSON.parse(fixed);
+    } catch (e2) {
+      console.error('[backup] Invalid GOOGLE_SERVICE_ACCOUNT_KEY JSON. First 80 chars:', serviceKeyRaw.slice(0, 80));
+      console.error('[backup] Parse error:', e2 instanceof Error ? e2.message : e2);
+      return NextResponse.json({ error: 'Invalid service account key' }, { status: 500 });
+    }
   }
 
   try {
