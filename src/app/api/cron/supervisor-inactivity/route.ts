@@ -6,11 +6,17 @@ const INACTIVITY_THRESHOLD_DAYS = 2;
 
 /**
  * Cron endpoint: checks for supervisors inactive for 2+ days.
- * Sends a single consolidated escalation email to all admins,
+ *
+ * "Inactive" = no status updates in audit_log for 2+ days.
+ * This is the real activity signal — a supervisor may stay logged
+ * in via session cookie but if they haven't updated any activity
+ * status, they're not doing their job on site.
+ *
+ * Sends a single consolidated escalation email TO all admins,
  * with inactive supervisors in CC.
  *
  * Protected by CRON_SECRET to prevent unauthorized access.
- * Vercel Cron calls this daily (see vercel.json).
+ * Vercel Cron calls this daily at 7 AM IST (see vercel.json).
  */
 export async function GET(req: NextRequest) {
   // ---- Auth: only Vercel Cron or manual call with secret ----
@@ -29,7 +35,6 @@ export async function GET(req: NextRequest) {
         id,
         full_name,
         email,
-        is_active,
         supervisor_assignments(
           project_id,
           projects(name)
@@ -47,64 +52,42 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'No active supervisors', sent: false });
     }
 
-    // 2. Fetch last_sign_in_at from Supabase Auth for each supervisor
+    // 2. For each supervisor, find their most recent audit_log entry
+    //    audit_log.changed_by = supervisor's profile ID
+    //    This is more accurate than last_sign_in_at because it tracks
+    //    actual work (status updates), not just password entry.
     const now = new Date();
     const inactiveSupervisors: Array<{
       name: string;
       email: string;
       project: string;
-      lastLogin: string;
-      daysSinceLogin: number;
+      lastLogin: string;      // relabeled as "Last Activity" in email
+      daysSinceLogin: number;  // days since last activity
     }> = [];
 
-    // Fetch auth users in batches (Supabase listUsers returns paginated)
-    const supervisorIds = supervisors.map(s => s.id);
-    const authUsersMap = new Map<string, string | null>();
-
-    let page = 1;
-    const perPage = 50;
-    let hasMore = true;
-
-    while (hasMore) {
-      const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.listUsers({
-        page,
-        perPage,
-      });
-
-      if (authErr || !authData?.users) {
-        console.error('[cron/supervisor-inactivity] Failed to fetch auth users:', authErr?.message);
-        break;
-      }
-
-      for (const user of authData.users) {
-        if (supervisorIds.includes(user.id)) {
-          authUsersMap.set(user.id, user.last_sign_in_at || null);
-        }
-      }
-
-      // Check if there are more pages
-      if (authData.users.length < perPage) {
-        hasMore = false;
-      } else {
-        page++;
-      }
-    }
-
-    // 3. Find supervisors inactive for 2+ days
     for (const sup of supervisors) {
-      const lastSignIn = authUsersMap.get(sup.id);
+      // Get the most recent audit_log entry for this supervisor
+      const { data: lastAudit } = await supabaseAdmin
+        .from('audit_log')
+        .select('created_at')
+        .eq('changed_by', sup.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-      let daysSinceLogin: number;
-      let lastLoginText: string;
+      let daysSinceActivity: number;
+      let lastActivityText: string;
 
-      if (!lastSignIn) {
-        // Never logged in
-        daysSinceLogin = 999;
-        lastLoginText = 'Never logged in';
+      if (!lastAudit?.created_at) {
+        // No audit entries — never made any updates
+        daysSinceActivity = 999;
+        lastActivityText = 'No activity recorded';
       } else {
-        const lastDate = new Date(lastSignIn);
-        daysSinceLogin = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-        lastLoginText = lastDate.toLocaleDateString('en-IN', {
+        const lastDate = new Date(lastAudit.created_at);
+        daysSinceActivity = Math.floor(
+          (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24),
+        );
+        lastActivityText = lastDate.toLocaleDateString('en-IN', {
           day: 'numeric',
           month: 'short',
           year: 'numeric',
@@ -113,8 +96,7 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      if (daysSinceLogin >= INACTIVITY_THRESHOLD_DAYS && sup.email) {
-        // Get project name from assignment
+      if (daysSinceActivity >= INACTIVITY_THRESHOLD_DAYS && sup.email) {
         const assignments = (sup.supervisor_assignments as Array<{
           project_id: string;
           projects: { name: string } | null;
@@ -125,8 +107,8 @@ export async function GET(req: NextRequest) {
           name: sup.full_name,
           email: sup.email,
           project: projectName,
-          lastLogin: lastLoginText,
-          daysSinceLogin: Math.min(daysSinceLogin, 999), // cap display
+          lastLogin: lastActivityText,
+          daysSinceLogin: Math.min(daysSinceActivity, 999),
         });
       }
     }
@@ -135,7 +117,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'All supervisors active', sent: false });
     }
 
-    // 4. Fetch admin emails (all admins get the escalation)
+    // 3. Fetch admin emails (all admins get the escalation)
     const { data: admins } = await supabaseAdmin
       .from('profiles')
       .select('email')
@@ -151,7 +133,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'No admin emails configured', sent: false });
     }
 
-    // 5. Send consolidated email — TO: admins, CC: inactive supervisors
+    // 4. Send consolidated email — TO: admins, CC: inactive supervisors
     const supervisorEmails = inactiveSupervisors.map(s => s.email);
     const supervisorCount = inactiveSupervisors.length;
 
@@ -163,7 +145,7 @@ export async function GET(req: NextRequest) {
     });
 
     console.log(
-      `[cron/supervisor-inactivity] ${supervisorCount} inactive supervisor(s) found. Email sent: ${emailSent}`,
+      `[cron/supervisor-inactivity] ${supervisorCount} inactive supervisor(s). Email sent: ${emailSent}`,
       inactiveSupervisors.map(s => `${s.name} (${s.daysSinceLogin}d)`).join(', '),
     );
 
@@ -172,7 +154,7 @@ export async function GET(req: NextRequest) {
       sent: emailSent,
       supervisors: inactiveSupervisors.map(s => ({
         name: s.name,
-        daysSinceLogin: s.daysSinceLogin,
+        daysSinceActivity: s.daysSinceLogin,
       })),
     });
   } catch (err) {

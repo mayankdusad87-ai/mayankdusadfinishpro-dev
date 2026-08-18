@@ -157,7 +157,7 @@ export function inactivityEscalationEmailHtml(
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 640px; margin: 0 auto;">
       <div style="background: #162032; color: white; padding: 20px 24px; border-radius: 8px 8px 0 0;">
         <h2 style="margin: 0; font-size: 18px; color: #C8922A;">⚠️ Supervisor Inactivity Alert</h2>
-        <p style="margin: 6px 0 0; font-size: 13px; color: #94a3b8;">The following supervisor(s) have not logged in for over 2 days</p>
+        <p style="margin: 6px 0 0; font-size: 13px; color: #94a3b8;">The following supervisor(s) have not updated any activity for over 2 days</p>
       </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
         <p style="margin: 0 0 16px; color: #374151; font-size: 14px;">
@@ -169,7 +169,7 @@ export function inactivityEscalationEmailHtml(
             <tr style="background: #f9fafb;">
               <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Supervisor</th>
               <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Project</th>
-              <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Last Login</th>
+              <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Last Activity</th>
               <th style="padding: 10px 12px; text-align: center; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Inactive</th>
             </tr>
           </thead>
