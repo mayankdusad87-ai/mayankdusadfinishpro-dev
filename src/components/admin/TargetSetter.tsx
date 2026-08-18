@@ -52,8 +52,8 @@ export default function TargetSetter() {
       const [targetsRes, stagesRes, floorsRes] = await Promise.all([
         supabase.from('project_milestones').select('id, stage, floor_from, floor_to, target_date, notes, title')
           .eq('project_id', currentProject.id).order('target_date', { ascending: true }),
-        supabase.from('activities').select('stage').eq('project_id', currentProject.id),
-        supabase.from('activities').select('floor').eq('project_id', currentProject.id),
+        supabase.from('activities').select('stage').eq('project_id', currentProject.id).limit(10000),
+        supabase.from('activities').select('floor').eq('project_id', currentProject.id).limit(10000),
       ]);
       setTargets((targetsRes.data || []) as TargetRow[]);
       setStages([...new Set((stagesRes.data || []).map(r => r.stage))].sort());
@@ -158,7 +158,7 @@ export default function TargetSetter() {
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Project Targets</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            Set monthly targets for {currentProject.name}. e.g. &quot;Complete Pre-Tiling for Floors 3–8 by Sep 15&quot;
+            Set monthly targets for {currentProject.name}. For non-contiguous floors (e.g. 1–2 and 18–19), create separate targets.
           </p>
         </div>
         <button
