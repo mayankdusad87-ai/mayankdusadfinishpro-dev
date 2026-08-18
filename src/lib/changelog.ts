@@ -49,6 +49,12 @@ export const CHANGELOG: ChangelogEntry[] = [
         description:
           'The Management Insights page now features a navy gradient header, colored percentage badges, and a more professional look across Pipeline, Site Pulse, and Fix This sections.',
       },
+      {
+        emoji: '📧',
+        title: 'Supervisor Inactivity Alerts',
+        description:
+          'A daily automated check detects supervisors who haven\'t updated any activity for 2+ days and sends an escalation email to all admins, with the inactive supervisors in CC.',
+      },
     ],
   },
   {
