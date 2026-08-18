@@ -4,22 +4,14 @@ import { memo, useState } from 'react';
 import type { ManagementData, StageFloorBreakdown } from '@/lib/insights-data';
 import type { UnitStore } from '@/repositories/store-repo';
 import MaterialStores from '@/components/admin/MaterialStores';
-import MilestoneTracker from '@/components/admin/MilestoneTracker';
-
-interface ActivityForMilestone {
-  floor: number;
-  flat_number: number;
-  stage: string;
-  stage_gate: string | null;
-  status: string;
-}
+import TargetAchievement from '@/components/admin/TargetAchievement';
+import { useRole } from '@/hooks/use-permission';
 
 interface Props {
   data: ManagementData;
   projectName: string;
   projectId: string;
   stores?: UnitStore[];
-  activities?: ActivityForMilestone[];
   stages?: string[];
   floors?: number[];
 }
@@ -114,10 +106,11 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
   );
 }
 
-function ManagementView({ data, projectName, projectId, stores = [], activities = [], stages = [], floors = [] }: Props) {
+function ManagementView({ data, projectName, projectId, stores = [], stages = [], floors = [] }: Props) {
   const { pipeline, bottlenecks, stageFloorBreakdowns, sitePulse } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [pulseExpanded, setPulseExpanded] = useState(false);
+  const role = useRole();
 
   return (
     <div className="space-y-5">
@@ -222,14 +215,14 @@ function ManagementView({ data, projectName, projectId, stores = [], activities 
         />
       )}
 
-      {/* ---- SECTION 3b: MILESTONE TRACKER ---- */}
+      {/* ---- SECTION 3b: TARGET ACHIEVEMENT ---- */}
       {projectId && (
-        <MilestoneTracker
+        <TargetAchievement
           projectId={projectId}
           projectName={projectName}
-          activities={activities}
           stages={stages}
           floors={floors}
+          isAdmin={role === 'admin'}
         />
       )}
 

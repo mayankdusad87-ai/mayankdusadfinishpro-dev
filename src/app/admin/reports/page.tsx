@@ -313,7 +313,6 @@ export default function InsightsPage() {
               projectName={currentProject.name}
               projectId={currentProject.id}
               stores={unitStores}
-              activities={activityRows}
               stages={stageList}
               floors={uniqueFloors}
             />
