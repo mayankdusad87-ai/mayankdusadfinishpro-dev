@@ -318,30 +318,21 @@ export default function SupervisorHomePage() {
     setRefreshKey(k => k + 1);
   }
 
-  async function confirmComplete(withPhoto: boolean) {
+  async function confirmComplete(_withPhoto: boolean) {
     if (showPhotoPrompt) {
       const row = allActivities.find(r => r.id === showPhotoPrompt);
       if (!row) { setShowPhotoPrompt(null); setPendingCompleteReason(null); return; }
 
-      const updates: ActivityUpdate = { status: 'completed', actual_end: TODAY };
-      if (!row.actual_start) updates.actual_start = TODAY;
-      if (pendingCompleteReason) updates.delay_reason = pendingCompleteReason;
-
-      await updateActivityWithAudit(showPhotoPrompt, updates, {
-        projectId: selectedProjectId,
-        changedBy: user?.id || '',
-        oldStatus: row.status,
-        newStatus: 'completed',
-        floor: row.floor,
-        flatNumber: row.flat_number,
-        stage: row.stage,
-        stageGate: row.stage_gate,
-        activityName: row.activity,
+      // Don't save completed status here — open the detail sheet instead.
+      // The detail sheet enforces photo upload before allowing completion.
+      // Pre-set status to completed so the detail sheet opens with it selected.
+      setSelectedDetail({
+        ...row,
+        status: 'completed',
+        actual_end: row.actual_end || TODAY,
+        actual_start: row.actual_start || TODAY,
+        delay_reason: pendingCompleteReason || row.delay_reason || '',
       });
-      setRefreshKey(k => k + 1);
-      if (withPhoto) {
-        setSelectedDetail({ ...row, status: 'completed', actual_end: TODAY, actual_start: row.actual_start || TODAY });
-      }
     }
     setShowPhotoPrompt(null);
     setPendingCompleteReason(null);

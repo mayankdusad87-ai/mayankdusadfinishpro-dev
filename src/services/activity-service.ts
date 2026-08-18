@@ -222,10 +222,21 @@ export async function bulkUpdateStatus(
   newStatus: 'in_progress' | 'completed',
   projectId: string,
   userId: string,
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; skippedNoPhoto?: number }> {
+  let skippedNoPhoto = 0;
+
   for (const id of activityIds) {
     const row = allActivities.find(r => r.id === id);
     if (!row || normalizeToDisplayStatus(row.status) === 'completed') continue;
+
+    // For bulk complete: skip activities that have no photos
+    if (newStatus === 'completed') {
+      const photoCount = await getPhotoCount(id);
+      if (photoCount === 0) {
+        skippedNoPhoto++;
+        continue;
+      }
+    }
 
     const updates = computeBulkUpdate(row.status, row.actual_start, newStatus);
 
@@ -241,7 +252,7 @@ export async function bulkUpdateStatus(
       activityName: row.activity,
     });
   }
-  return { error: null };
+  return { error: null, skippedNoPhoto };
 }
 
 export async function bulkUpdateField(
