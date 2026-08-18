@@ -27,16 +27,35 @@ export interface ChangelogEntry {
 // Newest entry first — the modal always shows CHANGELOG[0]
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.19',
+    headline: "Here's what's new in FinishPro",
+    date: 'August 19, 2026',
+    features: [
+      {
+        emoji: '🎯',
+        title: 'Target Achievement',
+        description:
+          'Set monthly targets per stage and floor range from Settings, then track live achievement on the Insights page — circular progress rings, status badges (Achieved, At Risk, Missed), and delay reasons at a glance.',
+      },
+      {
+        emoji: '⚙️',
+        title: 'Target Setter in Settings',
+        description:
+          'Admins can create, edit, and delete project targets from the Settings page. Supports non-contiguous floors by creating separate targets.',
+      },
+      {
+        emoji: '🎨',
+        title: 'Refreshed Insights UI',
+        description:
+          'The Management Insights page now features a navy gradient header, colored percentage badges, and a more professional look across Pipeline, Site Pulse, and Fix This sections.',
+      },
+    ],
+  },
+  {
     version: '2026.08.18',
     headline: "Here's what's new in FinishPro",
     date: 'August 18, 2026',
     features: [
-      {
-        emoji: '🎯',
-        title: 'Milestone Tracker',
-        description:
-          'Set target dates for each stage and floor range, and track progress with SPI scores. See at a glance which milestones are on track, at risk, or critical.',
-      },
       {
         emoji: '✉️',
         title: 'Welcome Email',
