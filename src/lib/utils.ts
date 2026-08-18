@@ -51,7 +51,6 @@ export function resolveStatus(userStatus: string, expectedEnd: string | null): s
   if (!expectedEnd) return userStatus;
   const overdue = expectedEnd < todayISO();
   if (userStatus === 'in_progress' && overdue) return 'in_progress_delayed';
-  if (userStatus === 'not_started' && overdue) return 'delayed';
   if (userStatus === 'completed' && overdue) return 'completed_delayed';
   return userStatus;
 }
@@ -69,11 +68,11 @@ export function isDelayReasonVisible(userStatus: string, expectedEnd: string | n
 
 /**
  * Is the delay reason mandatory (blocks save)?
- * True for on_hold and in_progress+overdue. NOT required for not_started+overdue (optional).
+ * True for on_hold, in_progress+overdue, and not_started+overdue.
  */
 export function isDelayReasonRequired(userStatus: string, expectedEnd: string | null): boolean {
   if (userStatus === 'on_hold') return true;
-  if (userStatus === 'completed' || userStatus === 'not_started') return false;
+  if (userStatus === 'completed') return false;
   if (!expectedEnd) return false;
   return expectedEnd < todayISO();
 }
