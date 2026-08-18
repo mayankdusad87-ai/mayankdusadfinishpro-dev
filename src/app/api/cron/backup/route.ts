@@ -177,9 +177,14 @@ export async function GET(req: NextRequest) {
       const fixed = serviceKeyRaw.replace(/\n/g, '\\n').replace(/\\\\n/g, '\\n');
       serviceKey = JSON.parse(fixed);
     } catch (e2) {
-      console.error('[backup] Invalid GOOGLE_SERVICE_ACCOUNT_KEY JSON. First 80 chars:', serviceKeyRaw.slice(0, 80));
+      const snippet = serviceKeyRaw.slice(0, 40);
+      const len = serviceKeyRaw.length;
+      console.error('[backup] Invalid GOOGLE_SERVICE_ACCOUNT_KEY JSON. Length:', len, 'Start:', snippet);
       console.error('[backup] Parse error:', e2 instanceof Error ? e2.message : e2);
-      return NextResponse.json({ error: 'Invalid service account key' }, { status: 500 });
+      return NextResponse.json({
+        error: 'Invalid service account key',
+        debug: { length: len, startsWith: snippet, parseError: e2 instanceof Error ? e2.message : String(e2) },
+      }, { status: 500 });
     }
   }
 
