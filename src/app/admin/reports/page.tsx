@@ -313,8 +313,6 @@ export default function InsightsPage() {
               projectName={currentProject.name}
               projectId={currentProject.id}
               stores={unitStores}
-              stages={stageList}
-              floors={uniqueFloors}
             />
           )}
           {tab === 'operations' && (opsLoading ? (

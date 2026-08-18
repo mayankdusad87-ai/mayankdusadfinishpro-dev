@@ -5,15 +5,12 @@ import type { ManagementData, StageFloorBreakdown } from '@/lib/insights-data';
 import type { UnitStore } from '@/repositories/store-repo';
 import MaterialStores from '@/components/admin/MaterialStores';
 import TargetAchievement from '@/components/admin/TargetAchievement';
-import { useRole } from '@/hooks/use-permission';
 
 interface Props {
   data: ManagementData;
   projectName: string;
   projectId: string;
   stores?: UnitStore[];
-  stages?: string[];
-  floors?: number[];
 }
 
 function formatDate(d: string | null): string {
@@ -27,23 +24,30 @@ const REASON_COLORS = ['#EF4444', '#3B82F6', '#F59E0B'];
 function barColor(pct: number): string {
   if (pct >= 80) return '#10B981';
   if (pct >= 50) return '#F59E0B';
-  if (pct > 0) return '#EF4444';
+  if (pct > 0) return '#F97316';
   return '#E5E7EB';
 }
 
 function barTextColor(pct: number): string {
   if (pct >= 80) return '#059669';
   if (pct >= 50) return '#D97706';
-  if (pct > 0) return '#DC2626';
+  if (pct > 0) return '#EA580C';
   return '#9CA3AF';
+}
+
+function pctBadgeBg(pct: number): string {
+  if (pct >= 80) return 'bg-emerald-100 text-emerald-700';
+  if (pct >= 50) return 'bg-amber-100 text-amber-700';
+  if (pct > 0) return 'bg-orange-100 text-orange-700';
+  return 'bg-gray-100 text-gray-500';
 }
 
 function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdowns: StageFloorBreakdown[]; onClose: () => void }) {
   return (
-    <div className="bg-white rounded-xl border-2 border-primary/20 p-4 md:p-6 animate-in fade-in duration-200">
+    <div className="bg-white rounded-xl border-2 border-[#C8922A]/20 p-4 md:p-6 animate-in fade-in duration-200">
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-sm md:text-base font-bold text-gray-900">
-          <span className="text-primary mr-1.5">&#9660;</span>
+          <span className="text-[#C8922A] mr-1.5">▾</span>
           {stage} — floor breakdown
         </h4>
         <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-600 transition-colors cursor-pointer flex items-center gap-1">
@@ -106,107 +110,121 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
   );
 }
 
-function ManagementView({ data, projectName, projectId, stores = [], stages = [], floors = [] }: Props) {
+function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
   const { pipeline, bottlenecks, stageFloorBreakdowns, sitePulse } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
   const [pulseExpanded, setPulseExpanded] = useState(false);
-  const role = useRole();
 
   return (
     <div className="space-y-5">
 
+      {/* ---- SECTION 0: TARGET ACHIEVEMENT (READ-ONLY, AT THE TOP) ---- */}
+      {projectId && (
+        <TargetAchievement
+          projectId={projectId}
+          projectName={projectName}
+        />
+      )}
+
       {/* ---- SECTION 1: PIPELINE FUNNEL ---- */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-4 md:mb-5">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Header with navy gradient */}
+        <div className="px-4 md:px-6 py-3.5 bg-gradient-to-r from-[#162032] to-[#1e2d45] flex items-center justify-between">
           <div>
-            <h3 className="text-base md:text-lg font-bold text-gray-900">Flat Completion Pipeline</h3>
+            <h3 className="text-sm md:text-base font-bold text-white">Flat Completion Pipeline</h3>
             <p className="text-xs text-gray-400 mt-0.5">Click a stage to see floor-level breakdown</p>
           </div>
-          <span className="text-xs text-gray-400 hidden md:inline">{projectName}</span>
+          <span className="text-xs text-gray-500 hidden md:inline">{projectName}</span>
         </div>
 
-        {/* Desktop: horizontal funnel */}
-        <div className="hidden md:block">
-          <div className="flex gap-3">
+        <div className="p-4 md:p-6">
+          {/* Desktop: horizontal funnel */}
+          <div className="hidden md:block">
+            <div className="flex gap-3">
+              {pipeline.map((s, i) => {
+                const w = s.totalFlats > 0 ? (s.completedFlats / s.totalFlats) * 100 : 0;
+                const isActive = selectedStage === s.stage;
+                return (
+                  <div key={s.stage} className="flex-1 relative">
+                    {i < pipeline.length - 1 && (
+                      <div className="absolute -right-2 top-1/2 -translate-y-1/2 z-10">
+                        <svg width="12" height="16" viewBox="0 0 12 16" fill="none">
+                          <path d="M2 1L10 8L2 15" stroke="#C8922A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
+                        </svg>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setSelectedStage(isActive ? null : s.stage)}
+                      className={`w-full rounded-xl p-4 border text-center transition-all cursor-pointer ${
+                        isActive
+                          ? 'border-[#C8922A] ring-2 ring-[#C8922A]/20 bg-[#C8922A]/5'
+                          : 'border-gray-100 bg-gray-50/80 hover:border-gray-300 hover:shadow-md hover:bg-white'
+                      }`}
+                    >
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 truncate">{s.stage}</div>
+                      <div className="text-2xl font-bold text-gray-900 tabular-nums">{s.completedFlats}</div>
+                      <div className="text-xs text-gray-400 tabular-nums">/ {s.totalFlats} flats</div>
+                      <div className="w-full h-2.5 bg-gray-200 rounded-full mt-3 overflow-hidden">
+                        <div className="h-2.5 rounded-full transition-all duration-500" style={{ width: `${w}%`, backgroundColor: barColor(w) }} />
+                      </div>
+                      <div className={`inline-flex items-center mt-2 px-2 py-0.5 rounded-full text-[11px] font-bold tabular-nums ${pctBadgeBg(w)}`}>
+                        {s.pct}%
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Mobile: vertical list */}
+          <div className="md:hidden space-y-3">
             {pipeline.map((s, i) => {
               const w = s.totalFlats > 0 ? (s.completedFlats / s.totalFlats) * 100 : 0;
+              const bc = barColor(w);
               const isActive = selectedStage === s.stage;
               return (
-                <div key={s.stage} className="flex-1 relative">
-                  {i < pipeline.length - 1 && (
-                    <div className="absolute -right-2 top-1/2 -translate-y-1/2 z-10">
-                      <svg width="12" height="16" viewBox="0 0 12 16" fill="none">
-                        <path d="M2 1L10 8L2 15" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <div key={s.stage}>
+                  <button
+                    onClick={() => setSelectedStage(isActive ? null : s.stage)}
+                    className={`w-full text-left rounded-xl p-3 transition-all cursor-pointer border ${
+                      isActive
+                        ? 'ring-2 ring-[#C8922A]/20 bg-[#C8922A]/5 border-[#C8922A]'
+                        : 'bg-gray-50/80 border-gray-100 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-[#162032] flex items-center justify-center text-[10px] font-bold text-white">{i + 1}</span>
+                        <span className="text-sm font-semibold text-gray-800">{s.stage}</span>
+                      </div>
+                      <div className="text-sm tabular-nums">
+                        <span className="font-bold text-gray-900">{s.completedFlats}</span>
+                        <span className="text-gray-400"> / {s.totalFlats}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-3 rounded-full transition-all duration-500" style={{ width: `${w}%`, backgroundColor: bc }} />
+                      </div>
+                      <span className={`text-xs font-bold tabular-nums w-12 text-right px-1.5 py-0.5 rounded-full ${pctBadgeBg(w)}`}>{s.pct}%</span>
+                    </div>
+                  </button>
+                  {i < pipeline.length - 1 && !isActive && (
+                    <div className="flex justify-center py-1">
+                      <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
+                        <path d="M8 2V10M8 10L4 6M8 10L12 6" stroke="#C8922A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
                       </svg>
                     </div>
                   )}
-                  <button
-                    onClick={() => setSelectedStage(isActive ? null : s.stage)}
-                    className={`w-full bg-gray-50 rounded-lg p-4 border text-center transition-all cursor-pointer ${
-                      isActive
-                        ? 'border-primary ring-2 ring-primary/20'
-                        : 'border-gray-100 hover:border-gray-300 hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 truncate">{s.stage}</div>
-                    <div className="text-2xl font-bold text-gray-900 tabular-nums">{s.completedFlats}</div>
-                    <div className="text-xs text-gray-400 tabular-nums">/ {s.totalFlats} flats</div>
-                    <div className="w-full h-2 bg-gray-200 rounded-full mt-3">
-                      <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${w}%`, backgroundColor: barColor(w) }} />
-                    </div>
-                    <div className="text-[11px] font-semibold mt-1.5 tabular-nums" style={{ color: barTextColor(w) }}>{s.pct}%</div>
-                  </button>
                 </div>
               );
             })}
           </div>
         </div>
-
-        {/* Mobile: vertical list */}
-        <div className="md:hidden space-y-3">
-          {pipeline.map((s, i) => {
-            const w = s.totalFlats > 0 ? (s.completedFlats / s.totalFlats) * 100 : 0;
-            const bc = barColor(w);
-            const isActive = selectedStage === s.stage;
-            return (
-              <div key={s.stage}>
-                <button
-                  onClick={() => setSelectedStage(isActive ? null : s.stage)}
-                  className={`w-full text-left rounded-lg p-2.5 transition-all cursor-pointer ${
-                    isActive ? 'ring-2 ring-primary/20 bg-primary/5' : ''
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500">{i + 1}</span>
-                      <span className="text-sm font-semibold text-gray-800">{s.stage}</span>
-                    </div>
-                    <div className="text-sm tabular-nums">
-                      <span className="font-bold text-gray-900">{s.completedFlats}</span>
-                      <span className="text-gray-400"> / {s.totalFlats}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-3 rounded-full transition-all duration-500" style={{ width: `${w}%`, backgroundColor: bc }} />
-                    </div>
-                    <span className="text-xs font-bold tabular-nums w-10 text-right" style={{ color: bc === '#E5E7EB' ? '#9CA3AF' : bc }}>{s.pct}%</span>
-                  </div>
-                </button>
-                {i < pipeline.length - 1 && !isActive && (
-                  <div className="flex justify-center py-1">
-                    <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
-                      <path d="M8 2V10M8 10L4 6M8 10L12 6" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       </div>
 
-      {/* ---- SECTION 3: STAGE DRILL-DOWN ---- */}
+      {/* ---- SECTION 2: STAGE DRILL-DOWN ---- */}
       {selectedStage && stageFloorBreakdowns[selectedStage] && (
         <DrilldownPanel
           stage={selectedStage}
@@ -215,27 +233,16 @@ function ManagementView({ data, projectName, projectId, stores = [], stages = []
         />
       )}
 
-      {/* ---- SECTION 3b: TARGET ACHIEVEMENT ---- */}
-      {projectId && (
-        <TargetAchievement
-          projectId={projectId}
-          projectName={projectName}
-          stages={stages}
-          floors={floors}
-          isAdmin={role === 'admin'}
-        />
-      )}
-
-      {/* ---- SECTION 4: FIX THIS ---- */}
+      {/* ---- SECTION 3: FIX THIS ---- */}
       <div>
         <div className="flex items-center gap-2.5 mb-3">
           <h3 className="text-base md:text-lg font-bold text-gray-900">Fix This</h3>
           {bottlenecks.length > 0 ? (
-            <span className="text-[11px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+            <span className="text-[11px] font-bold bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full">
               {bottlenecks.length} {bottlenecks.length === 1 ? 'blocker' : 'blockers'}
             </span>
           ) : (
-            <span className="text-[11px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+            <span className="text-[11px] font-bold bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full">
               All clear
             </span>
           )}
@@ -253,12 +260,12 @@ function ManagementView({ data, projectName, projectId, stores = [], stages = []
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {bottlenecks.map(b => (
-              <div key={`${b.floor}-${b.blockedStage}`} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="h-[3px] bg-red-500" />
+              <div key={`${b.floor}-${b.blockedStage}`} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+                <div className="h-[3px] bg-gradient-to-r from-red-500 to-red-400" />
                 <div className="p-4">
                   <div className="flex items-baseline justify-between mb-0.5">
                     <span className="text-sm font-bold text-gray-900">Floor {b.floor}</span>
-                    <span className="text-xs font-semibold text-red-600">{b.maxDaysBehind}d behind</span>
+                    <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{b.maxDaysBehind}d behind</span>
                   </div>
                   <div className="text-xs font-semibold text-red-600 mb-3">Stuck at {b.blockedStage}</div>
 
@@ -290,8 +297,8 @@ function ManagementView({ data, projectName, projectId, stores = [], stages = []
                                 </div>
                                 <span className={`text-xs font-semibold ${isNoReason ? 'text-gray-400' : 'text-gray-900'}`}>{dr.flatCount} {dr.flatCount === 1 ? 'flat' : 'flats'}</span>
                               </div>
-                              <div className="w-full h-1 bg-gray-100 rounded-full">
-                                <div className="h-1 rounded-full transition-all" style={{ width: `${barPct}%`, backgroundColor: dotColor, opacity: isNoReason ? 0.5 : 0.7 }} />
+                              <div className="w-full h-1.5 bg-gray-100 rounded-full">
+                                <div className="h-1.5 rounded-full transition-all" style={{ width: `${barPct}%`, backgroundColor: dotColor, opacity: isNoReason ? 0.5 : 0.7 }} />
                               </div>
                             </div>
                           );
@@ -306,124 +313,133 @@ function ManagementView({ data, projectName, projectId, stores = [], stages = []
         )}
       </div>
 
-      {/* ---- SECTION 5: SITE PULSE ---- */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
-        <h3 className="text-base md:text-lg font-bold text-gray-900 mb-4">Site Pulse</h3>
-
-        {/* 1. Completion snapshot */}
-        <div className="mb-5">
-          <div className="flex items-baseline justify-between mb-2">
-            <div className="text-sm text-gray-700">
-              <span className="text-2xl md:text-3xl font-bold text-gray-900 tabular-nums">{sitePulse.fullyFinishedFlats}</span>
-              <span className="text-gray-400 mx-1">of</span>
-              <span className="text-lg font-semibold text-gray-600 tabular-nums">{sitePulse.totalFlats}</span>
-              <span className="text-gray-500 ml-1.5">flats fully finished</span>
-            </div>
-            <span className="text-sm font-bold tabular-nums" style={{ color: sitePulse.completionPct >= 50 ? '#059669' : sitePulse.completionPct >= 20 ? '#D97706' : '#6B7280' }}>
-              {sitePulse.completionPct}%
-            </span>
-          </div>
-          <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-3 rounded-full transition-all duration-700"
-              style={{
-                width: `${sitePulse.completionPct}%`,
-                backgroundColor: sitePulse.completionPct >= 50 ? '#10B981' : sitePulse.completionPct >= 20 ? '#F59E0B' : '#9CA3AF',
-              }}
-            />
-          </div>
+      {/* ---- SECTION 4: SITE PULSE ---- */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 md:px-6 py-3.5 bg-gradient-to-r from-[#162032] to-[#1e2d45]">
+          <h3 className="text-sm md:text-base font-bold text-white">Site Pulse</h3>
         </div>
 
-        {/* 2. This week's velocity */}
-        <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-3 mb-4">
-          <div className="flex-1">
-            <div className="text-sm text-gray-700">
-              <span className="text-xl font-bold text-gray-900 tabular-nums">{sitePulse.completionsThisWeek}</span>
-              <span className="text-gray-500 ml-1.5">{sitePulse.completionsThisWeek === 1 ? 'activity' : 'activities'} completed this week</span>
-            </div>
-            <div className="text-xs text-gray-400 mt-0.5 tabular-nums">
-              vs {sitePulse.completionsLastWeek} last week
-            </div>
-          </div>
-          {sitePulse.velocityDelta !== 0 && (
-            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-bold ${
-              sitePulse.velocityDelta > 0
-                ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-red-100 text-red-700'
-            }`}>
-              <svg className={`w-3.5 h-3.5 ${sitePulse.velocityDelta < 0 ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-              </svg>
-              {Math.abs(sitePulse.velocityDelta)}
-            </div>
-          )}
-          {sitePulse.velocityDelta === 0 && sitePulse.completionsThisWeek > 0 && (
-            <div className="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-600">
-              Same pace
-            </div>
-          )}
-        </div>
-
-        {/* 3. Bottleneck alert */}
-        {sitePulse.bottleneck && (
-          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-              <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-              </svg>
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-red-800">
-                {sitePulse.bottleneck.stage} has {sitePulse.bottleneck.waitingFlats} {sitePulse.bottleneck.waitingFlats === 1 ? 'flat' : 'flats'} waiting
+        <div className="p-4 md:p-6">
+          {/* 1. Completion snapshot */}
+          <div className="mb-5">
+            <div className="flex items-baseline justify-between mb-2">
+              <div className="text-sm text-gray-700">
+                <span className="text-2xl md:text-3xl font-bold text-[#162032] tabular-nums">{sitePulse.fullyFinishedFlats}</span>
+                <span className="text-gray-400 mx-1">of</span>
+                <span className="text-lg font-semibold text-gray-600 tabular-nums">{sitePulse.totalFlats}</span>
+                <span className="text-gray-500 ml-1.5">flats fully finished</span>
               </div>
-              <div className="text-xs text-red-600">Longest queue — push this stage to unblock progress</div>
+              <span className={`text-sm font-bold tabular-nums px-2.5 py-0.5 rounded-full ${pctBadgeBg(sitePulse.completionPct)}`}>
+                {sitePulse.completionPct}%
+              </span>
+            </div>
+            <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-3 rounded-full transition-all duration-700"
+                style={{
+                  width: `${sitePulse.completionPct}%`,
+                  backgroundColor: sitePulse.completionPct >= 80 ? '#10B981' : sitePulse.completionPct >= 50 ? '#F59E0B' : sitePulse.completionPct >= 20 ? '#F97316' : '#9CA3AF',
+                }}
+              />
             </div>
           </div>
-        )}
 
-        {/* Drill-down toggle */}
-        {sitePulse.stagesActiveThisWeek.length > 0 && (
-          <>
-            <button
-              onClick={() => setPulseExpanded(!pulseExpanded)}
-              className="flex items-center gap-1.5 text-xs text-primary font-medium hover:text-primary-dark transition-colors cursor-pointer"
-            >
-              <svg className={`w-3.5 h-3.5 transition-transform ${pulseExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+          {/* 2. This week's velocity */}
+          <div className="flex items-center gap-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-3.5 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
               </svg>
-              {pulseExpanded ? 'Hide' : 'View'} this week&apos;s stage breakdown
-            </button>
-
-            {pulseExpanded && (
-              <div className="mt-3 space-y-2">
-                {sitePulse.stagesActiveThisWeek.map(s => (
-                  <div key={s.stage} className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2.5">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-gray-900 truncate">{s.stage}</div>
-                      <div className="text-[11px] text-gray-400">
-                        Floors: {s.floors.map(f => `F${f}`).join(', ')}
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-lg font-bold text-emerald-700 tabular-nums">{s.completedThisWeek}</div>
-                      <div className="text-[10px] text-gray-400">completed</div>
-                    </div>
-                  </div>
-                ))}
+            </div>
+            <div className="flex-1">
+              <div className="text-sm text-gray-700">
+                <span className="text-xl font-bold text-gray-900 tabular-nums">{sitePulse.completionsThisWeek}</span>
+                <span className="text-gray-500 ml-1.5">{sitePulse.completionsThisWeek === 1 ? 'activity' : 'activities'} this week</span>
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5 tabular-nums">
+                vs {sitePulse.completionsLastWeek} last week
+              </div>
+            </div>
+            {sitePulse.velocityDelta !== 0 && (
+              <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-sm font-bold ${
+                sitePulse.velocityDelta > 0
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-red-100 text-red-700'
+              }`}>
+                <svg className={`w-3.5 h-3.5 ${sitePulse.velocityDelta < 0 ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                </svg>
+                {Math.abs(sitePulse.velocityDelta)}
               </div>
             )}
-          </>
-        )}
-
-        {/* Empty state */}
-        {sitePulse.completionsThisWeek === 0 && sitePulse.completionsLastWeek === 0 && !sitePulse.bottleneck && (
-          <div className="text-center py-3 text-sm text-gray-400">
-            No completions recorded this week or last week.
+            {sitePulse.velocityDelta === 0 && sitePulse.completionsThisWeek > 0 && (
+              <div className="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-600">
+                Same pace
+              </div>
+            )}
           </div>
-        )}
+
+          {/* 3. Bottleneck alert */}
+          {sitePulse.bottleneck && (
+            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-3.5 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-red-800">
+                  {sitePulse.bottleneck.stage} has {sitePulse.bottleneck.waitingFlats} {sitePulse.bottleneck.waitingFlats === 1 ? 'flat' : 'flats'} waiting
+                </div>
+                <div className="text-xs text-red-600">Longest queue — push this stage to unblock progress</div>
+              </div>
+            </div>
+          )}
+
+          {/* Drill-down toggle */}
+          {sitePulse.stagesActiveThisWeek.length > 0 && (
+            <>
+              <button
+                onClick={() => setPulseExpanded(!pulseExpanded)}
+                className="flex items-center gap-1.5 text-xs text-[#C8922A] font-semibold hover:text-[#a8771e] transition-colors cursor-pointer"
+              >
+                <svg className={`w-3.5 h-3.5 transition-transform ${pulseExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+                {pulseExpanded ? 'Hide' : 'View'} this week&apos;s stage breakdown
+              </button>
+
+              {pulseExpanded && (
+                <div className="mt-3 space-y-2">
+                  {sitePulse.stagesActiveThisWeek.map(s => (
+                    <div key={s.stage} className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-900 truncate">{s.stage}</div>
+                        <div className="text-[11px] text-gray-400">
+                          Floors: {s.floors.map(f => `F${f}`).join(', ')}
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-lg font-bold text-emerald-700 tabular-nums">{s.completedThisWeek}</div>
+                        <div className="text-[10px] text-gray-400">completed</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Empty state */}
+          {sitePulse.completionsThisWeek === 0 && sitePulse.completionsLastWeek === 0 && !sitePulse.bottleneck && (
+            <div className="text-center py-3 text-sm text-gray-400">
+              No completions recorded this week or last week.
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ---- SECTION 6: MATERIAL STORES ---- */}
+      {/* ---- SECTION 5: MATERIAL STORES ---- */}
       <MaterialStores stores={stores} />
     </div>
   );

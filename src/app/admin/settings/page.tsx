@@ -6,6 +6,7 @@ import { getStageWeights, setStageWeights, getPaintDaysPerFlat, setPaintDaysPerF
 import { getSupervisors, resetUserPassword } from '@/repositories/supervisor-repo';
 import { STAGE_WEIGHTS, PAINT_DAYS_PER_FLAT } from '@/lib/constants';
 import { useDataLoader } from '@/hooks/use-data-loader';
+import TargetSetter from '@/components/admin/TargetSetter';
 
 const ALL_STAGES = [
   'Pre-Tiling',
@@ -422,6 +423,9 @@ export default function SettingsPage() {
           </>
         )}
       </div>
+
+      {/* ---- Project Targets ---- */}
+      <TargetSetter />
 
       {/* ---- Reset User Password ---- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
