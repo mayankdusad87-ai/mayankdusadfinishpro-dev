@@ -4,11 +4,12 @@ const FROM_ADDRESS = 'Finishing Pro <noreply@raghavgroup.in>';
 
 interface SendEmailOptions {
   to: string | string[];
+  cc?: string | string[];
   subject: string;
   html: string;
 }
 
-export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<boolean> {
+export async function sendEmail({ to, cc, subject, html }: SendEmailOptions): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn('[email] RESEND_API_KEY not configured, skipping email');
@@ -23,6 +24,7 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions): Promis
       const { data, error } = await resend.emails.send({
         from: FROM_ADDRESS,
         to: Array.isArray(to) ? to : [to],
+        ...(cc ? { cc: Array.isArray(cc) ? cc : [cc] } : {}),
         subject,
         html,
       });
@@ -123,6 +125,65 @@ export function reversalAlertEmailHtml(
           </tr>
         </table>
         <p style="margin: 16px 0 0; font-size: 12px; color: #9ca3af;">This is an automated notification from Finishing Pro.</p>
+      </div>
+    </div>
+  `;
+}
+
+export function inactivityEscalationEmailHtml(
+  supervisors: Array<{
+    name: string;
+    email: string;
+    project: string;
+    lastLogin: string;       // human-readable
+    daysSinceLogin: number;
+  }>,
+): string {
+  const rows = supervisors
+    .map(
+      (s) => `
+      <tr>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #111827;">${s.name}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #374151;">${s.project}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #6b7280;">${s.lastLogin}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">
+          <span style="background: ${s.daysSinceLogin >= 5 ? '#fee2e2' : '#fef3c7'}; color: ${s.daysSinceLogin >= 5 ? '#991b1b' : '#92400e'}; padding: 2px 10px; border-radius: 12px; font-weight: 700; font-size: 13px;">${s.daysSinceLogin} days</span>
+        </td>
+      </tr>`,
+    )
+    .join('');
+
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 640px; margin: 0 auto;">
+      <div style="background: #162032; color: white; padding: 20px 24px; border-radius: 8px 8px 0 0;">
+        <h2 style="margin: 0; font-size: 18px; color: #C8922A;">⚠️ Supervisor Inactivity Alert</h2>
+        <p style="margin: 6px 0 0; font-size: 13px; color: #94a3b8;">The following supervisor(s) have not logged in for over 2 days</p>
+      </div>
+      <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
+        <p style="margin: 0 0 16px; color: #374151; font-size: 14px;">
+          This is an automated escalation. Please follow up to ensure site supervision is not impacted.
+        </p>
+
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid #e5e7eb; border-radius: 8px;">
+          <thead>
+            <tr style="background: #f9fafb;">
+              <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Supervisor</th>
+              <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Project</th>
+              <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Last Login</th>
+              <th style="padding: 10px 12px; text-align: center; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb;">Inactive</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+
+        <p style="margin: 20px 0 0; font-size: 13px; color: #6b7280;">
+          <strong>Recommended action:</strong> Contact the supervisor(s) above and confirm their availability.
+          If a supervisor is on leave, consider assigning a replacement for their floors.
+        </p>
+
+        <p style="margin: 16px 0 0; font-size: 12px; color: #9ca3af;">This is an automated escalation from Finishing Pro. The supervisor(s) listed above have been copied on this email.</p>
       </div>
     </div>
   `;
