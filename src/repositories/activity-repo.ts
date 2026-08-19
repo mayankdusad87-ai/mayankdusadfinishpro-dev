@@ -34,6 +34,42 @@ function activityRowToUploaded(row: ActivityRow): UploadedActivity {
   };
 }
 
+/**
+ * Lightweight query for supervisor pages:
+ *  - Selects only the columns supervisors actually use (skips rooms, sub_stage_status, flat_status, floor_status, risk_status, series)
+ *  - Optionally filters by assigned floors server-side so Supabase returns fewer rows
+ */
+export async function getSupervisorActivities(
+  projectId: string,
+  assignedFloors?: number[] | null
+): Promise<UploadedActivity[]> {
+  const COLS = 'id, floor, flat_number, configuration, stage, stage_gate, activity, vendor, applicable, expected_start, expected_end, actual_start, actual_end, status, delay_days, delay_reason, remarks, sort_order, revised_start, revised_end';
+  const PAGE = 1000;
+  const allRows: Partial<ActivityRow>[] = [];
+  let from = 0;
+
+  while (true) {
+    let query = supabase
+      .from('activities')
+      .select(COLS)
+      .eq('project_id', projectId)
+      .order('sort_order', { ascending: true });
+
+    if (assignedFloors && assignedFloors.length > 0) {
+      query = query.in('floor', assignedFloors);
+    }
+
+    const { data, error } = await query.range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allRows.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return allRows.map(row => activityRowToUploaded(row as ActivityRow));
+}
+
 export async function getActivitiesFromSupabase(projectId: string): Promise<UploadedActivity[]> {
   const PAGE = 1000;
   const allRows: ActivityRow[] = [];

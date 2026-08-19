@@ -126,7 +126,32 @@ export async function getProjectDataFromSupabase(projectId: string): Promise<Pro
   if (activities.length === 0) return null;
 
   const project = await getProjectFromSupabase(projectId);
+  return buildProjectData(projectId, activities, project?.name);
+}
 
+/**
+ * Lightweight variant for supervisor pages:
+ *  - Uses getSupervisorActivities (selective columns + server-side floor filter)
+ *  - Returns the same ProjectData shape so the UI works unchanged
+ */
+export async function getSupervisorProjectData(
+  projectId: string,
+  assignedFloors?: number[] | null
+): Promise<ProjectData | null> {
+  const { getSupervisorActivities } = await import('./activity-repo');
+  const activities = await getSupervisorActivities(projectId, assignedFloors);
+  if (activities.length === 0) return null;
+
+  const project = await getProjectFromSupabase(projectId);
+  return buildProjectData(projectId, activities, project?.name);
+}
+
+/** Shared helper — derives metadata from an activities array */
+function buildProjectData(
+  projectId: string,
+  activities: UploadedActivity[],
+  projectName?: string
+): ProjectData {
   const stagesSet = new Set<string>();
   const vendorsSet = new Set<string>();
   const floorsSet = new Set<number>();
@@ -152,7 +177,7 @@ export async function getProjectDataFromSupabase(projectId: string): Promise<Pro
 
   return {
     projectId,
-    name: project?.name || 'Project',
+    name: projectName || 'Project',
     uploadedAt: new Date().toISOString(),
     fileName: '',
     totalRows: activities.length,

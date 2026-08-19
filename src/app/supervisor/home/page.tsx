@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
-import { getProjectsFromSupabase, getProjectDataFromSupabase, getActiveReasons, getSupervisorAssignments, updateActivityWithAudit } from '@/lib/supabase-data';
+import { getProjectsFromSupabase, getSupervisorProjectData, getActiveReasons, getSupervisorAssignments, updateActivityWithAudit } from '@/lib/supabase-data';
 import type { Reason } from '@/lib/supabase-data';
 import type { ActivityUpdate } from '@/types/database.types';
 import { useAuth } from '@/lib/auth-context';
@@ -58,6 +58,29 @@ export default function SupervisorHomePage() {
   const pullStartY = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // ---- Session cache helpers (stale-while-revalidate) ----
+  const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
+  const cacheKey = useCallback((pid: string) => `supervisor_cache_${pid}`, []);
+
+  const readCache = useCallback((pid: string): { ts: number; data: ProjectData; floors: number[] | null } | null => {
+    try {
+      const raw = sessionStorage.getItem(cacheKey(pid));
+      if (!raw) return null;
+      const cached = JSON.parse(raw);
+      if (Date.now() - cached.ts > CACHE_TTL) {
+        sessionStorage.removeItem(cacheKey(pid));
+        return null;
+      }
+      return cached;
+    } catch { return null; }
+  }, [cacheKey]);
+
+  const writeCache = useCallback((pid: string, data: ProjectData, floors: number[] | null) => {
+    try {
+      sessionStorage.setItem(cacheKey(pid), JSON.stringify({ data, floors, ts: Date.now() }));
+    } catch { /* storage full — ignore */ }
+  }, [cacheKey]);
+
   useEffect(() => {
     getProjectsFromSupabase().then(projects => {
       const withTemplate = projects.filter(p => p.hasTemplate);
@@ -75,29 +98,54 @@ export default function SupervisorHomePage() {
 
   useEffect(() => {
     if (!selectedProjectId) { setProjectData(null); setAssignedFloors(null); return; }
-    // Only show full-screen loading on initial load, not background refreshes
-    if (!projectData) setLoading(true);
-    Promise.all([
-      getProjectDataFromSupabase(selectedProjectId),
-      user ? getSupervisorAssignments(user.id) : Promise.resolve([]),
-    ]).then(([data, assignments]) => {
-      const assignment = assignments.find(a => a.project_id === selectedProjectId);
-      const myFloors = assignment?.assigned_floors?.length ? assignment.assigned_floors : null;
-      setAssignedFloors(myFloors);
-      setProjectData(data);
-      if (data) {
-        const allFloors = [...new Set(data.activities.map(a => a.floor))].sort((a, b) => a - b);
-        const visibleFloors = myFloors ? allFloors.filter(f => myFloors.includes(f)) : allFloors;
-        if (visibleFloors.length > 0 && !visibleFloors.includes(activeFloor)) {
-          setActiveFloor(visibleFloors[0]);
-        }
-      }
-      if (typeof window !== 'undefined') localStorage.setItem('supervisor_selected_project', selectedProjectId);
+
+    // Stale-while-revalidate: show cached data instantly, then fetch fresh in background
+    const cached = readCache(selectedProjectId);
+    if (cached) {
+      setAssignedFloors(cached.floors);
+      setProjectData(cached.data);
       setLoading(false);
-    }).catch(() => { setLoading(false); });
+      // Fall through — still fetch fresh data below
+    } else {
+      // Only show full-screen loading on initial (uncached) load
+      if (!projectData) setLoading(true);
+    }
+
+    // Step 1: Get assignments first (fast, small query) so we know which floors to filter by
+    const fetchData = async () => {
+      try {
+        const assignments = user ? await getSupervisorAssignments(user.id) : [];
+        const assignment = assignments.find(a => a.project_id === selectedProjectId);
+        const myFloors = assignment?.assigned_floors?.length ? assignment.assigned_floors : null;
+        setAssignedFloors(myFloors);
+
+        // Step 2: Fetch project data with server-side floor filter + selective columns
+        const data = await getSupervisorProjectData(selectedProjectId, myFloors);
+        setProjectData(data);
+
+        if (data) {
+          // Write to cache for next visit
+          writeCache(selectedProjectId, data, myFloors);
+
+          const dataFloors = [...new Set(data.activities.map(a => a.floor))].sort((a, b) => a - b);
+          if (dataFloors.length > 0 && !dataFloors.includes(activeFloor)) {
+            setActiveFloor(dataFloors[0]);
+          }
+        }
+        if (typeof window !== 'undefined') localStorage.setItem('supervisor_selected_project', selectedProjectId);
+      } catch {
+        // Network error — cached data (if any) is already showing
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId, user, refreshKey]);
 
+  // Data is already floor-filtered server-side by getSupervisorProjectData,
+  // but we keep a safety filter for cached data from older sessions
   const allActivities = useMemo(() => {
     if (!projectData) return [];
     if (!assignedFloors) return projectData.activities;
@@ -223,14 +271,17 @@ export default function SupervisorHomePage() {
     setTimeout(() => setActionToast(null), 2500);
   }
 
-  // Pull-to-refresh handler
+  // Pull-to-refresh handler — invalidate cache so we get fresh data
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
+    if (selectedProjectId) {
+      try { sessionStorage.removeItem(cacheKey(selectedProjectId)); } catch {}
+    }
     setRefreshKey(k => k + 1);
     // Wait a minimum of 600ms so the spinner is visible
     await new Promise(r => setTimeout(r, 600));
     setRefreshing(false);
-  }, []);
+  }, [selectedProjectId, cacheKey]);
 
   /** Gate: if activity is overdue in-progress with no delay_reason, capture reason first */
   function openDetail(row: UploadedActivity) {

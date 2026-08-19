@@ -14,6 +14,7 @@ export {
   getRefugeConfig,
   saveRefugeConfig,
   getProjectDataFromSupabase,
+  getSupervisorProjectData,
   recordUpload,
 } from '@/repositories/project-repo';
 
