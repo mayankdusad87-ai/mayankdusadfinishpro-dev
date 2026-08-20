@@ -22,7 +22,7 @@ export default function AdminLayout({
     if (!loading && !user) {
       router.replace('/login');
     }
-    if (!loading && profile && profile.role !== 'admin' && profile.role !== 'management') {
+    if (!loading && profile && profile.role !== 'admin' && profile.role !== 'management' && profile.role !== 'finishing_team') {
       router.replace('/supervisor/home');
     }
   }, [loading, user, profile, router]);

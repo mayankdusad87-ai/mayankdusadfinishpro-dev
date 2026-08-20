@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
         email,
         password,
         email_confirm: true,
-        user_metadata: { target_role: 'finishing_team', full_name: fullName },
+        user_metadata: { role: 'finishing_team', full_name: fullName },
       }),
     });
 
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
             email,
             password,
             email_confirm: true,
-            user_metadata: { target_role: 'finishing_team', full_name: fullName },
+            user_metadata: { role: 'finishing_team', full_name: fullName },
           }),
         });
         authJson = await authRes.json();
