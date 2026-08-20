@@ -46,6 +46,55 @@ CREATE TABLE IF NOT EXISTS supervisor_assignments (
   UNIQUE(supervisor_id, project_id)
 );
 
+-- 3b. SUPERVISOR ASSIGNMENT HISTORY (automatic via trigger)
+CREATE TABLE IF NOT EXISTS supervisor_assignment_history (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  supervisor_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+  assigned_floors INTEGER[],
+  previous_floors INTEGER[],
+  action TEXT NOT NULL CHECK (action IN ('assigned', 'updated', 'unassigned')),
+  performed_by UUID REFERENCES profiles(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_assignment_history_supervisor
+  ON supervisor_assignment_history (supervisor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_assignment_history_project
+  ON supervisor_assignment_history (project_id, created_at DESC);
+
+-- Trigger: automatically record history on assignment changes
+CREATE OR REPLACE FUNCTION record_assignment_history()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO supervisor_assignment_history
+      (supervisor_id, project_id, assigned_floors, previous_floors, action, performed_by)
+    VALUES
+      (NEW.supervisor_id, NEW.project_id, NEW.assigned_floors, NULL, 'assigned', auth.uid());
+    RETURN NEW;
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF OLD.assigned_floors IS DISTINCT FROM NEW.assigned_floors THEN
+      INSERT INTO supervisor_assignment_history
+        (supervisor_id, project_id, assigned_floors, previous_floors, action, performed_by)
+      VALUES
+        (NEW.supervisor_id, NEW.project_id, NEW.assigned_floors, OLD.assigned_floors, 'updated', auth.uid());
+    END IF;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    INSERT INTO supervisor_assignment_history
+      (supervisor_id, project_id, assigned_floors, previous_floors, action, performed_by)
+    VALUES
+      (OLD.supervisor_id, OLD.project_id, NULL, OLD.assigned_floors, 'unassigned', auth.uid());
+    RETURN OLD;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER trg_assignment_history
+  AFTER INSERT OR UPDATE OR DELETE ON supervisor_assignments
+  FOR EACH ROW EXECUTE FUNCTION record_assignment_history();
+
 -- 4. ACTIVITIES TABLE (uploaded Excel data)
 CREATE TABLE IF NOT EXISTS activities (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

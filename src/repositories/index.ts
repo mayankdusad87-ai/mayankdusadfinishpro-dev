@@ -65,6 +65,9 @@ export type { Reason } from './reason-repo';
 export { getAuditLog } from './audit-repo';
 export type { AuditLogRow } from './audit-repo';
 
+export { getAssignmentHistory } from './assignment-history-repo';
+export type { AssignmentHistoryEntry } from './assignment-history-repo';
+
 export {
   getStageWeights,
   setStageWeights,

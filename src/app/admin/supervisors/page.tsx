@@ -10,6 +10,7 @@ import {
   assignSupervisorToProject,
 } from '@/lib/supabase-data';
 import { useDataLoader } from '@/hooks/use-data-loader';
+import AssignmentHistoryModal from '@/components/admin/AssignmentHistoryModal';
 
 interface SupervisorRow {
   id: string;
@@ -35,6 +36,7 @@ export default function SupervisorsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
+  const [historyTarget, setHistoryTarget] = useState<SupervisorRow | null>(null);
 
   function handleAdd() {
     setEditingSupervisor(null);
@@ -203,6 +205,15 @@ export default function SupervisorsPage() {
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-1">
                       <button
+                        onClick={() => setHistoryTarget(sup)}
+                        className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        title="Assignment history"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </button>
+                      <button
                         onClick={() => handleEdit(sup)}
                         className="p-1.5 text-gray-400 hover:text-primary hover:bg-orange-50 rounded-lg transition-colors"
                         title="Edit / Assign floors"
@@ -273,6 +284,14 @@ export default function SupervisorsPage() {
           </div>
         </div>
       )}
+
+      {/* Assignment History Modal */}
+      <AssignmentHistoryModal
+        open={!!historyTarget}
+        onClose={() => setHistoryTarget(null)}
+        supervisorId={historyTarget?.id || ''}
+        supervisorName={historyTarget?.full_name || ''}
+      />
 
       {/* Reset Password Modal */}
       {resetModalOpen && (
