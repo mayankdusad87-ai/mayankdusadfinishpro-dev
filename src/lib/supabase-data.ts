@@ -59,6 +59,13 @@ export {
 export type { ManagementUser } from '@/repositories/management-repo';
 
 export {
+  createFinishingTeamUser,
+  getFinishingTeamUsers,
+  toggleFinishingTeamUserStatus,
+} from '@/repositories/finishing-team-repo';
+export type { FinishingTeamUser } from '@/repositories/finishing-team-repo';
+
+export {
   getReasons,
   getActiveReasons,
   createReason,

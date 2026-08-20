@@ -14,6 +14,13 @@ export const createManagementSchema = z.object({
   phone: z.string().optional(),
 });
 
+export const createFinishingTeamSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  fullName: z.string().min(1, 'Full name is required'),
+  phone: z.string().optional(),
+});
+
 export const deactivateSupervisorSchema = z.object({
   userId: z.string().uuid('Invalid user ID'),
   isActive: z.boolean(),

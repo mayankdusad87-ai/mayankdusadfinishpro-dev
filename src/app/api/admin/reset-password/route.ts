@@ -5,7 +5,7 @@ import { resetPasswordSchema } from '@/lib/validations';
 import { sendEmail, passwordResetEmailHtml } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
-  const auth = await verifyAdmin(req);
+  const auth = await verifyAdmin(req, ['admin', 'finishing_team']);
   if (auth.error) return auth.error;
 
   let body: unknown;

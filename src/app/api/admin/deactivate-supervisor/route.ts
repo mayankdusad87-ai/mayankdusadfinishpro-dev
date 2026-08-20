@@ -8,7 +8,7 @@ async function sendStatusEmail(email: string, fullName: string, role: string, ac
   if (!apiKey || !email) return; // silently skip if not configured
 
   const action = activated ? 'Activated' : 'Deactivated';
-  const roleLabel = role === 'management' ? 'Management' : 'Supervisor';
+  const roleLabel = role === 'management' ? 'Management' : role === 'finishing_team' ? 'Finishing Team' : 'Supervisor';
   const statusColor = activated ? '#16a34a' : '#dc2626';
   const statusBg = activated ? '#f0fdf4' : '#fef2f2';
 
@@ -55,7 +55,7 @@ async function sendStatusEmail(email: string, fullName: string, role: string, ac
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await verifyAdmin(req);
+  const auth = await verifyAdmin(req, ['admin', 'finishing_team']);
   if (auth.error) return auth.error;
 
   let body: unknown;

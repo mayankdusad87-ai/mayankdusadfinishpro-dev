@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'management' | 'supervisor';
+export type Role = 'admin' | 'management' | 'supervisor' | 'finishing_team';
 export type Device = 'desktop' | 'mobile';
 export type AccessLevel = 'full' | 'view' | 'restricted' | 'none';
 
@@ -7,6 +7,7 @@ export type Feature =
   | 'manage-projects'
   | 'manage-supervisors'
   | 'manage-management'
+  | 'manage-finishing-team'
   | 'dashboard'
   | 'activity-log'
   | 'error-log'
@@ -27,6 +28,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'manage-projects': 'full',
       'manage-supervisors': 'full',
       'manage-management': 'full',
+      'manage-finishing-team': 'full',
       dashboard: 'full',
       'activity-log': 'full',
       'error-log': 'full',
@@ -43,6 +45,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'manage-projects': 'full',
       'manage-supervisors': 'full',
       'manage-management': 'full',
+      'manage-finishing-team': 'full',
       dashboard: 'full',
       'activity-log': 'view',
       'error-log': 'view',
@@ -61,6 +64,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'manage-projects': 'view',
       'manage-supervisors': 'none',
       'manage-management': 'none',
+      'manage-finishing-team': 'none',
       dashboard: 'view',
       'activity-log': 'view',
       'error-log': 'none',
@@ -77,7 +81,44 @@ export const PERMISSIONS: PermissionMatrix = {
       'manage-projects': 'view',
       'manage-supervisors': 'none',
       'manage-management': 'none',
+      'manage-finishing-team': 'none',
       dashboard: 'view',
+      'activity-log': 'view',
+      'error-log': 'none',
+      'photo-review': 'view',
+      'insights-view': 'full',
+      'export-download': 'none',
+      settings: 'none',
+      'activity-updates': 'none',
+      'photo-upload': 'none',
+      'bulk-status-update': 'none',
+    },
+  },
+  finishing_team: {
+    desktop: {
+      'upload-template': 'full',
+      'manage-projects': 'full',
+      'manage-supervisors': 'full',
+      'manage-management': 'none',
+      'manage-finishing-team': 'none',
+      dashboard: 'full',
+      'activity-log': 'full',
+      'error-log': 'none',
+      'photo-review': 'full',
+      'insights-view': 'full',
+      'export-download': 'full',
+      settings: 'full',
+      'activity-updates': 'none',
+      'photo-upload': 'none',
+      'bulk-status-update': 'none',
+    },
+    mobile: {
+      'upload-template': 'none',
+      'manage-projects': 'full',
+      'manage-supervisors': 'full',
+      'manage-management': 'none',
+      'manage-finishing-team': 'none',
+      dashboard: 'full',
       'activity-log': 'view',
       'error-log': 'none',
       'photo-review': 'view',
@@ -95,6 +136,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'manage-projects': 'none',
       'manage-supervisors': 'none',
       'manage-management': 'none',
+      'manage-finishing-team': 'none',
       dashboard: 'none',
       'activity-log': 'none',
       'error-log': 'none',
@@ -111,6 +153,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'manage-projects': 'none',
       'manage-supervisors': 'none',
       'manage-management': 'none',
+      'manage-finishing-team': 'none',
       dashboard: 'none',
       'activity-log': 'none',
       'error-log': 'none',

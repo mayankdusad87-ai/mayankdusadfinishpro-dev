@@ -6,7 +6,7 @@
 -- 1. PROFILES TABLE (extends Supabase auth.users)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  role TEXT NOT NULL DEFAULT 'supervisor' CHECK (role IN ('admin', 'supervisor')),
+  role TEXT NOT NULL DEFAULT 'supervisor' CHECK (role IN ('admin', 'supervisor', 'management', 'finishing_team')),
   full_name TEXT NOT NULL,
   phone TEXT,
   email TEXT,

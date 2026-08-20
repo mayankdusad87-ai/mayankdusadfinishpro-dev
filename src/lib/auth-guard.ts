@@ -15,9 +15,12 @@ function createRequestClient(req: NextRequest) {
   );
 }
 
-/** Verify caller is an admin. Returns userId on success, NextResponse error on failure. */
-export async function verifyAdmin(req: NextRequest): Promise<
-  { userId: string; error?: never } | { userId?: never; error: NextResponse }
+/** Verify caller has one of the allowed roles. Defaults to admin-only. */
+export async function verifyAdmin(
+  req: NextRequest,
+  allowedRoles: string[] = ['admin'],
+): Promise<
+  { userId: string; role: string; error?: never } | { userId?: never; role?: never; error: NextResponse }
 > {
   const supabase = createRequestClient(req);
 
@@ -32,11 +35,11 @@ export async function verifyAdmin(req: NextRequest): Promise<
     .eq('id', user.id)
     .single();
 
-  if (profile?.role !== 'admin') {
+  if (!profile || !allowedRoles.includes(profile.role)) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
-  return { userId: user.id };
+  return { userId: user.id, role: profile.role };
 }
 
 /** Verify caller is any authenticated user. Returns userId on success, NextResponse error on failure. */

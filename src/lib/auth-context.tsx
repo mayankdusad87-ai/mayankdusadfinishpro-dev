@@ -6,7 +6,7 @@ import type { User, Session } from '@supabase/supabase-js';
 
 export interface Profile {
   id: string;
-  role: 'admin' | 'management' | 'supervisor';
+  role: 'admin' | 'management' | 'supervisor' | 'finishing_team';
   full_name: string;
   phone: string | null;
   email: string | null;

@@ -93,6 +93,29 @@ export function welcomeManagementEmailHtml(fullName: string, email: string, pass
   `;
 }
 
+export function welcomeFinishingTeamEmailHtml(fullName: string, email: string, password: string): string {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto;">
+      <div style="background: #162032; color: white; padding: 20px 24px; border-radius: 8px 8px 0 0;">
+        <h2 style="margin: 0; font-size: 20px; color: #C8922A;">Welcome to Finishing Pro</h2>
+      </div>
+      <div style="border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
+        <p style="margin: 0 0 16px; color: #374151;">Hi <strong>${fullName}</strong>,</p>
+        <p style="margin: 0 0 16px; color: #374151;">Your Finishing Team account has been created. You can now log in to manage projects, supervisors, review site photos, and track overall progress.</p>
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 0 0 16px;">
+          <p style="margin: 0 0 8px; font-size: 14px; color: #6b7280;">Your Login Credentials</p>
+          <table style="width: 100%; font-size: 14px;">
+            <tr><td style="padding: 4px 0; color: #6b7280; width: 80px;">Email</td><td style="padding: 4px 0; font-weight: 600; color: #111827;">${email}</td></tr>
+            <tr><td style="padding: 4px 0; color: #6b7280;">Password</td><td style="padding: 4px 0; font-weight: 700; color: #111827; letter-spacing: 1px; font-family: monospace;">${password}</td></tr>
+          </table>
+        </div>
+        <a href="https://finishpro-dev.vercel.app/login" style="display: inline-block; background: #C8922A; color: white; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-weight: 600; font-size: 14px;">Log In to Finishing Pro</a>
+        <p style="margin: 16px 0 0; font-size: 12px; color: #9ca3af;">This is an automated notification from Finishing Pro. Please change your password after your first login.</p>
+      </div>
+    </div>
+  `;
+}
+
 export function reversalAlertEmailHtml(
   projectName: string,
   floor: string | number,

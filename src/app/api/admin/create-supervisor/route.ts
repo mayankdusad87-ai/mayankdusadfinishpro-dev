@@ -4,7 +4,7 @@ import { verifyAdmin } from '@/lib/auth-guard';
 import { createSupervisorSchema } from '@/lib/validations';
 
 export async function POST(req: NextRequest) {
-  const auth = await verifyAdmin(req);
+  const auth = await verifyAdmin(req, ['admin', 'finishing_team']);
   if (auth.error) return auth.error;
 
   let body: unknown;

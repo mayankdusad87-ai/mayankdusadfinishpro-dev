@@ -47,6 +47,13 @@ export {
 } from './supervisor-repo';
 
 export {
+  createFinishingTeamUser,
+  getFinishingTeamUsers,
+  toggleFinishingTeamUserStatus,
+} from './finishing-team-repo';
+export type { FinishingTeamUser } from './finishing-team-repo';
+
+export {
   getReasons,
   getActiveReasons,
   createReason,
