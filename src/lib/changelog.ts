@@ -13,7 +13,7 @@
  */
 
 /** Roles that can be targeted by a changelog feature */
-export type ChangelogRole = 'supervisor' | 'admin' | 'management';
+export type ChangelogRole = 'supervisor' | 'admin' | 'management' | 'finishing_team';
 
 export interface ChangelogFeature {
   emoji: string;
@@ -32,6 +32,41 @@ export interface ChangelogEntry {
 
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '2026.08.20',
+    headline: 'Finishing Team Role',
+    date: 'August 20, 2026',
+    features: [
+      {
+        emoji: '👥',
+        title: 'New Finishing Team Role',
+        description:
+          'Admin can now create Finishing Team accounts with dedicated permissions — access to projects, supervisors, dashboard, photo review, insights, and exports.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '🔑',
+        title: 'Finishing Team Login',
+        description:
+          'Finishing Team members log in via the Head Office Portal and see all projects across the system.',
+        roles: ['finishing_team'],
+      },
+      {
+        emoji: '📧',
+        title: 'Welcome Email for Finishing Team',
+        description:
+          'New Finishing Team users receive a branded welcome email with their login credentials.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '✏️',
+        title: 'Full Target Editing',
+        description:
+          'All target fields are now editable — stage, floor range, target date, and notes — directly from the Insights view.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
   {
     version: '2026.08.19b',
     headline: 'Smoother, Faster Experience',
