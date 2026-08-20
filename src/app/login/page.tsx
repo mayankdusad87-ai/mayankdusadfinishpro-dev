@@ -38,6 +38,22 @@ export default function AdminLoginPage() {
       setSubmitting(false);
       return;
     }
+
+    // Check role and redirect — supervisors go to their home, others to admin panel
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authUser.id)
+        .single();
+
+      if (prof?.role === 'supervisor') {
+        router.replace('/supervisor/home');
+        return;
+      }
+    }
+
     router.replace('/admin/reports');
   }
 
