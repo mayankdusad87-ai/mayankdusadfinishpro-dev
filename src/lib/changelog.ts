@@ -33,6 +33,34 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.20b',
+    headline: 'Bug Fixes & Assignment History',
+    date: 'August 20, 2026',
+    features: [
+      {
+        emoji: '🔧',
+        title: 'Finishing Team Login Fix',
+        description:
+          'Finishing Team users now correctly land on the Admin Panel after logging in via the Head Office Portal.',
+        roles: ['admin', 'finishing_team'],
+      },
+      {
+        emoji: '📜',
+        title: 'Supervisor Assignment History',
+        description:
+          'Track every floor assignment change — who was assigned, updated, or unassigned, when, and by whom. Click the clock icon on any supervisor row to view the timeline.',
+        roles: ['admin', 'finishing_team'],
+      },
+      {
+        emoji: '🔒',
+        title: 'Role-Aware Login Routing',
+        description:
+          'Both login pages now detect your role and send you to the right place — no more landing on the wrong dashboard.',
+        roles: ['admin'],
+      },
+    ],
+  },
+  {
     version: '2026.08.20',
     headline: 'Finishing Team Role',
     date: 'August 20, 2026',
