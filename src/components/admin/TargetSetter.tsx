@@ -108,13 +108,22 @@ export default function TargetSetter() {
   async function handleSave() {
     setSuccessMsg('');
     if (editingId) {
-      if (!formTargetDate) { setFormError('Target date is required'); return; }
+      if (!formStage || formFloorFrom === '' || formFloorTo === '' || !formTargetDate) {
+        setFormError('Stage, floor range, and target date are required'); return;
+      }
+      if (formFloorTo < formFloorFrom) {
+        setFormError('"Floor To" must be ≥ "Floor From"'); return;
+      }
       setSaving(true); setFormError('');
       try {
         const res = await fetch('/api/targets', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editingId, targetDate: formTargetDate, notes: formNotes }),
+          body: JSON.stringify({
+            id: editingId, projectId: currentProject!.id,
+            stage: formStage, floorFrom: formFloorFrom, floorTo: formFloorTo,
+            targetDate: formTargetDate, notes: formNotes,
+          }),
         });
         const d = await res.json();
         if (!res.ok) { setFormError(d.error || 'Failed'); setSaving(false); return; }
@@ -255,8 +264,8 @@ export default function TargetSetter() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Stage</label>
-            <select value={formStage} onChange={e => setFormStage(e.target.value)} disabled={!!editingId}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#C8922A]/20 focus:border-[#C8922A] disabled:opacity-50 disabled:bg-gray-50">
+            <select value={formStage} onChange={e => setFormStage(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#C8922A]/20 focus:border-[#C8922A]">
               <option value="">Select stage</option>
               {stages.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -264,16 +273,16 @@ export default function TargetSetter() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Floor From</label>
-              <select value={formFloorFrom} onChange={e => setFormFloorFrom(e.target.value ? Number(e.target.value) : '')} disabled={!!editingId}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#C8922A]/20 focus:border-[#C8922A] disabled:opacity-50 disabled:bg-gray-50">
+              <select value={formFloorFrom} onChange={e => setFormFloorFrom(e.target.value ? Number(e.target.value) : '')}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#C8922A]/20 focus:border-[#C8922A]">
                 <option value="">From</option>
                 {floors.map(f => <option key={f} value={f}>Floor {f}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Floor To</label>
-              <select value={formFloorTo} onChange={e => setFormFloorTo(e.target.value ? Number(e.target.value) : '')} disabled={!!editingId}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#C8922A]/20 focus:border-[#C8922A] disabled:opacity-50 disabled:bg-gray-50">
+              <select value={formFloorTo} onChange={e => setFormFloorTo(e.target.value ? Number(e.target.value) : '')}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-[#C8922A]/20 focus:border-[#C8922A]">
                 <option value="">To</option>
                 {floors.filter(f => formFloorFrom === '' || f >= formFloorFrom).map(f => <option key={f} value={f}>Floor {f}</option>)}
               </select>

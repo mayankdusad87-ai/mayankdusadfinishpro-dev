@@ -59,9 +59,16 @@ const CreateTargetSchema = z.object({
 
 const UpdateTargetSchema = z.object({
   id: z.string().uuid('Invalid target ID'),
+  projectId: z.string().uuid('Invalid project ID').optional(),
+  stage: z.string().min(1).max(200).optional(),
+  floorFrom: z.number().int().min(0).max(200).optional(),
+  floorTo: z.number().int().min(0).max(200).optional(),
   targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').optional(),
   notes: z.string().max(500).optional(),
-});
+}).refine(d => {
+  if (d.floorFrom !== undefined && d.floorTo !== undefined) return d.floorTo >= d.floorFrom;
+  return true;
+}, { message: '"Floor To" must be ≥ "Floor From"', path: ['floorTo'] });
 
 const DeleteTargetSchema = z.object({
   id: z.string().uuid('Invalid target ID'),
@@ -143,7 +150,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ id: data?.id });
 }
 
-// ---- PATCH: Update target (date + notes only) ----
+// ---- PATCH: Update target (all fields) ----
 
 export async function PATCH(req: NextRequest) {
   const auth = await verifyAdmin(req);
@@ -159,18 +166,65 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  const updates: {
-    updated_at: string;
-    target_date?: string;
-    notes?: string | null;
-  } = { updated_at: new Date().toISOString() };
-  if (parsed.data.targetDate !== undefined) updates.target_date = parsed.data.targetDate;
-  if (parsed.data.notes !== undefined) updates.notes = parsed.data.notes || null;
+  const { id, projectId, stage, floorFrom, floorTo, targetDate, notes } = parsed.data;
+
+  // If stage or floor range changed, check for duplicates (exclude self)
+  if (projectId && stage && floorFrom !== undefined && floorTo !== undefined && targetDate) {
+    const monthDate = new Date(targetDate);
+    const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1).toISOString().split('T')[0];
+    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const { count: dupCount } = await supabaseAdmin
+      .from('project_milestones')
+      .select('id', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .eq('stage', stage)
+      .eq('floor_from', floorFrom)
+      .eq('floor_to', floorTo)
+      .gte('target_date', monthStart)
+      .lte('target_date', monthEnd)
+      .neq('id', id);
+
+    if ((dupCount ?? 0) > 0) {
+      return NextResponse.json(
+        { error: `A target for "${stage}" (Floor ${floorFrom}–${floorTo}) already exists this month` },
+        { status: 409 },
+      );
+    }
+  }
+
+  // Fetch current values so we can merge and regenerate the title
+  const { data: existing } = await supabaseAdmin
+    .from('project_milestones')
+    .select('stage, floor_from, floor_to, target_date, notes')
+    .eq('id', id)
+    .single();
+
+  if (!existing) {
+    return NextResponse.json({ error: 'Target not found' }, { status: 404 });
+  }
+
+  const finalStage = stage ?? existing.stage;
+  const finalFrom = floorFrom ?? existing.floor_from;
+  const finalTo = floorTo ?? existing.floor_to;
+  const finalDate = targetDate ?? existing.target_date;
+  const finalNotes = notes !== undefined ? (notes || null) : existing.notes;
+  const finalTitle = finalFrom === finalTo
+    ? `${finalStage} — Floor ${finalFrom}`
+    : `${finalStage} — Floors ${finalFrom}–${finalTo}`;
 
   const { error } = await supabaseAdmin
     .from('project_milestones')
-    .update(updates)
-    .eq('id', parsed.data.id);
+    .update({
+      stage: finalStage,
+      floor_from: finalFrom,
+      floor_to: finalTo,
+      target_date: finalDate,
+      notes: finalNotes,
+      title: finalTitle,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
