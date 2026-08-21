@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { verifyAdmin } from '@/lib/auth-guard';
 import {
   computeTargetStatus,
   computeTargetSummary,
@@ -13,7 +14,8 @@ import {
  * GET /api/targets/achievement?projectId=xxx
  *
  * Server-side computation of target achievement.
- * Uses supabaseAdmin (service role) — no RLS, no auth cookie needed.
+ * Requires authenticated admin/management/finishing_team role.
+ * Uses supabaseAdmin (service role) internally to bypass RLS for aggregation.
  *
  * For each target, runs a focused query on just the relevant stage+floor range,
  * selecting only 5 narrow columns. Paginates to handle >1000 rows.
@@ -21,6 +23,10 @@ import {
  * If the project has 0 targets, returns immediately — no further queries.
  */
 export async function GET(req: NextRequest) {
+  // Authenticate: only admin-panel roles can access target achievement data
+  const auth = await verifyAdmin(req, ['admin', 'management', 'finishing_team']);
+  if (auth.error) return auth.error;
+
   const projectId = req.nextUrl.searchParams.get('projectId');
   if (!projectId) {
     return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
@@ -34,7 +40,8 @@ export async function GET(req: NextRequest) {
     .order('target_date', { ascending: true });
 
   if (tErr) {
-    return NextResponse.json({ error: tErr.message }, { status: 500 });
+    console.error('[achievement] targets query error:', tErr.message);
+    return NextResponse.json({ error: 'Failed to fetch targets' }, { status: 500 });
   }
 
   // Fast path: no targets → empty response, zero additional queries
