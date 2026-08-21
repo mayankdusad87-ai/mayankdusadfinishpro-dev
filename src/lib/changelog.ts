@@ -33,6 +33,20 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.21b',
+    headline: 'Pending Work Matrix',
+    date: 'August 21, 2026',
+    features: [
+      {
+        emoji: '📊',
+        title: 'Pending Work Matrix',
+        description:
+          'The Site Pulse section now shows a stage-by-stage breakdown of pending work — see which floors still need each sub-stage, with progress bars and color-coded floor chips (blue = in progress, gray = yet to start).',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.21',
     headline: 'UI Polish & Rate Limiting',
     date: 'August 21, 2026',
