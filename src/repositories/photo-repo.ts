@@ -81,16 +81,25 @@ export async function getPhotosForActivity(activityId: string): Promise<Activity
     .eq('activity_id', activityId)
     .order('created_at', { ascending: true });
 
-  if (error) return [];
+  if (error || !data || data.length === 0) return [];
 
-  const photos: ActivityPhoto[] = [];
-  for (const photo of data || []) {
-    const { data: urlData } = await supabase.storage
-      .from(PHOTO_BUCKET)
-      .createSignedUrl(photo.storage_path, 3600);
-    photos.push({ ...photo, url: urlData?.signedUrl || '' });
+  // Batch: single request for all signed URLs instead of N sequential calls
+  const paths = data.map(p => p.storage_path);
+  const { data: urlData } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .createSignedUrls(paths, 3600);
+
+  const urlMap = new Map<string, string>();
+  if (urlData) {
+    for (const entry of urlData) {
+      if (entry.path && entry.signedUrl) urlMap.set(entry.path, entry.signedUrl);
+    }
   }
-  return photos;
+
+  return data.map(photo => ({
+    ...photo,
+    url: urlMap.get(photo.storage_path) || '',
+  }));
 }
 
 export async function getPhotosForProject(
@@ -108,16 +117,25 @@ export async function getPhotosForProject(
   if (filters?.stageGate) query = query.eq('stage_gate', filters.stageGate);
 
   const { data, error } = await query;
-  if (error) return [];
+  if (error || !data || data.length === 0) return [];
 
-  const photos: ActivityPhoto[] = [];
-  for (const photo of data || []) {
-    const { data: urlData } = await supabase.storage
-      .from(PHOTO_BUCKET)
-      .createSignedUrl(photo.storage_path, 3600);
-    photos.push({ ...photo, url: urlData?.signedUrl || '' });
+  // Batch: single request for all signed URLs instead of N sequential calls
+  const paths = data.map(p => p.storage_path);
+  const { data: urlData } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .createSignedUrls(paths, 3600);
+
+  const urlMap = new Map<string, string>();
+  if (urlData) {
+    for (const entry of urlData) {
+      if (entry.path && entry.signedUrl) urlMap.set(entry.path, entry.signedUrl);
+    }
   }
-  return photos;
+
+  return data.map(photo => ({
+    ...photo,
+    url: urlMap.get(photo.storage_path) || '',
+  }));
 }
 
 export async function deleteActivityPhoto(photoId: string, storagePath: string): Promise<{ error: string | null }> {
