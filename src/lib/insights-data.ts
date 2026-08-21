@@ -138,6 +138,23 @@ export interface SitePulse {
   stagesActiveThisWeek: SitePulseStage[];
 }
 
+export interface PendingFloor {
+  floor: number;
+  status: 'in_progress' | 'not_started';
+}
+
+export interface PendingSubStage {
+  subStage: string;
+  completedFloors: number;
+  totalFloors: number;
+  pendingFloors: PendingFloor[];
+}
+
+export interface PendingStage {
+  stage: string;
+  subStages: PendingSubStage[];
+}
+
 export interface ManagementData {
   health: HealthVerdict;
   pipeline: PipelineStage[];
@@ -145,6 +162,7 @@ export interface ManagementData {
   bottlenecks: ManagementBottleneck[];
   stageFloorBreakdowns: Record<string, StageFloorBreakdown[]>;
   sitePulse: SitePulse;
+  pendingWork: PendingStage[];
 }
 
 export interface VendorScore {
@@ -330,6 +348,71 @@ function computeSitePulse(rows: InsightRow[]): SitePulse {
     bottleneck,
     stagesActiveThisWeek,
   };
+}
+
+function computePendingWork(rows: InsightRow[]): PendingStage[] {
+  // Group rows by stage → subStage (stage_gate) → floor
+  // Key: `stage|subStage|floor` → { total, completed, hasInProgress }
+  const map = new Map<string, Map<string, Map<number, { total: number; completed: number; hasInProgress: boolean }>>>();
+
+  for (const r of rows) {
+    if (!map.has(r.stage)) map.set(r.stage, new Map());
+    const stageMap = map.get(r.stage)!;
+    if (!stageMap.has(r.stage_gate)) stageMap.set(r.stage_gate, new Map());
+    const subMap = stageMap.get(r.stage_gate)!;
+    if (!subMap.has(r.floor)) subMap.set(r.floor, { total: 0, completed: 0, hasInProgress: false });
+    const entry = subMap.get(r.floor)!;
+    entry.total++;
+    if (isComplete(r.status)) {
+      entry.completed++;
+    } else if (r.status === 'in_progress') {
+      entry.hasInProgress = true;
+    }
+  }
+
+  const result: PendingStage[] = [];
+
+  // Use PIPELINE_STAGES order to maintain consistent stage ordering
+  for (const stage of PIPELINE_STAGES) {
+    const stageMap = map.get(stage);
+    if (!stageMap) continue;
+
+    const subStages: PendingSubStage[] = [];
+
+    for (const [subStage, floorMap] of stageMap) {
+      const allFloors = [...floorMap.keys()].sort((a, b) => a - b);
+      const totalFloors = allFloors.length;
+      const pendingFloors: PendingFloor[] = [];
+
+      for (const floor of allFloors) {
+        const entry = floorMap.get(floor)!;
+        // Floor is pending if not all activities are completed
+        if (entry.completed < entry.total) {
+          pendingFloors.push({
+            floor,
+            status: entry.hasInProgress ? 'in_progress' : 'not_started',
+          });
+        }
+      }
+
+      // Only include sub-stages that have pending work
+      if (pendingFloors.length > 0) {
+        subStages.push({
+          subStage,
+          completedFloors: totalFloors - pendingFloors.length,
+          totalFloors,
+          pendingFloors,
+        });
+      }
+    }
+
+    // Only include stages that have pending sub-stages
+    if (subStages.length > 0) {
+      result.push({ stage, subStages });
+    }
+  }
+
+  return result;
 }
 
 // ---- Management ----
@@ -704,6 +787,9 @@ export function computeManagement(
   // --- Site pulse ---
   const sitePulse = computeSitePulse(rows);
 
+  // --- Pending work matrix ---
+  const pendingWork = computePendingWork(rows);
+
   return {
     health,
     pipeline,
@@ -711,6 +797,7 @@ export function computeManagement(
     bottlenecks: bottlenecks.slice(0, 3),
     stageFloorBreakdowns,
     sitePulse,
+    pendingWork,
   };
 }
 
