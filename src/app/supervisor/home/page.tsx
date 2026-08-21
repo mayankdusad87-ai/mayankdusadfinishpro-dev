@@ -440,7 +440,7 @@ export default function SupervisorHomePage() {
 
   if (!projectData || availableProjects.length === 0) {
     return (
-      <div className="min-h-screen bg-navy-dark flex flex-col items-center justify-center px-6 max-w-md mx-auto">
+      <div className="min-h-screen bg-navy-dark flex flex-col items-center justify-center px-6 max-w-md md:max-w-lg mx-auto">
         <div className="w-20 h-20 rounded-2xl bg-navy-light flex items-center justify-center mb-6">
           <svg className="w-10 h-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -463,7 +463,7 @@ export default function SupervisorHomePage() {
   const selectedProject = availableProjects.find(p => p.id === selectedProjectId);
 
   return (
-    <div className="min-h-screen bg-navy-dark flex flex-col max-w-md mx-auto">
+    <div className="min-h-screen bg-navy-dark flex flex-col max-w-md md:max-w-3xl lg:max-w-4xl mx-auto">
       {/* Action toast */}
       {actionToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] max-w-xs">
@@ -485,7 +485,7 @@ export default function SupervisorHomePage() {
       )}
 
       {/* Header */}
-      <div className="px-4 pt-4 pb-3">
+      <div className="px-4 md:px-6 pt-4 pb-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <svg viewBox="0 0 40 40" fill="none" className="w-8 h-8">
@@ -574,7 +574,7 @@ export default function SupervisorHomePage() {
         </div>
 
         {/* Priority Summary */}
-        <div className="grid grid-cols-4 gap-2 mb-2">
+        <div className="grid grid-cols-4 gap-2 md:gap-3 mb-2">
           <button
             onClick={() => setActiveView(activeView === 'overdue' ? 'floor' : 'overdue')}
             className={`flex flex-col items-center py-2 rounded-lg transition-all ${
@@ -635,7 +635,7 @@ export default function SupervisorHomePage() {
         {/* Floor Tabs */}
         {(activeView === 'floor' || activeView === 'all') && (
           <div className="relative">
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            <div className="flex gap-2 overflow-x-auto md:overflow-x-visible md:flex-wrap pb-1 scrollbar-hide">
               <button
                 onClick={() => { setActiveView('all'); clearFilters(); setSelectedIds(new Set()); setBulkMode(false); }}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
@@ -685,13 +685,13 @@ export default function SupervisorHomePage() {
       </div>
 
       {/* Content area */}
-      <div ref={contentRef} className="flex-1 bg-gray-50 rounded-t-3xl px-4 pt-4 pb-24">
+      <div ref={contentRef} className="flex-1 bg-gray-50 rounded-t-3xl px-4 md:px-6 pt-4 pb-24">
 
         {/* Priority view content */}
         {(activeView === 'overdue' || activeView === 'due_today' || activeView === 'starting_today') && (
-          <div className="space-y-3">
+          <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
             {getPriorityRows().length === 0 ? (
-              <div className="text-center py-12">
+              <div className="text-center py-12 md:col-span-2">
                 <div className="text-4xl mb-3">{activeView === 'overdue' ? '\u{1F389}' : '\u{1F4CB}'}</div>
                 <h3 className="text-lg font-semibold text-gray-900">
                   {activeView === 'overdue' ? 'No overdue activities!' : 'Nothing here'}
@@ -714,7 +714,7 @@ export default function SupervisorHomePage() {
                 {getPriorityRows().length > priorityDisplayCount && (
                   <button
                     onClick={() => setPriorityDisplayCount(c => c + 30)}
-                    className="w-full py-3 text-sm font-semibold text-primary bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors"
+                    className="w-full md:col-span-2 py-3 text-sm font-semibold text-primary bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors"
                   >
                     Load More ({getPriorityRows().length - priorityDisplayCount} remaining)
                   </button>
@@ -817,7 +817,7 @@ export default function SupervisorHomePage() {
                       <div className="flex-1 h-px bg-gray-200" />
                       <span className="text-xs text-gray-400">{group.rows.length}</span>
                     </div>
-                    <div className="space-y-3 mb-4">
+                    <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0 mb-4">
                       {group.rows.map(row => (
                         <ActivityCard
                           key={row.id}
@@ -841,7 +841,7 @@ export default function SupervisorHomePage() {
         {activeView === 'floor' && (
           <>
             {/* Floor summary strip */}
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+            <div className="grid grid-cols-6 gap-2 mb-4">
               {([
                 { label: 'Total', count: statusCounts.total, filter: null as string | null, borderColor: '', activeBg: 'bg-amber-50' },
                 { label: 'Not Started', count: statusCounts.not_started, filter: 'not_started', borderColor: 'border-gray-300', activeBg: 'bg-gray-50' },
@@ -853,14 +853,14 @@ export default function SupervisorHomePage() {
                 <button
                   key={stat.label}
                   onClick={() => setStatusFilter(statusFilter === stat.filter ? null : stat.filter)}
-                  className={`min-w-[68px] flex-shrink-0 flex flex-col items-center py-2 rounded-xl border transition-all ${
+                  className={`flex flex-col items-center py-2 md:py-3 rounded-xl border transition-all ${
                     statusFilter === stat.filter
                       ? `${stat.borderColor || 'border-primary'} ${stat.activeBg} ring-1 ring-primary/30`
                       : `border-gray-200 bg-white ${stat.borderColor ? `hover:${stat.borderColor}` : ''}`
                   }`}
                 >
-                  <div className="text-lg font-bold text-gray-900">{stat.count}</div>
-                  <div className="text-[9px] text-gray-500 leading-tight">{stat.label}</div>
+                  <div className="text-lg md:text-xl font-bold text-gray-900">{stat.count}</div>
+                  <div className="text-[9px] md:text-[11px] text-gray-500 leading-tight">{stat.label}</div>
                 </button>
               ))}
             </div>
@@ -932,9 +932,9 @@ export default function SupervisorHomePage() {
             )}
 
             {/* Activity Cards */}
-            <div className="space-y-3">
+            <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
               {floorRows.length === 0 ? (
-                <div className="text-center py-12">
+                <div className="text-center py-12 md:col-span-2">
                   <div className="text-4xl mb-3">{'\u{1F3D7}️'}</div>
                   <h3 className="text-lg font-semibold text-gray-900">No activities found</h3>
                   <p className="text-sm text-gray-500 mt-1">Try changing the filters or search keyword.</p>
@@ -956,7 +956,7 @@ export default function SupervisorHomePage() {
                   {floorRows.length > floorDisplayCount && (
                     <button
                       onClick={() => setFloorDisplayCount(c => c + 20)}
-                      className="w-full py-3 text-sm font-semibold text-primary bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors"
+                      className="w-full md:col-span-2 py-3 text-sm font-semibold text-primary bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors"
                     >
                       Load More ({floorRows.length - floorDisplayCount} remaining)
                     </button>

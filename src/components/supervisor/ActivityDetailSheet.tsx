@@ -170,7 +170,7 @@ export default function ActivityDetailSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end max-w-md mx-auto">
+    <div className="fixed inset-0 z-50 flex flex-col justify-end max-w-md md:max-w-2xl mx-auto">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto">
         <div className="flex justify-center pt-3 pb-2">

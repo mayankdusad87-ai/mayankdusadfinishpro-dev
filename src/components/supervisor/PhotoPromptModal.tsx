@@ -7,7 +7,7 @@ interface PhotoPromptModalProps {
 
 export default function PhotoPromptModal({ onConfirm, onCancel }: PhotoPromptModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center max-w-md mx-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center max-w-md md:max-w-3xl lg:max-w-4xl mx-auto">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
       <div className="relative bg-white rounded-2xl mx-6 p-5 shadow-xl w-full max-w-xs">
         <h3 className="text-base font-bold text-gray-900 mb-1">Photo Required</h3>

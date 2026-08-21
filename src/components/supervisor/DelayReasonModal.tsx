@@ -17,7 +17,7 @@ export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 
   const canSubmit = selected && (isOther ? remarks.trim().length > 0 : true);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center max-w-md mx-auto">
+    <div className="fixed inset-0 z-50 flex items-end justify-center max-w-md md:max-w-2xl mx-auto">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
       <div className="relative bg-white rounded-t-2xl w-full shadow-xl max-h-[70vh] overflow-y-auto">
         <div className="flex justify-center pt-3 pb-1">
