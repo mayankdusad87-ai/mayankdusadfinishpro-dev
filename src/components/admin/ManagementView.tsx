@@ -96,7 +96,7 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
               {b.onHoldFlats.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {b.onHoldFlats.map(oh => (
-                    <div key={`${oh.floor}-${oh.flatNumber}`} className="text-[11px] bg-amber-100/60 text-amber-800 rounded px-2 py-1">
+                    <div key={`${oh.floor}-${oh.flatNumber}`} className="text-xs bg-amber-100/60 text-amber-800 rounded px-2 py-1">
                       <span className="font-semibold">Flat {oh.flatNumber}</span> on hold — {oh.reason}
                     </div>
                   ))}
@@ -161,7 +161,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                           : 'border-gray-100 bg-gray-50/80 hover:border-gray-300 hover:shadow-md hover:bg-white'
                       }`}
                     >
-                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 truncate">{s.stage}</div>
+                      <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 truncate">{s.stage}</div>
                       <div className="text-2xl font-bold text-gray-900 tabular-nums">{s.completedFlats}</div>
                       <div className="text-xs text-gray-400 tabular-nums">/ {s.totalFlats} flats</div>
                       <div className="w-full h-2.5 bg-gray-200 rounded-full mt-3 overflow-hidden">

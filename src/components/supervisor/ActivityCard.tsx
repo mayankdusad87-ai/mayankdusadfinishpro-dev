@@ -31,7 +31,7 @@ function ActivityCard({
     ? daysOverdue(row.expected_end) : 0;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 transition-colors">
+    <div className={`bg-white rounded-xl border border-gray-200 p-4 transition-colors ${!bulkMode ? 'hover:bg-gray-50 cursor-pointer' : ''}`}>
       <div className="flex items-start justify-between" onClick={() => !bulkMode && onOpenDetail(row)}>
         <div className="flex items-start gap-3 flex-1 min-w-0">
           {bulkMode && !isCompleted && (
@@ -53,11 +53,11 @@ function ActivityCard({
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${sc.bg} ${sc.text}`}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${sc.bg} ${sc.text}`}>
             {sc.label}
           </span>
           {overdueDays > 0 && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-red-500 text-white text-[11px] font-bold">
               {overdueDays}d overdue
             </span>
           )}

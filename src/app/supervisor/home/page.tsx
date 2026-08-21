@@ -582,7 +582,7 @@ export default function SupervisorHomePage() {
             }`}
           >
             <div className="text-lg font-bold text-red-400">{priorities.overdue.length}</div>
-            <div className="text-[9px] text-gray-400 leading-tight">Overdue</div>
+            <div className="text-[11px] text-gray-400 leading-tight">Overdue</div>
           </button>
           <button
             onClick={() => setActiveView(activeView === 'due_today' ? 'floor' : 'due_today')}
@@ -591,7 +591,7 @@ export default function SupervisorHomePage() {
             }`}
           >
             <div className="text-lg font-bold text-yellow-400">{priorities.dueToday.length}</div>
-            <div className="text-[9px] text-gray-400 leading-tight">Due today</div>
+            <div className="text-[11px] text-gray-400 leading-tight">Due today</div>
           </button>
           <button
             onClick={() => setActiveView(activeView === 'starting_today' ? 'floor' : 'starting_today')}
@@ -600,11 +600,11 @@ export default function SupervisorHomePage() {
             }`}
           >
             <div className="text-lg font-bold text-blue-400">{priorities.startingToday.length}</div>
-            <div className="text-[9px] text-gray-400 leading-tight text-center">Starting</div>
+            <div className="text-[11px] text-gray-400 leading-tight text-center">Starting</div>
           </button>
           <div className="flex flex-col items-center py-2 rounded-lg bg-navy-light/60">
             <div className="text-lg font-bold text-green-400">{priorities.completedToday.length}</div>
-            <div className="text-[9px] text-gray-400 leading-tight">Done</div>
+            <div className="text-[11px] text-gray-400 leading-tight">Done</div>
           </div>
         </div>
 
@@ -692,7 +692,15 @@ export default function SupervisorHomePage() {
           <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
             {getPriorityRows().length === 0 ? (
               <div className="text-center py-12 md:col-span-2">
-                <div className="text-4xl mb-3">{activeView === 'overdue' ? '\u{1F389}' : '\u{1F4CB}'}</div>
+                {activeView === 'overdue' ? (
+                  <svg className="w-12 h-12 text-green-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                ) : (
+                  <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+                  </svg>
+                )}
                 <h3 className="text-lg font-semibold text-gray-900">
                   {activeView === 'overdue' ? 'No overdue activities!' : 'Nothing here'}
                 </h3>
@@ -803,7 +811,9 @@ export default function SupervisorHomePage() {
               </div>
             ) : allFloorRows.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-4xl mb-3">{'\u{1F3D7}️'}</div>
+                <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
                 <h3 className="text-lg font-semibold text-gray-900">No activities found</h3>
                 <p className="text-sm text-gray-500 mt-1">Try changing the filters or search keyword.</p>
               </div>
@@ -841,7 +851,7 @@ export default function SupervisorHomePage() {
         {activeView === 'floor' && (
           <>
             {/* Floor summary strip */}
-            <div className="grid grid-cols-6 gap-2 mb-4">
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-4">
               {([
                 { label: 'Total', count: statusCounts.total, filter: null as string | null, borderColor: '', activeBg: 'bg-amber-50' },
                 { label: 'Not Started', count: statusCounts.not_started, filter: 'not_started', borderColor: 'border-gray-300', activeBg: 'bg-gray-50' },
@@ -860,7 +870,7 @@ export default function SupervisorHomePage() {
                   }`}
                 >
                   <div className="text-lg md:text-xl font-bold text-gray-900">{stat.count}</div>
-                  <div className="text-[9px] md:text-[11px] text-gray-500 leading-tight">{stat.label}</div>
+                  <div className="text-[11px] md:text-xs text-gray-500 leading-tight">{stat.label}</div>
                 </button>
               ))}
             </div>
@@ -935,7 +945,9 @@ export default function SupervisorHomePage() {
             <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
               {floorRows.length === 0 ? (
                 <div className="text-center py-12 md:col-span-2">
-                  <div className="text-4xl mb-3">{'\u{1F3D7}️'}</div>
+                  <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                  </svg>
                   <h3 className="text-lg font-semibold text-gray-900">No activities found</h3>
                   <p className="text-sm text-gray-500 mt-1">Try changing the filters or search keyword.</p>
                 </div>

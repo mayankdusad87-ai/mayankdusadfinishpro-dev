@@ -81,7 +81,7 @@ function HealthScore(props: HealthScoreProps) {
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-3xl font-bold text-gray-900">{score}</span>
-              <span className="text-[11px] text-gray-500 font-medium">/ 100</span>
+              <span className="text-xs text-gray-500 font-medium">/ 100</span>
             </div>
           </div>
           <div>
@@ -90,7 +90,7 @@ function HealthScore(props: HealthScoreProps) {
             <div className="mt-3 space-y-2">
               {factors.map(f => (
                 <div key={f.label}>
-                  <div className="flex items-center justify-between text-[11px] mb-0.5">
+                  <div className="flex items-center justify-between text-xs mb-0.5">
                     <span className="font-semibold text-gray-700">{f.label}</span>
                     <span className="text-gray-500">{f.value.toFixed(0)}%</span>
                   </div>
@@ -100,7 +100,7 @@ function HealthScore(props: HealthScoreProps) {
                       style={{ width: `${Math.min(100, f.value)}%`, transition: 'width 0.8s ease' }}
                     />
                   </div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">{f.desc}</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">{f.desc}</div>
                 </div>
               ))}
             </div>
@@ -123,10 +123,10 @@ function HealthScore(props: HealthScoreProps) {
               >
                 <div className="flex items-center gap-2 mb-1">
                   <div className={`w-2 h-2 rounded-full ${chip.dot}`} />
-                  <span className="text-[11px] font-medium text-gray-500">{chip.label}</span>
+                  <span className="text-xs font-medium text-gray-500">{chip.label}</span>
                 </div>
                 <div className="text-lg font-bold text-gray-900">{count.toLocaleString()}</div>
-                <div className="text-[10px] text-gray-400">{pct}%</div>
+                <div className="text-[11px] text-gray-400">{pct}%</div>
               </button>
             );
           })}

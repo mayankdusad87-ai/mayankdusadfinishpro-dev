@@ -162,7 +162,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <div className="text-xs font-bold leading-tight tracking-wide">FINISHING PRO</div>
-            <div className="text-[10px] text-gray-400 leading-tight">Head Office</div>
+            <div className="text-xs text-gray-400 leading-tight">Head Office</div>
           </div>
         )}
         {/* Close button on mobile */}
@@ -187,6 +187,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               key={item.href}
               href={item.href}
               onClick={onMobileClose}
+              aria-current={isActive ? 'page' : undefined}
               className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-colors relative group ${
                 isActive
                   ? 'bg-sidebar-hover text-white'
@@ -219,8 +220,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-white text-xs font-semibold truncate">{profile?.full_name || 'User'}</div>
-              <div className="text-gray-400 text-[10px] truncate">{user?.email || ''}</div>
-              <div className="text-[9px] uppercase tracking-wider text-primary/70 font-medium mt-0.5">{profile?.role || 'admin'}</div>
+              <div className="text-gray-400 text-xs truncate">{user?.email || ''}</div>
+              <div className="text-[11px] uppercase tracking-wider text-primary/70 font-medium mt-0.5">{profile?.role || 'admin'}</div>
             </div>
           </div>
         )}
