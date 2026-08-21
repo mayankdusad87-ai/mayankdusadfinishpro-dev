@@ -33,15 +33,15 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '2026.08.21b',
-    headline: 'Pending Work Matrix',
+    version: '2026.08.21c',
+    headline: 'Site Pulse Redesign',
     date: 'August 21, 2026',
     features: [
       {
         emoji: '📊',
-        title: 'Pending Work Matrix',
+        title: 'Collapsible Pending Work',
         description:
-          'The Site Pulse section now shows a stage-by-stage breakdown of pending work — see which floors still need each sub-stage, with progress bars and color-coded floor chips (blue = in progress, gray = yet to start).',
+          'Site Pulse now shows compact stage rows by default with aggregate progress. Tap any stage to expand and see sub-stage detail with floor-level chips — much cleaner for quick executive review.',
         roles: ['admin', 'management'],
       },
     ],
