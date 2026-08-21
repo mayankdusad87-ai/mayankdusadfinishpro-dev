@@ -119,19 +119,32 @@ function getClientIp(req: NextRequest): string {
   );
 }
 
-// ---- Pre-built limiter instances (shared across warm invocations) ----
+// ---- Pre-built limiter instances ----
+// Use globalThis to survive module re-evaluation in Next.js dev mode
+// (same pattern as Prisma/Supabase client singletons).
+// In production (Vercel serverless), each warm instance gets its own set.
 
-/** Auth-sensitive: password reset, login attempts — 5/min */
-const authLimiter = createRateLimiter(DEFAULT_CONFIGS.auth);
+interface RateLimiters {
+  auth: RateLimiter;
+  create: RateLimiter;
+  standard: RateLimiter;
+  read: RateLimiter;
+}
 
-/** User creation: create-supervisor, create-management, etc. — 10/min */
-const createLimiter = createRateLimiter(DEFAULT_CONFIGS.create);
+const globalForLimiters = globalThis as typeof globalThis & {
+  _rateLimiters?: RateLimiters;
+};
 
-/** Standard API routes — 30/min */
-const standardLimiter = createRateLimiter(DEFAULT_CONFIGS.standard);
+if (!globalForLimiters._rateLimiters) {
+  globalForLimiters._rateLimiters = {
+    auth: createRateLimiter(DEFAULT_CONFIGS.auth),
+    create: createRateLimiter(DEFAULT_CONFIGS.create),
+    standard: createRateLimiter(DEFAULT_CONFIGS.standard),
+    read: createRateLimiter(DEFAULT_CONFIGS.read),
+  };
+}
 
-/** Read-heavy routes — 60/min */
-const readLimiter = createRateLimiter(DEFAULT_CONFIGS.read);
+const limiters = globalForLimiters._rateLimiters;
 
 /**
  * Apply rate limiting to a request. Returns a 429 response if limited, null if allowed.
@@ -151,14 +164,14 @@ export function applyRateLimit(
 
   switch (tier) {
     case 'auth':
-      return authLimiter.check(ip);
+      return limiters.auth.check(ip);
     case 'create':
-      return createLimiter.check(ip);
+      return limiters.create.check(ip);
     case 'read':
-      return readLimiter.check(ip);
+      return limiters.read.check(ip);
     case 'standard':
     default:
-      return standardLimiter.check(ip);
+      return limiters.standard.check(ip);
   }
 }
 
