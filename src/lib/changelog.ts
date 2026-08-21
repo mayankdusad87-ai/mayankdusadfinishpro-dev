@@ -33,6 +33,37 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.21e',
+    headline: 'Premium Visual Refresh',
+    date: 'August 21, 2026',
+    features: [
+      {
+        emoji: '✨',
+        title: 'Professional Typography',
+        description:
+          'New DM Sans headings and Inter body text give the app a sharper, more polished look throughout.',
+      },
+      {
+        emoji: '🎨',
+        title: 'Warm, Refined Background',
+        description:
+          'The page background is now a warm neutral tone instead of cold blue-gray — easier on the eyes during long sessions.',
+      },
+      {
+        emoji: '🏷️',
+        title: 'Branded Favicon',
+        description:
+          'A new navy-and-gold "F" icon appears in your browser tab for quick identification.',
+      },
+      {
+        emoji: '👁️',
+        title: 'Better Text Contrast',
+        description:
+          'Faint gray text across the app has been darkened for WCAG AA readability — labels, subtitles, and metadata are all easier to read.',
+      },
+    ],
+  },
+  {
     version: '2026.08.21d',
     headline: 'Site Pulse Drill-Downs',
     date: 'August 21, 2026',
