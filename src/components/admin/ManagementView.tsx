@@ -50,7 +50,7 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
           <span className="text-[#C8922A] mr-1.5">▾</span>
           {stage} — floor breakdown
         </h4>
-        <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-600 transition-colors cursor-pointer flex items-center gap-1">
+        <button onClick={onClose} className="text-xs text-gray-500 hover:text-gray-600 transition-colors cursor-pointer flex items-center gap-1">
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           Close
         </button>
@@ -117,7 +117,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
   const [weeklyDrillOpen, setWeeklyDrillOpen] = useState(false);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
 
       {/* ---- SECTION 0: TARGET ACHIEVEMENT (READ-ONLY, AT THE TOP) ---- */}
       {projectId && (
@@ -133,7 +133,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
         <div className="px-4 md:px-6 py-3.5 bg-gradient-to-r from-[#162032] to-[#1e2d45] flex items-center justify-between">
           <div>
             <h3 className="text-sm md:text-base font-bold text-white">Flat Completion Pipeline</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Click a stage to see floor-level breakdown</p>
+            <p className="text-xs text-gray-500 mt-0.5">Click a stage to see floor-level breakdown</p>
           </div>
           <span className="text-xs text-gray-500 hidden md:inline">{projectName}</span>
         </div>
@@ -162,13 +162,13 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                           : 'border-gray-100 bg-gray-50/80 hover:border-gray-300 hover:shadow-md hover:bg-white'
                       }`}
                     >
-                      <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 truncate">{s.stage}</div>
+                      <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 truncate">{s.stage}</div>
                       <div className="text-2xl font-bold text-gray-900 tabular-nums">{s.completedFlats}</div>
-                      <div className="text-xs text-gray-400 tabular-nums">/ {s.totalFlats} flats</div>
+                      <div className="text-xs text-gray-500 tabular-nums">/ {s.totalFlats} flats</div>
                       <div className="w-full h-2.5 bg-gray-200 rounded-full mt-3 overflow-hidden">
                         <div className="h-2.5 rounded-full transition-all duration-500" style={{ width: `${w}%`, backgroundColor: barColor(w) }} />
                       </div>
-                      <div className={`inline-flex items-center mt-2 px-2 py-0.5 rounded-full text-[11px] font-bold tabular-nums ${pctBadgeBg(w)}`}>
+                      <div className={`inline-flex items-center mt-2 px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${pctBadgeBg(w)}`}>
                         {s.pct}%
                       </div>
                     </button>
@@ -201,7 +201,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                       </div>
                       <div className="text-sm tabular-nums">
                         <span className="font-bold text-gray-900">{s.completedFlats}</span>
-                        <span className="text-gray-400"> / {s.totalFlats}</span>
+                        <span className="text-gray-500"> / {s.totalFlats}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -235,19 +235,20 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
       )}
 
       {/* ---- SECTION 3: FIX THIS ---- */}
-      <div>
-        <div className="flex items-center gap-2.5 mb-3">
-          <h3 className="text-base md:text-lg font-bold text-gray-900">Fix This</h3>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 md:px-6 py-3.5 bg-gradient-to-r from-[#162032] to-[#1e2d45] flex items-center justify-between">
+          <h3 className="text-sm md:text-base font-bold text-white">Fix This</h3>
           {bottlenecks.length > 0 ? (
-            <span className="text-[11px] font-bold bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full">
+            <span className="text-xs font-bold bg-red-500/20 text-red-300 px-2.5 py-0.5 rounded-full">
               {bottlenecks.length} {bottlenecks.length === 1 ? 'blocker' : 'blockers'}
             </span>
           ) : (
-            <span className="text-[11px] font-bold bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full">
+            <span className="text-xs font-bold bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full">
               All clear
             </span>
           )}
         </div>
+        <div className="p-4 md:p-6">
 
         {bottlenecks.length === 0 ? (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
@@ -272,18 +273,18 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
 
                   <div className="space-y-1.5 border-t border-gray-100 pt-2.5">
                     <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">Vendor</span>
+                      <span className="text-gray-500">Vendor</span>
                       <span className="font-semibold text-gray-900">{b.blockedVendor || '—'}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-gray-400">Overdue</span>
+                      <span className="text-gray-500">Overdue</span>
                       <span className="font-semibold text-red-600">{b.overdueCount} {b.overdueCount === 1 ? 'activity' : 'activities'}</span>
                     </div>
                   </div>
 
                   {b.delayReasons.length > 0 && (
                     <div className="border-t border-gray-100 mt-2.5 pt-2.5">
-                      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Why it&apos;s stuck</div>
+                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Why it&apos;s stuck</div>
                       <div className="space-y-2">
                         {b.delayReasons.map((dr, i) => {
                           const isNoReason = dr.category === 'No reason logged';
@@ -294,9 +295,9 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                               <div className="flex justify-between items-center mb-1">
                                 <div className="flex items-center gap-1.5">
                                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
-                                  <span className={`text-xs ${isNoReason ? 'text-gray-400 italic' : 'text-gray-700'}`}>{dr.category}</span>
+                                  <span className={`text-xs ${isNoReason ? 'text-gray-500 italic' : 'text-gray-700'}`}>{dr.category}</span>
                                 </div>
-                                <span className={`text-xs font-semibold ${isNoReason ? 'text-gray-400' : 'text-gray-900'}`}>{dr.flatCount} {dr.flatCount === 1 ? 'flat' : 'flats'}</span>
+                                <span className={`text-xs font-semibold ${isNoReason ? 'text-gray-500' : 'text-gray-900'}`}>{dr.flatCount} {dr.flatCount === 1 ? 'flat' : 'flats'}</span>
                               </div>
                               <div className="w-full h-1.5 bg-gray-100 rounded-full">
                                 <div className="h-1.5 rounded-full transition-all" style={{ width: `${barPct}%`, backgroundColor: dotColor, opacity: isNoReason ? 0.5 : 0.7 }} />
@@ -312,6 +313,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
             ))}
           </div>
         )}
+        </div>
       </div>
 
       {/* ---- SECTION 4: SITE PULSE ---- */}
@@ -339,7 +341,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                   <span className="text-xl font-bold text-gray-900 tabular-nums">{sitePulse.completionsThisWeek}</span>
                   <span className="text-gray-500 ml-1.5">{sitePulse.completionsThisWeek === 1 ? 'activity' : 'activities'} completed this week</span>
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5 tabular-nums">
+                <div className="text-xs text-gray-500 mt-0.5 tabular-nums">
                   vs {sitePulse.completionsLastWeek} last week
                   {sitePulse.completionsThisWeek > 0 && (
                     <span className="text-blue-500 ml-2 font-medium">{weeklyDrillOpen ? '▾ Hide detail' : '▸ View detail'}</span>
@@ -372,11 +374,11 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-left">
-                        <th className="px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Floor</th>
-                        <th className="px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Flat</th>
-                        <th className="px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Activity</th>
-                        <th className="px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Stage</th>
-                        <th className="px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Completed</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Floor</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Flat</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Activity</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Stage</th>
+                        <th className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Completed</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -414,7 +416,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
               <div className="text-sm font-semibold text-gray-700">All clear</div>
-              <div className="text-xs text-gray-400 mt-0.5">Every sub-stage is completed across all floors</div>
+              <div className="text-xs text-gray-500 mt-0.5">Every sub-stage is completed across all floors</div>
             </div>
           ) : (
             <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-200">
@@ -440,7 +442,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                       {/* Chevron */}
                       <svg
                         className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
-                          isExpanded ? 'rotate-90 text-[#C8922A]' : 'text-gray-400'
+                          isExpanded ? 'rotate-90 text-[#C8922A]' : 'text-gray-500'
                         }`}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
                       >
@@ -460,7 +462,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                             style={{ width: `${stagePct}%` }}
                           />
                         </div>
-                        <span className={`text-[11px] tabular-nums flex-shrink-0 font-medium ${
+                        <span className={`text-xs tabular-nums flex-shrink-0 font-medium ${
                           isExpanded ? 'text-gray-300' : 'text-gray-500'
                         }`}>
                           {floorsCompleted}/{totalFloors} floors
@@ -468,23 +470,26 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                       </div>
 
                       {/* Sub-stage count badge */}
-                      <span className={`text-[11px] flex-shrink-0 ${isExpanded ? 'text-gray-400' : 'text-gray-400'}`}>
+                      <span className={`text-xs flex-shrink-0 ${isExpanded ? 'text-gray-500' : 'text-gray-500'}`}>
                         {stageGroup.subStages.length} sub-stage{stageGroup.subStages.length !== 1 ? 's' : ''}
                       </span>
                     </button>
 
                     {/* Expanded: sub-stage detail rows */}
-                    {isExpanded && (
-                      <div className="bg-gray-50/80">
+                    <div
+                      className="grid transition-[grid-template-rows] duration-200 ease-out"
+                      style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+                    >
+                      <div className={`overflow-hidden ${isExpanded ? 'bg-gray-50/80' : ''}`}>
                         {/* Legend row */}
                         <div className="flex items-center gap-4 px-4 py-2 border-b border-gray-100">
                           <div className="flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-blue-500" />
-                            <span className="text-[11px] text-gray-400">In progress</span>
+                            <span className="text-xs text-gray-500">In progress</span>
                           </div>
                           <div className="flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-gray-300" />
-                            <span className="text-[11px] text-gray-400">Yet to start</span>
+                            <span className="text-xs text-gray-500">Yet to start</span>
                           </div>
                         </div>
 
@@ -511,7 +516,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                                       style={{ width: `${pct}%` }}
                                     />
                                   </div>
-                                  <span className="text-[11px] text-gray-500 tabular-nums flex-shrink-0">
+                                  <span className="text-xs text-gray-500 tabular-nums flex-shrink-0">
                                     {sub.completedFloors}/{sub.totalFloors}
                                   </span>
                                 </div>
@@ -519,7 +524,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                                   {sub.pendingFloors.map(pf => (
                                     <span
                                       key={pf.floor}
-                                      className={`inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded ${
+                                      className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded ${
                                         pf.status === 'in_progress'
                                           ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                           : 'bg-gray-100 text-gray-500 border border-gray-200'
@@ -534,7 +539,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
                           );
                         })}
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}
@@ -543,7 +548,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
 
           {/* Footer note */}
           {pendingWork.length > 0 && (
-            <div className="text-[11px] text-gray-400 mt-2.5">
+            <div className="text-xs text-gray-500 mt-2.5">
               Tap a stage to see sub-stage detail. Completed sub-stages are hidden.
             </div>
           )}

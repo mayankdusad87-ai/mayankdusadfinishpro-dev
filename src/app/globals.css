@@ -3,12 +3,15 @@
 @theme inline {
   --color-primary: #C8922A;
   --color-primary-dark: #A67921;
+  --color-primary-text: #9A7020;
   --color-navy: #162032;
   --color-navy-light: #1E2D42;
   --color-navy-dark: #0D1520;
   --color-sidebar: #162032;
   --color-sidebar-hover: #1E2D42;
   --color-sidebar-active: #C8922A;
+  --font-heading: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 * {
@@ -16,10 +19,14 @@
 }
 
 body {
-  background: #f5f6fa;
+  background: #F7F6F3;
   color: #1a1a2e;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-body);
   margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
 }
 
 ::-webkit-scrollbar {

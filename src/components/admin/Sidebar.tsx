@@ -146,7 +146,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const sidebarContent = (
     <aside
       className={`flex flex-col h-screen bg-sidebar text-white transition-all duration-200 flex-shrink-0 ${
-        collapsed ? 'w-[60px]' : 'w-[170px]'
+        collapsed ? 'w-[60px]' : 'w-[220px]'
       }`}
     >
       {/* Logo */}
