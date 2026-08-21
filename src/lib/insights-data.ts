@@ -120,6 +120,15 @@ export interface SitePulseStage {
   floors: number[];
 }
 
+export interface CompletedActivity {
+  floor: number;
+  flatNumber: number;
+  activity: string;
+  stage: string;
+  stageGate: string;
+  completedDate: string;
+}
+
 export interface SitePulse {
   // Completion snapshot: flats where every activity is done
   fullyFinishedFlats: number;
@@ -136,6 +145,9 @@ export interface SitePulse {
 
   // Drill-down: stages that had completions this week
   stagesActiveThisWeek: SitePulseStage[];
+
+  // Activity-level detail for this week's completions
+  completedActivitiesThisWeek: CompletedActivity[];
 }
 
 export interface PendingFloor {
@@ -275,6 +287,8 @@ function computeSitePulse(rows: InsightRow[]): SitePulse {
   let completionsLastWeek = 0;
   // Stage drill-down for this week
   const thisWeekByStage = new Map<string, { count: number; floors: Set<number> }>();
+  // Activity-level detail for this week
+  const completedActivitiesThisWeek: CompletedActivity[] = [];
   // 3. Bottleneck: stage with the most unique flats that are overdue & incomplete
   const stageOverdueFlats = new Map<string, Set<string>>();
 
@@ -296,6 +310,14 @@ function computeSitePulse(rows: InsightRow[]): SitePulse {
         if (!sb) { sb = { count: 0, floors: new Set() }; thisWeekByStage.set(r.stage, sb); }
         sb.count++;
         sb.floors.add(r.floor);
+        completedActivitiesThisWeek.push({
+          floor: r.floor,
+          flatNumber: r.flat_number,
+          activity: r.activity,
+          stage: r.stage,
+          stageGate: r.stage_gate,
+          completedDate: r.actual_end,
+        });
       }
       if (r.actual_end >= lastMonday && r.actual_end <= lastSunday) {
         completionsLastWeek++;
@@ -308,6 +330,11 @@ function computeSitePulse(rows: InsightRow[]): SitePulse {
       stageOverdueFlats.get(r.stage)!.add(flatKey);
     }
   }
+
+  // Sort completed activities by date descending, then floor ascending
+  completedActivitiesThisWeek.sort((a, b) =>
+    a.completedDate < b.completedDate ? 1 : a.completedDate > b.completedDate ? -1 : a.floor - b.floor
+  );
 
   // Compute fully-finished flats
   let fullyFinishedFlats = 0;
@@ -347,6 +374,7 @@ function computeSitePulse(rows: InsightRow[]): SitePulse {
     velocityDelta: completionsThisWeek - completionsLastWeek,
     bottleneck,
     stagesActiveThisWeek,
+    completedActivitiesThisWeek,
   };
 }
 

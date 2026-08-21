@@ -33,15 +33,22 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '2026.08.21c',
-    headline: 'Site Pulse Redesign',
+    version: '2026.08.21d',
+    headline: 'Site Pulse Drill-Downs',
     date: 'August 21, 2026',
     features: [
       {
-        emoji: '📊',
-        title: 'Collapsible Pending Work',
+        emoji: '🔍',
+        title: 'Weekly Completions Drill-Down',
         description:
-          'Site Pulse now shows compact stage rows by default with aggregate progress. Tap any stage to expand and see sub-stage detail with floor-level chips — much cleaner for quick executive review.',
+          'Tap the weekly progress strip to see exactly which activities were completed — floor, flat, activity name, stage, and completion date.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📊',
+        title: 'Floor-Level Stage Progress',
+        description:
+          'Pending work now shows floor-level progress (e.g. 14/22 floors) instead of sub-stage totals — a floor counts as done only when all its sub-stages are complete.',
         roles: ['admin', 'management'],
       },
     ],
