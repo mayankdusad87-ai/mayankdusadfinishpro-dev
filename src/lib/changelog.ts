@@ -33,6 +33,40 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.21',
+    headline: 'UI Polish & Rate Limiting',
+    date: 'August 21, 2026',
+    features: [
+      {
+        emoji: '🎨',
+        title: 'Improved Readability',
+        description:
+          'Text across the app is now larger and easier to read — sidebar labels, status badges, priority cards, and dashboard strips all got a bump.',
+      },
+      {
+        emoji: '📱',
+        title: 'Better Mobile Status Grid',
+        description:
+          'The floor-view status grid now wraps to two rows on mobile instead of cramming six columns into a narrow screen.',
+        roles: ['supervisor'],
+      },
+      {
+        emoji: '✨',
+        title: 'Polished Empty States',
+        description:
+          'Empty-state screens now use clean SVG icons instead of emoji for a more professional look.',
+        roles: ['supervisor'],
+      },
+      {
+        emoji: '🛡️',
+        title: 'API Rate Limiting',
+        description:
+          'Added two-layer rate limiting — a global ceiling at the proxy level and per-route limits — to protect against abuse.',
+        roles: ['admin'],
+      },
+    ],
+  },
+  {
     version: '2026.08.20b',
     headline: 'Bug Fixes & Assignment History',
     date: 'August 20, 2026',
