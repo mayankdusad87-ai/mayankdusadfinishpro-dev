@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { applyRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod';
 
 // ---- Auth helper (reusable) ----
@@ -77,6 +78,9 @@ const DeleteTargetSchema = z.object({
 // ---- POST: Create target ----
 
 export async function POST(req: NextRequest) {
+  const limited = applyRateLimit(req, 'standard');
+  if (limited) return limited;
+
   const auth = await verifyAdmin(req);
   if ('error' in auth) return auth.error;
 
@@ -153,6 +157,9 @@ export async function POST(req: NextRequest) {
 // ---- PATCH: Update target (all fields) ----
 
 export async function PATCH(req: NextRequest) {
+  const limited = applyRateLimit(req, 'standard');
+  if (limited) return limited;
+
   const auth = await verifyAdmin(req);
   if ('error' in auth) return auth.error;
 
@@ -233,6 +240,9 @@ export async function PATCH(req: NextRequest) {
 // ---- DELETE: Remove target ----
 
 export async function DELETE(req: NextRequest) {
+  const limited = applyRateLimit(req, 'standard');
+  if (limited) return limited;
+
   const auth = await verifyAdmin(req);
   if ('error' in auth) return auth.error;
 

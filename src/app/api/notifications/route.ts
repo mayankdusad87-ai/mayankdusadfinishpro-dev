@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { applyRateLimit } from '@/lib/rate-limit';
 
 /**
  * GET /api/notifications — fetch notifications for the authenticated user
  */
 export async function GET(req: NextRequest) {
+  const limited = applyRateLimit(req, 'read');
+  if (limited) return limited;
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -49,6 +53,9 @@ export async function GET(req: NextRequest) {
  * Body: { notificationId: string } or { markAll: true }
  */
 export async function PATCH(req: NextRequest) {
+  const limited = applyRateLimit(req, 'standard');
+  if (limited) return limited;
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

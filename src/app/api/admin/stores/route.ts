@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/auth-guard';
+import { applyRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /**
@@ -7,6 +8,9 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  * Body: { projectId, floor, flatNumber, notes? }
  */
 export async function POST(req: NextRequest) {
+  const limited = applyRateLimit(req, 'standard');
+  if (limited) return limited;
+
   const auth = await verifyAdmin(req);
   if (auth.error) return auth.error;
 
@@ -50,6 +54,9 @@ export async function POST(req: NextRequest) {
  * Body: { storeId }
  */
 export async function PATCH(req: NextRequest) {
+  const limited = applyRateLimit(req, 'standard');
+  if (limited) return limited;
+
   const auth = await verifyAdmin(req);
   if (auth.error) return auth.error;
 

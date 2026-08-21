@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyAdmin } from '@/lib/auth-guard';
+import { applyRateLimit } from '@/lib/rate-limit';
 import {
   computeTargetStatus,
   computeTargetSummary,
@@ -23,6 +24,9 @@ import {
  * If the project has 0 targets, returns immediately — no further queries.
  */
 export async function GET(req: NextRequest) {
+  const limited = applyRateLimit(req, 'read');
+  if (limited) return limited;
+
   // Authenticate: only admin-panel roles can access target achievement data
   const auth = await verifyAdmin(req, ['admin', 'management', 'finishing_team']);
   if (auth.error) return auth.error;

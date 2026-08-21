@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyAdmin } from '@/lib/auth-guard';
+import { applyRateLimit } from '@/lib/rate-limit';
 import { resetPasswordSchema } from '@/lib/validations';
 import { sendEmail, passwordResetEmailHtml } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
+  const limited = applyRateLimit(req, 'auth');
+  if (limited) return limited;
+
   const auth = await verifyAdmin(req, ['admin', 'finishing_team']);
   if (auth.error) return auth.error;
 

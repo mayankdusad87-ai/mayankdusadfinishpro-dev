@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/auth-guard';
+import { applyRateLimit } from '@/lib/rate-limit';
 import { createNotification, createNotificationForUsers, getAdminUserIds } from '@/lib/notify';
 import type { NotificationType } from '@/lib/notify';
 import { z } from 'zod';
@@ -19,6 +20,9 @@ const createSchema = z.object({
  * POST /api/notifications/create — create notifications (admin-only or internal)
  */
 export async function POST(req: NextRequest) {
+  const limited = applyRateLimit(req, 'standard');
+  if (limited) return limited;
+
   const auth = await verifyAdmin(req);
   if (auth.error) return auth.error;
 

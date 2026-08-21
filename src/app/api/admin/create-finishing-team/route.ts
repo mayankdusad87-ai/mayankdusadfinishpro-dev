@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyAdmin } from '@/lib/auth-guard';
+import { applyRateLimit } from '@/lib/rate-limit';
 import { createFinishingTeamSchema } from '@/lib/validations';
 import { sendEmail, welcomeFinishingTeamEmailHtml } from '@/lib/email';
 
@@ -39,6 +40,9 @@ async function findAndDeleteOrphanedAuthUser(email: string): Promise<boolean> {
 
 export async function POST(req: NextRequest) {
   try {
+    const limited = applyRateLimit(req, 'create');
+    if (limited) return limited;
+
     // Only admin can create finishing team users
     const auth = await verifyAdmin(req);
     if (auth.error) return auth.error;

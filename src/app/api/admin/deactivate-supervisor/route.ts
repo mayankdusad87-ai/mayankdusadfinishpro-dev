@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyAdmin } from '@/lib/auth-guard';
+import { applyRateLimit } from '@/lib/rate-limit';
 import { deactivateSupervisorSchema } from '@/lib/validations';
 
 async function sendStatusEmail(email: string, fullName: string, role: string, activated: boolean) {
@@ -55,6 +56,9 @@ async function sendStatusEmail(email: string, fullName: string, role: string, ac
 }
 
 export async function POST(req: NextRequest) {
+  const limited = applyRateLimit(req, 'standard');
+  if (limited) return limited;
+
   const auth = await verifyAdmin(req, ['admin', 'finishing_team']);
   if (auth.error) return auth.error;
 

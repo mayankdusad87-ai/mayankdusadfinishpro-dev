@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdmin } from '@/lib/auth-guard';
+import { applyRateLimit } from '@/lib/rate-limit';
 import { notifyReversalSchema } from '@/lib/validations';
 import { STATUS_LABELS } from '@/lib/constants';
 import { createNotificationForUsers, getAdminUserIds } from '@/lib/notify';
@@ -7,6 +8,9 @@ import { sendEmail, reversalAlertEmailHtml } from '@/lib/email';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(req: NextRequest) {
+  const limited = applyRateLimit(req, 'standard');
+  if (limited) return limited;
+
   const auth = await verifyAdmin(req);
   if (auth.error) return auth.error;
 
