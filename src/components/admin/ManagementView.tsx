@@ -42,15 +42,27 @@ function pctBadgeBg(pct: number): string {
   return 'bg-gray-100 text-gray-500';
 }
 
-const STATUS_BADGE: Record<FloorActivityDetail['status'], { dot: string; label: string; text: string }> = {
-  in_progress: { dot: 'bg-amber-500', label: 'In Progress', text: 'text-amber-700' },
-  yet_to_start: { dot: 'bg-gray-400', label: 'Yet to Start', text: 'text-gray-500' },
-  overdue: { dot: 'bg-red-500', label: 'Overdue', text: 'text-red-600' },
-};
+type StatusFilter = 'in_progress' | 'yet_to_start' | null;
+
+/** Group activities by activity name → list of flat numbers */
+function groupByActivity(activities: FloorActivityDetail[], filter: 'in_progress' | 'yet_to_start') {
+  const map = new Map<string, number[]>();
+  for (const a of activities) {
+    if (a.status !== filter) continue;
+    if (!map.has(a.activity)) map.set(a.activity, []);
+    map.get(a.activity)!.push(a.flatNumber);
+  }
+  // Sort flats within each activity
+  for (const flats of map.values()) flats.sort((a, b) => a - b);
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
 
 function FloorCard({ b }: { b: StageFloorBreakdown }) {
-  const [expanded, setExpanded] = useState(false);
-  const hasPending = b.activities.length > 0;
+  const [activeFilter, setActiveFilter] = useState<StatusFilter>(null);
+
+  function toggleFilter(filter: 'in_progress' | 'yet_to_start') {
+    setActiveFilter(prev => prev === filter ? null : filter);
+  }
 
   let borderColor = 'border-gray-200';
   let bgColor = 'bg-gray-50';
@@ -58,22 +70,13 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
   else if (b.hasOverdue) { borderColor = 'border-red-300'; bgColor = 'bg-red-50'; }
   else if (b.inProgress > 0) { borderColor = 'border-amber-300'; bgColor = 'bg-amber-50'; }
 
+  const grouped = activeFilter ? groupByActivity(b.activities, activeFilter) : [];
+
   return (
     <div className={`rounded-lg border-l-[3px] ${borderColor} ${bgColor}`}>
-      <button
-        onClick={() => hasPending && setExpanded(!expanded)}
-        className={`w-full text-left p-3 ${hasPending ? 'cursor-pointer hover:brightness-95 transition-all' : ''}`}
-        disabled={!hasPending}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-bold text-gray-900">Floor {b.floor}</span>
-          {hasPending && (
-            <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+      <div className="p-3">
+        <div className="text-sm font-bold text-gray-900 mb-2">Floor {b.floor}</div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs">
           {b.completed > 0 && (
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -81,16 +84,40 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
             </span>
           )}
           {b.inProgress > 0 && (
-            <span className="flex items-center gap-1.5">
+            <button
+              onClick={() => toggleFilter('in_progress')}
+              className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors cursor-pointer ${
+                activeFilter === 'in_progress'
+                  ? 'bg-amber-100 ring-1 ring-amber-400'
+                  : 'hover:bg-amber-50'
+              }`}
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              <span className="text-gray-600">{b.inProgress} in progress</span>
-            </span>
+              <span className="text-amber-700 font-medium">{b.inProgress} in progress</span>
+              {activeFilter === 'in_progress' && (
+                <svg className="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
           )}
           {b.yetToStart > 0 && (
-            <span className="flex items-center gap-1.5">
+            <button
+              onClick={() => toggleFilter('yet_to_start')}
+              className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors cursor-pointer ${
+                activeFilter === 'yet_to_start'
+                  ? 'bg-gray-200 ring-1 ring-gray-400'
+                  : 'hover:bg-gray-100'
+              }`}
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-              <span className="text-gray-600">{b.yetToStart} yet to start</span>
-            </span>
+              <span className="text-gray-600 font-medium">{b.yetToStart} yet to start</span>
+              {activeFilter === 'yet_to_start' && (
+                <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
           )}
           {b.hasOverdue && (
             <span className="flex items-center gap-1.5">
@@ -99,42 +126,31 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
             </span>
           )}
         </div>
-      </button>
+      </div>
 
-      {/* Expandable activity detail table */}
+      {/* Expandable activity detail — grouped by activity */}
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"
-        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+        style={{ gridTemplateRows: activeFilter ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden">
-          {expanded && (
-            <div className="px-3 pb-3 pt-1 border-t border-gray-200/60">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-gray-500">
-                    <th className="text-left font-medium py-1 pr-2">Flat</th>
-                    <th className="text-left font-medium py-1 pr-2">Activity</th>
-                    <th className="text-left font-medium py-1">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {b.activities.map((a, i) => {
-                    const badge = STATUS_BADGE[a.status];
-                    return (
-                      <tr key={i} className={i % 2 === 0 ? '' : 'bg-white/40'}>
-                        <td className="py-1 pr-2 font-semibold text-gray-800 tabular-nums">{a.flatNumber}</td>
-                        <td className="py-1 pr-2 text-gray-700">{a.activity}</td>
-                        <td className="py-1">
-                          <span className={`inline-flex items-center gap-1 ${badge.text}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
-                            {badge.label}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          {activeFilter && grouped.length > 0 && (
+            <div className="px-3 pb-3 pt-1 border-t border-gray-200/60 space-y-2">
+              {grouped.map(([activity, flats]) => (
+                <div key={activity}>
+                  <div className="text-xs font-semibold text-gray-700 mb-1">{activity}</div>
+                  <div className="flex flex-wrap gap-1">
+                    {flats.map(flat => (
+                      <span
+                        key={flat}
+                        className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-700 tabular-nums"
+                      >
+                        {flat}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
