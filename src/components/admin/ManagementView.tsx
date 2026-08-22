@@ -308,7 +308,7 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
             </div>
           </div>
 
-          {/* Mobile: vertical list */}
+          {/* Mobile: vertical list with inline drill-down */}
           <div className="md:hidden space-y-3">
             {pipeline.map((s, i) => {
               const w = s.totalFlats > 0 ? (s.completedFlats / s.totalFlats) * 100 : 0;
@@ -341,6 +341,17 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
                       <span className={`text-xs font-bold tabular-nums w-12 text-right px-1.5 py-0.5 rounded-full ${pctBadgeBg(w)}`}>{s.pct}%</span>
                     </div>
                   </button>
+                  {/* Inline drill-down on mobile — appears right below the tapped stage */}
+                  {isActive && stageFloorBreakdowns[s.stage] && (
+                    <div className="mt-2">
+                      <DrilldownPanel
+                        stage={s.stage}
+                        breakdowns={stageFloorBreakdowns[s.stage]}
+                        onClose={() => setSelectedStage(null)}
+                        handoverMap={handoverMap}
+                      />
+                    </div>
+                  )}
                   {i < pipeline.length - 1 && !isActive && (
                     <div className="flex justify-center py-1">
                       <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
@@ -355,14 +366,16 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
         </div>
       </div>
 
-      {/* ---- SECTION 2: STAGE DRILL-DOWN ---- */}
+      {/* ---- SECTION 2: STAGE DRILL-DOWN (desktop only — mobile renders inline above) ---- */}
       {selectedStage && stageFloorBreakdowns[selectedStage] && (
-        <DrilldownPanel
-          stage={selectedStage}
-          breakdowns={stageFloorBreakdowns[selectedStage]}
-          onClose={() => setSelectedStage(null)}
-          handoverMap={handoverMap}
-        />
+        <div className="hidden md:block">
+          <DrilldownPanel
+            stage={selectedStage}
+            breakdowns={stageFloorBreakdowns[selectedStage]}
+            onClose={() => setSelectedStage(null)}
+            handoverMap={handoverMap}
+          />
+        </div>
       )}
 
       {/* ---- SECTION 3: FIX THIS ---- */}
