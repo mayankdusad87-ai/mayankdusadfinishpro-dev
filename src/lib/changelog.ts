@@ -33,6 +33,19 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.22b',
+    headline: 'Automated Daily Backups',
+    date: 'August 22, 2026',
+    features: [
+      {
+        emoji: '☁️',
+        title: 'Daily Cloud Backup',
+        description: 'All database tables and activity photos are now automatically backed up to Cloudflare R2 every night at 2:30 AM IST with 30-day retention.',
+        roles: ['admin'],
+      },
+    ],
+  },
+  {
     version: '2026.08.22a',
     headline: 'RCC Floor Handover Tracking',
     date: 'August 22, 2026',
