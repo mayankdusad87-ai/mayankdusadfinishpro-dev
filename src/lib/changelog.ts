@@ -33,6 +33,31 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.22a',
+    headline: 'RCC Floor Handover Tracking',
+    date: 'August 22, 2026',
+    features: [
+      {
+        emoji: '🏗️',
+        title: 'RCC Handover Dates',
+        description: 'Track when each floor is handed over by the civil/RCC team. Enter planned and actual dates in Settings — status is auto-computed.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '⚠️',
+        title: 'Handover Alerts in Insights',
+        description: 'Floors not yet handed over by RCC are highlighted in the stage drill-down with a red warning banner and planned date.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '🧹',
+        title: 'Cleaner Settings Page',
+        description: 'Removed Stage Weights configuration from Settings for a lighter, less cluttered page.',
+        roles: ['admin'],
+      },
+    ],
+  },
+  {
     version: '2026.08.21e',
     headline: 'Premium Visual Refresh',
     date: 'August 21, 2026',
