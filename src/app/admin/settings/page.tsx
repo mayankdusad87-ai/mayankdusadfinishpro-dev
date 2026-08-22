@@ -6,7 +6,9 @@ import { getStageWeights, setStageWeights, getPaintDaysPerFlat, setPaintDaysPerF
 import { getSupervisors, resetUserPassword } from '@/repositories/supervisor-repo';
 import { STAGE_WEIGHTS, PAINT_DAYS_PER_FLAT } from '@/lib/constants';
 import { useDataLoader } from '@/hooks/use-data-loader';
+import { useProject } from '@/lib/project-context';
 import TargetSetter from '@/components/admin/TargetSetter';
+import RccHandover from '@/components/admin/RccHandover';
 
 const ALL_STAGES = [
   'Pre-Tiling',
@@ -21,6 +23,7 @@ const ALL_STAGES = [
 ];
 
 export default function SettingsPage() {
+  const { currentProject } = useProject();
   const { data: reasons, loading, refresh: loadReasons } = useDataLoader(() => getReasons(), [] as Reason[]);
   const [newLabel, setNewLabel] = useState('');
   const [error, setError] = useState('');
@@ -426,6 +429,13 @@ export default function SettingsPage() {
 
       {/* ---- Project Targets ---- */}
       <TargetSetter />
+
+      {/* ---- RCC Floor Handover ---- */}
+      {currentProject && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <RccHandover projectId={currentProject.id} />
+        </div>
+      )}
 
       {/* ---- Reset User Password ---- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">

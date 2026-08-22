@@ -580,6 +580,47 @@ export type Database = {
           },
         ]
       }
+      floor_handovers: {
+        Row: {
+          id: string
+          project_id: string
+          floor: number
+          planned_handover: string | null
+          actual_handover: string | null
+          remarks: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          floor: number
+          planned_handover?: string | null
+          actual_handover?: string | null
+          remarks?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          floor?: number
+          planned_handover?: string | null
+          actual_handover?: string | null
+          remarks?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "floor_handovers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       uploads: {
         Row: {
           file_name: string

@@ -8,6 +8,8 @@ import type { InsightRow } from '@/repositories/activity-repo';
 import { computeHeatmapFromRollup } from '@/lib/floor-rollup';
 import type { HeatmapData } from '@/lib/floor-rollup';
 import { computeManagement, computeOperations } from '@/lib/insights-data';
+import { getFloorHandovers } from '@/repositories/handover-repo';
+import type { FloorHandover } from '@/repositories/handover-repo';
 import { getInsightsSettings } from '@/repositories/settings-repo';
 import { getSupervisorActivity, getRecentReversals, getSiteActivity } from '@/repositories/audit-repo';
 import type { SupervisorPulse, RecentReversal, SiteActivityEntry } from '@/repositories/audit-repo';
@@ -45,6 +47,7 @@ export default function InsightsPage() {
   const [unitStores, setUnitStores] = useState<UnitStore[]>([]);
   const [activityRows, setActivityRows] = useState<InsightRow[]>([]);
   const [stageList, setStageList] = useState<string[]>([]);
+  const [handovers, setHandovers] = useState<FloorHandover[]>([]);
   // Track whether ops data has been loaded for current project
   const opsLoadedForProject = useRef<string | null>(null);
 
@@ -110,14 +113,16 @@ export default function InsightsPage() {
     }
 
     try {
-      const [dashData, rows, settings, stores] = await Promise.all([
+      const [dashData, rows, settings, stores, floorHandovers] = await Promise.all([
         getDashboardData(pid),
         getInsightActivities(pid),
         getInsightsSettings(),
         getUnitStores(pid),
+        getFloorHandovers(pid),
       ]);
 
       setUnitStores(stores);
+      setHandovers(floorHandovers);
       setActivityRows(rows);
 
       if (!dashData) {
@@ -313,6 +318,7 @@ export default function InsightsPage() {
               projectName={currentProject.name}
               projectId={currentProject.id}
               stores={unitStores}
+              handovers={handovers}
             />
           )}
           {tab === 'operations' && (opsLoading ? (

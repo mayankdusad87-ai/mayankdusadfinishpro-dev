@@ -81,3 +81,10 @@ export {
   markAllNotificationsRead,
 } from './notification-repo';
 export type { NotificationsResult } from './notification-repo';
+
+export {
+  getFloorHandovers,
+  upsertFloorHandover,
+  bulkUpsertFloorHandovers,
+} from './handover-repo';
+export type { FloorHandover } from './handover-repo';

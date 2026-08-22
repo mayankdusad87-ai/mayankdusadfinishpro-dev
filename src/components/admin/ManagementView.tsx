@@ -1,8 +1,9 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import type { ManagementData, StageFloorBreakdown, FloorActivityDetail } from '@/lib/insights-data';
 import type { UnitStore } from '@/repositories/store-repo';
+import type { FloorHandover } from '@/repositories/handover-repo';
 import MaterialStores from '@/components/admin/MaterialStores';
 import TargetAchievement from '@/components/admin/TargetAchievement';
 
@@ -11,6 +12,7 @@ interface Props {
   projectName: string;
   projectId: string;
   stores?: UnitStore[];
+  handovers?: FloorHandover[];
 }
 
 function formatDate(d: string | null): string {
@@ -67,7 +69,8 @@ function groupByStatusThenActivity(activities: FloorActivityDetail[]) {
   return result;
 }
 
-function FloorCard({ b }: { b: StageFloorBreakdown }) {
+function FloorCard({ b, handover }: { b: StageFloorBreakdown; handover?: FloorHandover }) {
+  const notHandedOver = handover ? !handover.actual_handover : false;
   const [expanded, setExpanded] = useState(false);
   // Deduplicate on-hold flats (one flat can have multiple on-hold activities)
   const onHoldCount = new Set(b.onHoldFlats.map(oh => oh.flatNumber)).size;
@@ -87,6 +90,21 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
           <span className="text-sm font-bold text-gray-900">Floor {b.floor}</span>
           <span className="text-xs text-gray-400 tabular-nums">{b.totalUnits} units</span>
         </div>
+        {/* RCC handover warning */}
+        {notHandedOver && (
+          <div className="mb-2 flex items-center gap-1.5 text-xs bg-red-50 border border-red-200 rounded px-2 py-1.5">
+            <svg className="w-3.5 h-3.5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+            <span className="text-red-700 font-medium">Not handed over by RCC</span>
+            {handover?.planned_handover && (
+              <span className="text-red-500 ml-auto tabular-nums">
+                Planned: {new Date(handover.planned_handover).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs">
           {b.completedUnits > 0 && (
             <span className="flex items-center gap-1.5">
@@ -171,7 +189,13 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
   );
 }
 
-function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdowns: StageFloorBreakdown[]; onClose: () => void }) {
+function DrilldownPanel({ stage, breakdowns, onClose, handoverMap }: { stage: string; breakdowns: StageFloorBreakdown[]; onClose: () => void; handoverMap: Map<number, FloorHandover> }) {
+  // Floors in this stage not yet handed over by RCC
+  const notHandedOverFloors = breakdowns.filter(b => {
+    const h = handoverMap.get(b.floor);
+    return h && !h.actual_handover;
+  }).map(b => b.floor);
+
   return (
     <div className="bg-white rounded-xl border-2 border-[#C8922A]/20 p-4 md:p-6 animate-in fade-in duration-200">
       <div className="flex items-center justify-between mb-4">
@@ -185,18 +209,40 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
         </button>
       </div>
 
-      <p className="text-xs text-gray-400 mb-3">Tap a status badge to see activity details</p>
+      {/* RCC handover summary */}
+      {notHandedOverFloors.length > 0 && (
+        <div className="mb-3 flex items-center gap-2 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+          </svg>
+          <span className="text-red-700 font-medium">
+            {notHandedOverFloors.length} floor{notHandedOverFloors.length > 1 ? 's' : ''} not handed over by RCC:
+          </span>
+          <span className="text-red-600 tabular-nums">
+            {notHandedOverFloors.join(', ')}
+          </span>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-400 mb-3">Tap a floor card to see activity details</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {breakdowns.map(b => <FloorCard key={b.floor} b={b} />)}
+        {breakdowns.map(b => <FloorCard key={b.floor} b={b} handover={handoverMap.get(b.floor)} />)}
       </div>
     </div>
   );
 }
 
-function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
+function ManagementView({ data, projectName, projectId, stores = [], handovers = [] }: Props) {
   const { pipeline, bottlenecks, stageFloorBreakdowns, sitePulse, pendingWork } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
+
+  // Build handover lookup: floor → FloorHandover
+  const handoverMap = useMemo(() => {
+    const m = new Map<number, FloorHandover>();
+    for (const h of handovers) m.set(h.floor, h);
+    return m;
+  }, [handovers]);
   const [expandedPulseStage, setExpandedPulseStage] = useState<string | null>(null);
   const [weeklyDrillOpen, setWeeklyDrillOpen] = useState(false);
 
@@ -315,6 +361,7 @@ function ManagementView({ data, projectName, projectId, stores = [] }: Props) {
           stage={selectedStage}
           breakdowns={stageFloorBreakdowns[selectedStage]}
           onClose={() => setSelectedStage(null)}
+          handoverMap={handoverMap}
         />
       )}
 
