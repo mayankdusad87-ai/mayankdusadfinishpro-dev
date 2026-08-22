@@ -2,25 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getReasons, createReason, updateReason, deleteReason, Reason } from '@/lib/supabase-data';
-import { getStageWeights, setStageWeights, getPaintDaysPerFlat, setPaintDaysPerFlat } from '@/repositories/settings-repo';
 import { getSupervisors, resetUserPassword } from '@/repositories/supervisor-repo';
-import { STAGE_WEIGHTS, PAINT_DAYS_PER_FLAT } from '@/lib/constants';
 import { useDataLoader } from '@/hooks/use-data-loader';
 import { useProject } from '@/lib/project-context';
 import TargetSetter from '@/components/admin/TargetSetter';
 import RccHandover from '@/components/admin/RccHandover';
-
-const ALL_STAGES = [
-  'Pre-Tiling',
-  'Tiling',
-  'Post Tiling',
-  'Pre Paint Activities',
-  '1st coat paint',
-  'Post First Coat Paint',
-  'Second Coat Paint',
-  'Post Second Coat Paint',
-  'Lobby Flooring',
-];
 
 export default function SettingsPage() {
   const { currentProject } = useProject();
@@ -86,27 +72,7 @@ export default function SettingsPage() {
     setSupervisorsLoading(false);
   }, []);
 
-  // ---- Stage Weights state ----
-  const [weights, setWeights] = useState<Record<string, number>>({ ...STAGE_WEIGHTS });
-  const [paintDays, setPaintDaysState] = useState<number>(PAINT_DAYS_PER_FLAT);
-  const [weightsLoading, setWeightsLoading] = useState(true);
-  const [weightsSaving, setWeightsSaving] = useState(false);
-  const [weightsMsg, setWeightsMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const loadWeights = useCallback(async () => {
-    setWeightsLoading(true);
-    try {
-      const [dbWeights, dbPaint] = await Promise.all([getStageWeights(), getPaintDaysPerFlat()]);
-      if (dbWeights) setWeights(dbWeights);
-      if (dbPaint !== null) setPaintDaysState(dbPaint);
-    } catch {
-      // fall back to constants (already set as defaults)
-    }
-    setWeightsLoading(false);
-  }, []);
-
-  // Fire supervisors + weights in parallel instead of sequentially
-  useEffect(() => { loadSupervisors(); loadWeights(); }, [loadSupervisors, loadWeights]);
+  useEffect(() => { loadSupervisors(); }, [loadSupervisors]);
 
   async function handleResetPassword(e: React.FormEvent) {
     e.preventDefault();
@@ -123,35 +89,6 @@ export default function SettingsPage() {
       setSelectedUser('');
     }
     setResetting(false);
-  }
-
-  const weightsTotal = ALL_STAGES.reduce((sum, s) => sum + (weights[s] || 0), 0);
-  const weightsValid = weightsTotal === 100 && ALL_STAGES.every(s => (weights[s] || 0) > 0) && paintDays >= 1 && paintDays <= 30;
-
-  function handleWeightChange(stage: string, val: string) {
-    const num = val === '' ? 0 : parseInt(val, 10);
-    if (isNaN(num) || num < 0 || num > 100) return;
-    setWeights(prev => ({ ...prev, [stage]: num }));
-    setWeightsMsg(null);
-  }
-
-  async function handleSaveWeights() {
-    if (!weightsValid) return;
-    setWeightsSaving(true);
-    setWeightsMsg(null);
-    try {
-      await Promise.all([setStageWeights(weights), setPaintDaysPerFlat(paintDays)]);
-      setWeightsMsg({ type: 'success', text: 'Settings saved successfully.' });
-    } catch (err) {
-      setWeightsMsg({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save settings.' });
-    }
-    setWeightsSaving(false);
-  }
-
-  function handleResetWeights() {
-    setWeights({ ...STAGE_WEIGHTS });
-    setPaintDaysState(PAINT_DAYS_PER_FLAT);
-    setWeightsMsg(null);
   }
 
   if (loading) {
@@ -310,121 +247,6 @@ export default function SettingsPage() {
           Supervisors will see these as a dropdown when marking activities as Delayed or On Hold.
           An &ldquo;Other&rdquo; option is always available — it enables a free-text remarks field.
         </div>
-      </div>
-
-      {/* ---- Stage Weights Configuration ---- */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Stage Weights</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Configure the weightage of each finishing stage for progress calculation.
-            Weights must be positive whole numbers and sum to exactly 100.
-          </p>
-        </div>
-
-        {weightsLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="w-6 h-6 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <>
-            {weightsMsg && (
-              <div className={`mb-4 rounded-lg p-3 text-sm ${weightsMsg.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
-                {weightsMsg.text}
-              </div>
-            )}
-
-            <div className="space-y-2 mb-4">
-              {ALL_STAGES.map(stage => (
-                <div key={stage} className="flex items-center gap-3">
-                  <span className="flex-1 text-sm text-gray-700">{stage}</span>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={weights[stage] || ''}
-                      onChange={(e) => handleWeightChange(stage, e.target.value)}
-                      className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                    />
-                    <span className="text-xs text-gray-400 w-4">%</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Total indicator */}
-            <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border mb-4 ${
-              weightsTotal === 100
-                ? 'bg-emerald-50 border-emerald-200'
-                : 'bg-red-50 border-red-200'
-            }`}>
-              <span className={`text-sm font-semibold ${weightsTotal === 100 ? 'text-emerald-700' : 'text-red-700'}`}>
-                Total: {weightsTotal}%
-              </span>
-              {weightsTotal !== 100 && (
-                <span className="text-xs text-red-600">
-                  {weightsTotal < 100 ? `${100 - weightsTotal}% remaining` : `${weightsTotal - 100}% over`}
-                </span>
-              )}
-              {weightsTotal === 100 && (
-                <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                </svg>
-              )}
-            </div>
-
-            {/* Paint days per flat */}
-            <div className="border-t border-gray-100 pt-4 mb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-sm text-gray-700 font-medium">Paint days per flat</span>
-                  <p className="text-xs text-gray-400 mt-0.5">Used to project 1st coat paint completion date</p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={paintDays}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      if (!isNaN(v) && v >= 1 && v <= 30) setPaintDaysState(v);
-                      setWeightsMsg(null);
-                    }}
-                    className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  />
-                  <span className="text-xs text-gray-400 w-10">days</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleSaveWeights}
-                disabled={!weightsValid || weightsSaving}
-                className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {weightsSaving ? 'Saving...' : 'Save Configuration'}
-              </button>
-              <button
-                onClick={handleResetWeights}
-                className="px-4 py-2 text-gray-500 text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-              >
-                Reset to Defaults
-              </button>
-            </div>
-
-            <div className="mt-4 flex items-start gap-2 text-xs text-gray-500">
-              <svg className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Higher weight = more impact on overall progress %. Tiling is typically the heaviest stage in finishing work.
-              Changes apply to the Management Insights dashboard immediately.
-            </div>
-          </>
-        )}
       </div>
 
       {/* ---- Project Targets ---- */}
