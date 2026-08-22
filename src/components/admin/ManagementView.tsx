@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
-import type { ManagementData, StageFloorBreakdown } from '@/lib/insights-data';
+import type { ManagementData, StageFloorBreakdown, FloorActivityDetail } from '@/lib/insights-data';
 import type { UnitStore } from '@/repositories/store-repo';
 import MaterialStores from '@/components/admin/MaterialStores';
 import TargetAchievement from '@/components/admin/TargetAchievement';
@@ -42,6 +42,118 @@ function pctBadgeBg(pct: number): string {
   return 'bg-gray-100 text-gray-500';
 }
 
+const STATUS_BADGE: Record<FloorActivityDetail['status'], { dot: string; label: string; text: string }> = {
+  in_progress: { dot: 'bg-amber-500', label: 'In Progress', text: 'text-amber-700' },
+  yet_to_start: { dot: 'bg-gray-400', label: 'Yet to Start', text: 'text-gray-500' },
+  overdue: { dot: 'bg-red-500', label: 'Overdue', text: 'text-red-600' },
+};
+
+function FloorCard({ b }: { b: StageFloorBreakdown }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasPending = b.activities.length > 0;
+
+  let borderColor = 'border-gray-200';
+  let bgColor = 'bg-gray-50';
+  if (b.completed === b.total) { borderColor = 'border-emerald-300'; bgColor = 'bg-emerald-50'; }
+  else if (b.hasOverdue) { borderColor = 'border-red-300'; bgColor = 'bg-red-50'; }
+  else if (b.inProgress > 0) { borderColor = 'border-amber-300'; bgColor = 'bg-amber-50'; }
+
+  return (
+    <div className={`rounded-lg border-l-[3px] ${borderColor} ${bgColor}`}>
+      <button
+        onClick={() => hasPending && setExpanded(!expanded)}
+        className={`w-full text-left p-3 ${hasPending ? 'cursor-pointer hover:brightness-95 transition-all' : ''}`}
+        disabled={!hasPending}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-bold text-gray-900">Floor {b.floor}</span>
+          {hasPending && (
+            <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          {b.completed > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="text-gray-600">{b.completed} done</span>
+            </span>
+          )}
+          {b.inProgress > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              <span className="text-gray-600">{b.inProgress} in progress</span>
+            </span>
+          )}
+          {b.yetToStart > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+              <span className="text-gray-600">{b.yetToStart} yet to start</span>
+            </span>
+          )}
+          {b.hasOverdue && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              <span className="text-red-600 font-semibold">{b.overdueCount} overdue</span>
+            </span>
+          )}
+        </div>
+      </button>
+
+      {/* Expandable activity detail table */}
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-out"
+        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+      >
+        <div className="overflow-hidden">
+          {expanded && (
+            <div className="px-3 pb-3 pt-1 border-t border-gray-200/60">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-gray-500">
+                    <th className="text-left font-medium py-1 pr-2">Flat</th>
+                    <th className="text-left font-medium py-1 pr-2">Activity</th>
+                    <th className="text-left font-medium py-1">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {b.activities.map((a, i) => {
+                    const badge = STATUS_BADGE[a.status];
+                    return (
+                      <tr key={i} className={i % 2 === 0 ? '' : 'bg-white/40'}>
+                        <td className="py-1 pr-2 font-semibold text-gray-800 tabular-nums">{a.flatNumber}</td>
+                        <td className="py-1 pr-2 text-gray-700">{a.activity}</td>
+                        <td className="py-1">
+                          <span className={`inline-flex items-center gap-1 ${badge.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                            {badge.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* On-hold flats (always visible) */}
+      {b.onHoldFlats.length > 0 && (
+        <div className="px-3 pb-3 space-y-1">
+          {b.onHoldFlats.map(oh => (
+            <div key={`${oh.floor}-${oh.flatNumber}`} className="text-xs bg-amber-100/60 text-amber-800 rounded px-2 py-1">
+              <span className="font-semibold">Flat {oh.flatNumber}</span> on hold — {oh.reason}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdowns: StageFloorBreakdown[]; onClose: () => void }) {
   return (
     <div className="bg-white rounded-xl border-2 border-[#C8922A]/20 p-4 md:p-6 animate-in fade-in duration-200">
@@ -56,55 +168,10 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {breakdowns.map(b => {
-          let borderColor = 'border-gray-200';
-          let bgColor = 'bg-gray-50';
-          if (b.completed === b.total) { borderColor = 'border-emerald-300'; bgColor = 'bg-emerald-50'; }
-          else if (b.hasOverdue) { borderColor = 'border-red-300'; bgColor = 'bg-red-50'; }
-          else if (b.inProgress > 0) { borderColor = 'border-amber-300'; bgColor = 'bg-amber-50'; }
+      <p className="text-xs text-gray-400 mb-3">Tap a floor to see pending activities</p>
 
-          return (
-            <div key={b.floor} className={`rounded-lg border-l-[3px] ${borderColor} ${bgColor} p-3`}>
-              <div className="text-sm font-bold text-gray-900 mb-2">Floor {b.floor}</div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                {b.completed > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-gray-600">{b.completed} done</span>
-                  </span>
-                )}
-                {b.inProgress > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                    <span className="text-gray-600">{b.inProgress} in progress</span>
-                  </span>
-                )}
-                {b.yetToStart > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                    <span className="text-gray-600">{b.yetToStart} yet to start</span>
-                  </span>
-                )}
-                {b.hasOverdue && (
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                    <span className="text-red-600 font-semibold">overdue</span>
-                  </span>
-                )}
-              </div>
-              {b.onHoldFlats.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {b.onHoldFlats.map(oh => (
-                    <div key={`${oh.floor}-${oh.flatNumber}`} className="text-xs bg-amber-100/60 text-amber-800 rounded px-2 py-1">
-                      <span className="font-semibold">Flat {oh.flatNumber}</span> on hold — {oh.reason}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {breakdowns.map(b => <FloorCard key={b.floor} b={b} />)}
       </div>
     </div>
   );

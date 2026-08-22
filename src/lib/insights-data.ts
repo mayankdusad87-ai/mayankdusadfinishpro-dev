@@ -88,6 +88,12 @@ export interface OnHoldFlat {
   reason: string;
 }
 
+export interface FloorActivityDetail {
+  flatNumber: number;
+  activity: string;
+  status: 'in_progress' | 'yet_to_start' | 'overdue';
+}
+
 export interface StageFloorBreakdown {
   floor: number;
   completed: number;
@@ -95,7 +101,10 @@ export interface StageFloorBreakdown {
   yetToStart: number;
   total: number;
   hasOverdue: boolean;
+  overdueCount: number;
   onHoldFlats: OnHoldFlat[];
+  /** Activity-level detail for drill-down (non-completed items only) */
+  activities: FloorActivityDetail[];
 }
 
 export interface DelayReasonRollup {
@@ -792,12 +801,33 @@ export function computeManagement(
   const stageFloorBreakdowns: Record<string, StageFloorBreakdown[]> = {};
   for (const stage of PIPELINE_STAGES) {
     const breakdowns: StageFloorBreakdown[] = [];
+    // Collect non-completed activities for this stage, keyed by floor
+    const stageRows = rows.filter(r => r.stage === stage && !isComplete(r.status) && r.status !== 'not_applicable');
+    const activityByFloor = new Map<number, FloorActivityDetail[]>();
+    const overdueCountByFloor = new Map<number, number>();
+    for (const r of stageRows) {
+      const isOverdue = !!(r.expected_end && r.expected_end < TODAY);
+      const isInProg = r.status === 'in_progress' || r.status === 'in_progress_delayed';
+      const detail: FloorActivityDetail = {
+        flatNumber: r.flat_number,
+        activity: r.activity,
+        status: isOverdue ? 'overdue' : isInProg ? 'in_progress' : 'yet_to_start',
+      };
+      if (!activityByFloor.has(r.floor)) activityByFloor.set(r.floor, []);
+      activityByFloor.get(r.floor)!.push(detail);
+      if (isOverdue) {
+        overdueCountByFloor.set(r.floor, (overdueCountByFloor.get(r.floor) || 0) + 1);
+      }
+    }
+
     for (const floorRow of heatmap.floors) {
       const cell = floorRow.stages[stage];
       if (!cell || cell.total === 0) continue;
       const overdueKey = `${stage}|${floorRow.floor}`;
       const hasOverdue = stageFloorOverdue.has(overdueKey);
       const stageOnHold = (onHoldByStage.get(stage) || []).filter(oh => oh.floor === floorRow.floor);
+      const activities = (activityByFloor.get(floorRow.floor) || [])
+        .sort((a, b) => a.flatNumber - b.flatNumber);
       breakdowns.push({
         floor: floorRow.floor,
         completed: cell.completed,
@@ -805,7 +835,9 @@ export function computeManagement(
         yetToStart: cell.total - cell.completed - cell.running,
         total: cell.total,
         hasOverdue,
+        overdueCount: overdueCountByFloor.get(floorRow.floor) || 0,
         onHoldFlats: stageOnHold,
+        activities,
       });
     }
     breakdowns.sort((a, b) => a.floor - b.floor);
