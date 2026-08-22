@@ -579,27 +579,29 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
                     {/* Collapsed / expanded header */}
                     <button
                       onClick={() => setExpandedPulseStage(prev => prev === stageGroup.stage ? null : stageGroup.stage)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 transition-colors cursor-pointer ${
+                      className={`w-full px-4 py-3 transition-colors cursor-pointer ${
                         isExpanded ? 'bg-[#162032]' : 'bg-white hover:bg-gray-50'
                       }`}
                     >
-                      {/* Chevron */}
-                      <svg
-                        className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
-                          isExpanded ? 'rotate-90 text-[#C8922A]' : 'text-gray-500'
-                        }`}
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                      </svg>
-
-                      {/* Stage name */}
-                      <span className={`text-sm font-semibold flex-shrink-0 ${isExpanded ? 'text-white' : 'text-gray-800'}`}>
-                        {stageGroup.stage}
-                      </span>
-
-                      {/* Progress bar (collapsed only) */}
-                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                      {/* Row 1: chevron + stage name + sub-stage badge */}
+                      <div className="flex items-center gap-2.5">
+                        <svg
+                          className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
+                            isExpanded ? 'rotate-90 text-[#C8922A]' : 'text-gray-500'
+                          }`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                        </svg>
+                        <span className={`text-sm font-semibold ${isExpanded ? 'text-white' : 'text-gray-800'}`}>
+                          {stageGroup.stage}
+                        </span>
+                        <span className={`ml-auto text-xs flex-shrink-0 tabular-nums ${isExpanded ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {stageGroup.subStages.length} sub-stage{stageGroup.subStages.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      {/* Row 2: progress bar + floor count */}
+                      <div className="flex items-center gap-2.5 mt-2 pl-6">
                         <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isExpanded ? 'bg-white/15' : 'bg-gray-100'}`}>
                           <div
                             className={`h-1.5 rounded-full transition-all duration-500 ${isExpanded ? 'bg-[#C8922A]' : 'bg-blue-500'}`}
@@ -612,11 +614,6 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
                           {floorsCompleted}/{totalFloors} floors
                         </span>
                       </div>
-
-                      {/* Sub-stage count badge */}
-                      <span className={`text-xs flex-shrink-0 ${isExpanded ? 'text-gray-500' : 'text-gray-500'}`}>
-                        {stageGroup.subStages.length} sub-stage{stageGroup.subStages.length !== 1 ? 's' : ''}
-                      </span>
                     </button>
 
                     {/* Expanded: sub-stage detail rows */}
