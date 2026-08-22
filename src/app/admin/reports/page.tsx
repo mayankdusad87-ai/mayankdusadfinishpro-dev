@@ -49,7 +49,7 @@ export default function InsightsPage() {
   const opsLoadedForProject = useRef<string | null>(null);
 
   // ---- Session cache helpers (stale-while-revalidate) ----
-  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
   const cacheKey = useCallback((pid: string) => `insights_cache_${pid}`, []);
 
   const readCache = useCallback((pid: string) => {

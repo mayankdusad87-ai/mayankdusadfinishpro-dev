@@ -620,6 +620,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      distinct_floors: {
+        Args: { p_project_id: string }
+        Returns: { floor: number }[]
+      }
+      distinct_stages: {
+        Args: { p_project_id: string }
+        Returns: { stage: string }[]
+      }
       get_dashboard_data: { Args: { p_project_id: string }; Returns: Json }
       get_distinct_floors: {
         Args: { p_project_id: string }

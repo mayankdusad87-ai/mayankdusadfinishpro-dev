@@ -38,30 +38,6 @@ export default function TargetSetter() {
   const [formError, setFormError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  /** Paginate a single-column query past Supabase's 1000-row cap */
-  async function fetchAllSingleColumn<T>(
-    table: 'activities',
-    column: string,
-    projectId: string,
-  ): Promise<T[]> {
-    const PAGE = 1000;
-    const all: T[] = [];
-    let from = 0;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { data } = await supabase
-        .from(table)
-        .select(column)
-        .eq('project_id', projectId)
-        .range(from, from + PAGE - 1);
-      if (!data || data.length === 0) break;
-      all.push(...(data as T[]));
-      if (data.length < PAGE) break;   // last page
-      from += PAGE;
-    }
-    return all;
-  }
-
   const loadData = useCallback(async () => {
     if (!currentProject) {
       setTargets([]);
@@ -72,16 +48,17 @@ export default function TargetSetter() {
     }
     setLoading(true);
     try {
-      // Fetch targets (small count) + paginate stages & floors
-      const [targetsRes, stageRows, floorRows] = await Promise.all([
+      // Fetch targets + distinct stages & floors in parallel
+      // Using RPC for DISTINCT keeps the transfer to ~30 rows instead of thousands
+      const [targetsRes, stageRes, floorRes] = await Promise.all([
         supabase.from('project_milestones').select('id, stage, floor_from, floor_to, target_date, notes, title')
           .eq('project_id', currentProject.id).order('target_date', { ascending: true }),
-        fetchAllSingleColumn<{ stage: string }>('activities', 'stage', currentProject.id),
-        fetchAllSingleColumn<{ floor: number }>('activities', 'floor', currentProject.id),
+        supabase.rpc('distinct_stages', { p_project_id: currentProject.id }),
+        supabase.rpc('distinct_floors', { p_project_id: currentProject.id }),
       ]);
       setTargets((targetsRes.data || []) as TargetRow[]);
-      setStages([...new Set(stageRows.map(r => r.stage))].sort());
-      setFloors([...new Set(floorRows.map(r => r.floor))].sort((a, b) => a - b));
+      setStages(((stageRes.data || []) as Array<{ stage: string }>).map(r => r.stage).sort());
+      setFloors(((floorRes.data || []) as Array<{ floor: number }>).map(r => r.floor).sort((a, b) => a - b));
     } catch { /* ignore */ }
     setLoading(false);
   }, [currentProject]);

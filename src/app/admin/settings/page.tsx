@@ -71,6 +71,7 @@ export default function SettingsPage() {
   const [resetMsg, setResetMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [resetting, setResetting] = useState(false);
 
+  // ---- Load supervisors + weights in parallel (single round-trip) ----
   const loadSupervisors = useCallback(async () => {
     setSupervisorsLoading(true);
     try {
@@ -81,25 +82,6 @@ export default function SettingsPage() {
     }
     setSupervisorsLoading(false);
   }, []);
-
-  useEffect(() => { loadSupervisors(); }, [loadSupervisors]);
-
-  async function handleResetPassword(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selectedUser || !newPassword || newPassword.length < 6) return;
-    setResetting(true);
-    setResetMsg(null);
-    const { error: resetError } = await resetUserPassword(selectedUser, newPassword);
-    if (resetError) {
-      setResetMsg({ type: 'error', text: resetError });
-    } else {
-      const user = supervisors.find(s => s.id === selectedUser);
-      setResetMsg({ type: 'success', text: `Password reset successfully for ${user?.full_name || 'user'}.` });
-      setNewPassword('');
-      setSelectedUser('');
-    }
-    setResetting(false);
-  }
 
   // ---- Stage Weights state ----
   const [weights, setWeights] = useState<Record<string, number>>({ ...STAGE_WEIGHTS });
@@ -120,7 +102,25 @@ export default function SettingsPage() {
     setWeightsLoading(false);
   }, []);
 
-  useEffect(() => { loadWeights(); }, [loadWeights]);
+  // Fire supervisors + weights in parallel instead of sequentially
+  useEffect(() => { loadSupervisors(); loadWeights(); }, [loadSupervisors, loadWeights]);
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedUser || !newPassword || newPassword.length < 6) return;
+    setResetting(true);
+    setResetMsg(null);
+    const { error: resetError } = await resetUserPassword(selectedUser, newPassword);
+    if (resetError) {
+      setResetMsg({ type: 'error', text: resetError });
+    } else {
+      const user = supervisors.find(s => s.id === selectedUser);
+      setResetMsg({ type: 'success', text: `Password reset successfully for ${user?.full_name || 'user'}.` });
+      setNewPassword('');
+      setSelectedUser('');
+    }
+    setResetting(false);
+  }
 
   const weightsTotal = ALL_STAGES.reduce((sum, s) => sum + (weights[s] || 0), 0);
   const weightsValid = weightsTotal === 100 && ALL_STAGES.every(s => (weights[s] || 0) > 0) && paintDays >= 1 && paintDays <= 30;
