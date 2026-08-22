@@ -42,10 +42,10 @@ function pctBadgeBg(pct: number): string {
   return 'bg-gray-100 text-gray-500';
 }
 
-type StatusFilter = 'in_progress' | 'yet_to_start' | null;
+type StatusFilter = 'in_progress' | 'yet_to_start' | 'on_hold' | null;
 
 /** Group activities by activity name → list of flat numbers */
-function groupByActivity(activities: FloorActivityDetail[], filter: 'in_progress' | 'yet_to_start') {
+function groupByActivity(activities: FloorActivityDetail[], filter: 'in_progress' | 'yet_to_start' | 'on_hold') {
   const map = new Map<string, number[]>();
   for (const a of activities) {
     if (a.status !== filter) continue;
@@ -59,8 +59,9 @@ function groupByActivity(activities: FloorActivityDetail[], filter: 'in_progress
 
 function FloorCard({ b }: { b: StageFloorBreakdown }) {
   const [activeFilter, setActiveFilter] = useState<StatusFilter>(null);
+  const onHoldCount = b.onHoldFlats.length;
 
-  function toggleFilter(filter: 'in_progress' | 'yet_to_start') {
+  function toggleFilter(filter: 'in_progress' | 'yet_to_start' | 'on_hold') {
     setActiveFilter(prev => prev === filter ? null : filter);
   }
 
@@ -125,6 +126,24 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
               <span className="text-red-600 font-semibold">{b.overdueCount} overdue</span>
             </span>
           )}
+          {onHoldCount > 0 && (
+            <button
+              onClick={() => toggleFilter('on_hold')}
+              className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors cursor-pointer ${
+                activeFilter === 'on_hold'
+                  ? 'bg-orange-100 ring-1 ring-orange-400'
+                  : 'hover:bg-orange-50'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+              <span className="text-orange-700 font-medium">{onHoldCount} on hold</span>
+              {activeFilter === 'on_hold' && (
+                <svg className="w-3 h-3 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -155,17 +174,6 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
           )}
         </div>
       </div>
-
-      {/* On-hold flats (always visible) */}
-      {b.onHoldFlats.length > 0 && (
-        <div className="px-3 pb-3 space-y-1">
-          {b.onHoldFlats.map(oh => (
-            <div key={`${oh.floor}-${oh.flatNumber}`} className="text-xs bg-amber-100/60 text-amber-800 rounded px-2 py-1">
-              <span className="font-semibold">Flat {oh.flatNumber}</span> on hold — {oh.reason}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -184,7 +192,7 @@ function DrilldownPanel({ stage, breakdowns, onClose }: { stage: string; breakdo
         </button>
       </div>
 
-      <p className="text-xs text-gray-400 mb-3">Tap a floor to see pending activities</p>
+      <p className="text-xs text-gray-400 mb-3">Tap a status badge to see activity details</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {breakdowns.map(b => <FloorCard key={b.floor} b={b} />)}

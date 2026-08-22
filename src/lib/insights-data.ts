@@ -91,7 +91,7 @@ export interface OnHoldFlat {
 export interface FloorActivityDetail {
   flatNumber: number;
   activity: string;
-  status: 'in_progress' | 'yet_to_start' | 'overdue';
+  status: 'in_progress' | 'yet_to_start' | 'on_hold';
 }
 
 export interface StageFloorBreakdown {
@@ -808,10 +808,11 @@ export function computeManagement(
     for (const r of stageRows) {
       const isOverdue = !!(r.expected_end && r.expected_end < TODAY);
       const isInProg = r.status === 'in_progress' || r.status === 'in_progress_delayed';
+      const isOnHold = r.status === 'on_hold';
       const detail: FloorActivityDetail = {
         flatNumber: r.flat_number,
         activity: r.activity,
-        status: isOverdue ? 'overdue' : isInProg ? 'in_progress' : 'yet_to_start',
+        status: isOnHold ? 'on_hold' : isInProg ? 'in_progress' : 'yet_to_start',
       };
       if (!activityByFloor.has(r.floor)) activityByFloor.set(r.floor, []);
       activityByFloor.get(r.floor)!.push(detail);
