@@ -42,10 +42,13 @@ function pctBadgeBg(pct: number): string {
   return 'bg-gray-100 text-gray-500';
 }
 
-/** Group ALL non-completed activities by activity name → list of flat numbers */
-function groupAllPending(activities: FloorActivityDetail[]) {
+type StatusFilter = 'in_progress' | 'yet_to_start' | null;
+
+/** Group activities by status, then by activity name → list of flat numbers */
+function groupByActivity(activities: FloorActivityDetail[], filter: StatusFilter) {
   const map = new Map<string, Set<number>>();
   for (const a of activities) {
+    if (filter && a.status !== filter) continue;
     if (!map.has(a.activity)) map.set(a.activity, new Set());
     map.get(a.activity)!.add(a.flatNumber);
   }
@@ -55,15 +58,19 @@ function groupAllPending(activities: FloorActivityDetail[]) {
 }
 
 function FloorCard({ b }: { b: StageFloorBreakdown }) {
-  const [expanded, setExpanded] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<StatusFilter>(null);
   const onHoldCount = b.onHoldFlats.length;
+
+  function toggleFilter(filter: 'in_progress' | 'yet_to_start') {
+    setActiveFilter(prev => prev === filter ? null : filter);
+  }
 
   let borderColor = 'border-gray-200';
   let bgColor = 'bg-gray-50';
   if (b.completedUnits === b.totalUnits) { borderColor = 'border-emerald-300'; bgColor = 'bg-emerald-50'; }
   else if (b.inProgressUnits > 0) { borderColor = 'border-amber-300'; bgColor = 'bg-amber-50'; }
 
-  const grouped = expanded ? groupAllPending(b.activities) : [];
+  const grouped = activeFilter ? groupByActivity(b.activities, activeFilter) : [];
 
   return (
     <div className={`rounded-lg border-l-[3px] ${borderColor} ${bgColor}`}>
@@ -81,18 +88,38 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
           )}
           {b.inProgressUnits > 0 && (
             <button
-              onClick={() => setExpanded(prev => !prev)}
+              onClick={() => toggleFilter('in_progress')}
               className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors cursor-pointer ${
-                expanded
+                activeFilter === 'in_progress'
                   ? 'bg-amber-100 ring-1 ring-amber-400'
                   : 'hover:bg-amber-50'
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               <span className="text-amber-700 font-medium">{b.inProgressUnits} in progress</span>
-              <svg className={`w-3 h-3 text-amber-500 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
+              {activeFilter === 'in_progress' && (
+                <svg className="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
+          )}
+          {b.yetToStartUnits > 0 && (
+            <button
+              onClick={() => toggleFilter('yet_to_start')}
+              className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors cursor-pointer ${
+                activeFilter === 'yet_to_start'
+                  ? 'bg-gray-200 ring-1 ring-gray-400'
+                  : 'hover:bg-gray-100'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+              <span className="text-gray-600 font-medium">{b.yetToStartUnits} yet to start</span>
+              {activeFilter === 'yet_to_start' && (
+                <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
             </button>
           )}
           {onHoldCount > 0 && (
@@ -107,10 +134,10 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
       {/* Expandable activity detail — grouped by activity */}
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"
-        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+        style={{ gridTemplateRows: activeFilter ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden">
-          {expanded && grouped.length > 0 && (
+          {activeFilter && grouped.length > 0 && (
             <div className="px-3 pb-3 pt-1 border-t border-gray-200/60 space-y-2">
               {grouped.map(([activity, flats]) => (
                 <div key={activity}>

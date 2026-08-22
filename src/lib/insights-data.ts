@@ -96,10 +96,12 @@ export interface FloorActivityDetail {
 
 export interface StageFloorBreakdown {
   floor: number;
-  /** Number of flats where ALL activities are completed */
+  /** Flats where ALL activities are completed */
   completedUnits: number;
-  /** Number of flats where at least one activity is not completed */
+  /** Flats where at least one activity has started (in_progress) but not all done */
   inProgressUnits: number;
+  /** Flats where NO activity has started yet */
+  yetToStartUnits: number;
   /** Total flats on this floor for this stage */
   totalUnits: number;
   onHoldFlats: OnHoldFlat[];
@@ -821,14 +823,16 @@ export function computeManagement(
     }
 
     // Compute flat-level counts per floor: group all rows by floor→flat
-    const floorFlatRows = new Map<number, Map<number, { total: number; completed: number }>>();
+    // Track total, completed, and whether any activity has started (in_progress)
+    const floorFlatRows = new Map<number, Map<number, { total: number; completed: number; hasStarted: boolean }>>();
     for (const r of allStageRows) {
       if (!floorFlatRows.has(r.floor)) floorFlatRows.set(r.floor, new Map());
       const flatMap = floorFlatRows.get(r.floor)!;
-      if (!flatMap.has(r.flat_number)) flatMap.set(r.flat_number, { total: 0, completed: 0 });
+      if (!flatMap.has(r.flat_number)) flatMap.set(r.flat_number, { total: 0, completed: 0, hasStarted: false });
       const fc = flatMap.get(r.flat_number)!;
       fc.total++;
-      if (isComplete(r.status)) fc.completed++;
+      if (isComplete(r.status)) { fc.completed++; fc.hasStarted = true; }
+      else if (r.status === 'in_progress' || r.status === 'in_progress_delayed') fc.hasStarted = true;
     }
 
     for (const floorRow of heatmap.floors) {
@@ -838,21 +842,26 @@ export function computeManagement(
       const activities = (activityByFloor.get(floorRow.floor) || [])
         .sort((a, b) => a.flatNumber - b.flatNumber);
 
-      // Flat-level counts
+      // Flat-level counts: completed / in progress / yet to start
       const flatMap = floorFlatRows.get(floorRow.floor);
       let completedUnits = 0;
+      let inProgressUnits = 0;
+      let yetToStartUnits = 0;
       let totalUnits = 0;
       if (flatMap) {
         for (const fc of flatMap.values()) {
           totalUnits++;
           if (fc.completed === fc.total) completedUnits++;
+          else if (fc.hasStarted) inProgressUnits++;
+          else yetToStartUnits++;
         }
       }
 
       breakdowns.push({
         floor: floorRow.floor,
         completedUnits,
-        inProgressUnits: totalUnits - completedUnits,
+        inProgressUnits,
+        yetToStartUnits,
         totalUnits,
         onHoldFlats: stageOnHold,
         activities,
