@@ -70,6 +70,7 @@ export default function InsightsPage() {
         activityRows: InsightRow[];
         stageList: string[];
         stores: UnitStore[];
+        handovers?: FloorHandover[];
       };
     } catch { return null; }
   }, [cacheKey]);
@@ -79,6 +80,7 @@ export default function InsightsPage() {
     activityRows: InsightRow[];
     stageList: string[];
     stores: UnitStore[];
+    handovers: FloorHandover[];
   }) => {
     try {
       sessionStorage.setItem(cacheKey(pid), JSON.stringify({ ...data, ts: Date.now() }));
@@ -106,6 +108,7 @@ export default function InsightsPage() {
       setActivityRows(cached.activityRows);
       setStageList(cached.stageList);
       setUnitStores(cached.stores);
+      if (cached.handovers) setHandovers(cached.handovers);
       setLoading(false);
       // Don't return — fall through to fetch fresh data in background
     } else {
@@ -144,7 +147,7 @@ export default function InsightsPage() {
         );
         setMgmt(mgmtData);
         // Cache for instant load next time
-        writeCache(pid, { mgmt: mgmtData, activityRows: rows, stageList: dashData.stages || [], stores });
+        writeCache(pid, { mgmt: mgmtData, activityRows: rows, stageList: dashData.stages || [], stores, handovers: floorHandovers });
       } else {
         console.warn('[Insights]', currentProject.name, '— 0 activity rows');
         setMgmt(null);

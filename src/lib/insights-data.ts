@@ -799,40 +799,47 @@ export function computeManagement(
   }
   bottlenecks.sort((a, b) => b.maxDaysBehind - a.maxDaysBehind);
 
+  // --- Pre-group rows by stage (single pass replaces repeated .filter()) ---
+  const rowsByStage = new Map<string, InsightRow[]>();
+  for (const r of rows) {
+    if (r.status === 'not_applicable') continue;
+    let arr = rowsByStage.get(r.stage);
+    if (!arr) { arr = []; rowsByStage.set(r.stage, arr); }
+    arr.push(r);
+  }
+
   // --- Stage floor breakdowns (for drill-down) ---
   const stageFloorBreakdowns: Record<string, StageFloorBreakdown[]> = {};
   for (const stage of PIPELINE_STAGES) {
     const breakdowns: StageFloorBreakdown[] = [];
+    const stageRows = rowsByStage.get(stage) || [];
 
-    // ALL rows for this stage (including completed) to compute flat-level counts
-    const allStageRows = rows.filter(r => r.stage === stage && r.status !== 'not_applicable');
-
-    // Non-completed rows for the drill-down activities list
-    const pendingRows = allStageRows.filter(r => !isComplete(r.status));
+    // Build activity drill-down + flat-level counts in a single pass
     const activityByFloor = new Map<number, FloorActivityDetail[]>();
-    for (const r of pendingRows) {
-      const isInProg = r.status === 'in_progress' || r.status === 'in_progress_delayed';
-      const isOnHold = r.status === 'on_hold';
-      const detail: FloorActivityDetail = {
-        flatNumber: r.flat_number,
-        activity: r.activity,
-        status: isOnHold ? 'on_hold' : isInProg ? 'in_progress' : 'yet_to_start',
-      };
-      if (!activityByFloor.has(r.floor)) activityByFloor.set(r.floor, []);
-      activityByFloor.get(r.floor)!.push(detail);
-    }
-
-    // Compute flat-level counts per floor: group all rows by floor→flat
-    // Track total, completed, and whether any activity has started (in_progress)
     const floorFlatRows = new Map<number, Map<number, { total: number; completed: number; hasStarted: boolean }>>();
-    for (const r of allStageRows) {
+
+    for (const r of stageRows) {
+      // Flat-level counts
       if (!floorFlatRows.has(r.floor)) floorFlatRows.set(r.floor, new Map());
       const flatMap = floorFlatRows.get(r.floor)!;
       if (!flatMap.has(r.flat_number)) flatMap.set(r.flat_number, { total: 0, completed: 0, hasStarted: false });
       const fc = flatMap.get(r.flat_number)!;
       fc.total++;
-      if (isComplete(r.status)) { fc.completed++; fc.hasStarted = true; }
+      const done = isComplete(r.status);
+      if (done) { fc.completed++; fc.hasStarted = true; }
       else if (r.status === 'in_progress' || r.status === 'in_progress_delayed') fc.hasStarted = true;
+
+      // Pending activities for drill-down
+      if (!done) {
+        const isInProg = r.status === 'in_progress' || r.status === 'in_progress_delayed';
+        const isOnHold = r.status === 'on_hold';
+        if (!activityByFloor.has(r.floor)) activityByFloor.set(r.floor, []);
+        activityByFloor.get(r.floor)!.push({
+          flatNumber: r.flat_number,
+          activity: r.activity,
+          status: isOnHold ? 'on_hold' : isInProg ? 'in_progress' : 'yet_to_start',
+        });
+      }
     }
 
     for (const floorRow of heatmap.floors) {

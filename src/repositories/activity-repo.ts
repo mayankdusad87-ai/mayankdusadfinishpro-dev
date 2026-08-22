@@ -380,21 +380,41 @@ export interface InsightRow {
 }
 
 export async function getInsightActivities(projectId: string): Promise<InsightRow[]> {
-  const all: InsightRow[] = [];
-  let from = 0;
+  const COLS = 'floor, flat_number, stage, stage_gate, activity, status, expected_start, expected_end, actual_start, actual_end, vendor, delay_reason';
   const PAGE = 1000;
-  while (true) {
-    const { data, error } = await supabase
-      .from('activities')
-      .select('floor, flat_number, stage, stage_gate, activity, status, expected_start, expected_end, actual_start, actual_end, vendor, delay_reason')
-      .eq('project_id', projectId)
-      .neq('status', 'not_applicable')
-      .range(from, from + PAGE - 1);
-    if (error) { console.error('[getInsightActivities] query error:', error.message, error.code); break; }
-    if (!data || data.length === 0) break;
-    all.push(...(data as InsightRow[]));
-    if (data.length < PAGE) break;
-    from += PAGE;
+
+  // First page + exact count in one request
+  const { data: first, error, count } = await supabase
+    .from('activities')
+    .select(COLS, { count: 'exact' })
+    .eq('project_id', projectId)
+    .neq('status', 'not_applicable')
+    .range(0, PAGE - 1);
+
+  if (error) { console.error('[getInsightActivities] query error:', error.message, error.code); return []; }
+  if (!first || first.length === 0) return [];
+
+  const all: InsightRow[] = first as InsightRow[];
+  const total = count ?? first.length;
+
+  // Fetch remaining pages in parallel
+  if (total > PAGE) {
+    const remaining = Math.ceil((total - PAGE) / PAGE);
+    const pages = await Promise.all(
+      Array.from({ length: remaining }, (_, i) => {
+        const start = (i + 1) * PAGE;
+        return supabase
+          .from('activities')
+          .select(COLS)
+          .eq('project_id', projectId)
+          .neq('status', 'not_applicable')
+          .range(start, start + PAGE - 1);
+      }),
+    );
+    for (const pg of pages) {
+      if (pg.data) all.push(...(pg.data as InsightRow[]));
+    }
   }
+
   return all;
 }
