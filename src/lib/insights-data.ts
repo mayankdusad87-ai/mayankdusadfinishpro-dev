@@ -829,11 +829,14 @@ export function computeManagement(
       const stageOnHold = (onHoldByStage.get(stage) || []).filter(oh => oh.floor === floorRow.floor);
       const activities = (activityByFloor.get(floorRow.floor) || [])
         .sort((a, b) => a.flatNumber - b.flatNumber);
+      // Derive counts from activities array so badge always matches drill-down
+      const ipCount = activities.filter(a => a.status === 'in_progress').length;
+      const ytsCount = activities.filter(a => a.status === 'yet_to_start').length;
       breakdowns.push({
         floor: floorRow.floor,
         completed: cell.completed,
-        inProgress: cell.running,
-        yetToStart: cell.total - cell.completed - cell.running,
+        inProgress: ipCount,
+        yetToStart: ytsCount,
         total: cell.total,
         hasOverdue,
         overdueCount: overdueCountByFloor.get(floorRow.floor) || 0,
