@@ -69,7 +69,8 @@ function groupByStatusThenActivity(activities: FloorActivityDetail[]) {
 
 function FloorCard({ b }: { b: StageFloorBreakdown }) {
   const [expanded, setExpanded] = useState(false);
-  const onHoldCount = b.onHoldFlats.length;
+  // Deduplicate on-hold flats (one flat can have multiple on-hold activities)
+  const onHoldCount = new Set(b.onHoldFlats.map(oh => oh.flatNumber)).size;
   const hasPending = b.activities.length > 0;
 
   let borderColor = 'border-gray-200';
