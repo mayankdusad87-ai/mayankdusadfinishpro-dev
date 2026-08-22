@@ -42,35 +42,42 @@ function pctBadgeBg(pct: number): string {
   return 'bg-gray-100 text-gray-500';
 }
 
-type StatusFilter = 'in_progress' | 'yet_to_start' | null;
+/** Group activities by status → activity name → flat numbers */
+function groupByStatusThenActivity(activities: FloorActivityDetail[]) {
+  const result: { status: string; label: string; dot: string; items: [string, number[]][] }[] = [];
 
-/** Group activities by status, then by activity name → list of flat numbers */
-function groupByActivity(activities: FloorActivityDetail[], filter: StatusFilter) {
-  const map = new Map<string, Set<number>>();
-  for (const a of activities) {
-    if (filter && a.status !== filter) continue;
-    if (!map.has(a.activity)) map.set(a.activity, new Set());
-    map.get(a.activity)!.add(a.flatNumber);
+  for (const [status, label, dot] of [
+    ['in_progress', 'In Progress', 'bg-amber-500'],
+    ['yet_to_start', 'Yet to Start', 'bg-gray-400'],
+    ['on_hold', 'On Hold', 'bg-orange-500'],
+  ] as const) {
+    const map = new Map<string, Set<number>>();
+    for (const a of activities) {
+      if (a.status !== status) continue;
+      if (!map.has(a.activity)) map.set(a.activity, new Set());
+      map.get(a.activity)!.add(a.flatNumber);
+    }
+    if (map.size > 0) {
+      const items = [...map.entries()]
+        .map(([activity, flatSet]) => [activity, [...flatSet].sort((a, b) => a - b)] as [string, number[]])
+        .sort((a, b) => a[0].localeCompare(b[0]));
+      result.push({ status, label, dot, items });
+    }
   }
-  return [...map.entries()]
-    .map(([activity, flatSet]) => [activity, [...flatSet].sort((a, b) => a - b)] as [string, number[]])
-    .sort((a, b) => a[0].localeCompare(b[0]));
+  return result;
 }
 
 function FloorCard({ b }: { b: StageFloorBreakdown }) {
-  const [activeFilter, setActiveFilter] = useState<StatusFilter>(null);
+  const [expanded, setExpanded] = useState(false);
   const onHoldCount = b.onHoldFlats.length;
-
-  function toggleFilter(filter: 'in_progress' | 'yet_to_start') {
-    setActiveFilter(prev => prev === filter ? null : filter);
-  }
+  const hasPending = b.activities.length > 0;
 
   let borderColor = 'border-gray-200';
   let bgColor = 'bg-gray-50';
   if (b.completedUnits === b.totalUnits) { borderColor = 'border-emerald-300'; bgColor = 'bg-emerald-50'; }
   else if (b.inProgressUnits > 0) { borderColor = 'border-amber-300'; bgColor = 'bg-amber-50'; }
 
-  const grouped = activeFilter ? groupByActivity(b.activities, activeFilter) : [];
+  const statusGroups = expanded ? groupByStatusThenActivity(b.activities) : [];
 
   return (
     <div className={`rounded-lg border-l-[3px] ${borderColor} ${bgColor}`}>
@@ -87,40 +94,16 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
             </span>
           )}
           {b.inProgressUnits > 0 && (
-            <button
-              onClick={() => toggleFilter('in_progress')}
-              className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors cursor-pointer ${
-                activeFilter === 'in_progress'
-                  ? 'bg-amber-100 ring-1 ring-amber-400'
-                  : 'hover:bg-amber-50'
-              }`}
-            >
+            <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               <span className="text-amber-700 font-medium">{b.inProgressUnits} in progress</span>
-              {activeFilter === 'in_progress' && (
-                <svg className="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              )}
-            </button>
+            </span>
           )}
           {b.yetToStartUnits > 0 && (
-            <button
-              onClick={() => toggleFilter('yet_to_start')}
-              className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors cursor-pointer ${
-                activeFilter === 'yet_to_start'
-                  ? 'bg-gray-200 ring-1 ring-gray-400'
-                  : 'hover:bg-gray-100'
-              }`}
-            >
+            <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
               <span className="text-gray-600 font-medium">{b.yetToStartUnits} yet to start</span>
-              {activeFilter === 'yet_to_start' && (
-                <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              )}
-            </button>
+            </span>
           )}
           {onHoldCount > 0 && (
             <span className="flex items-center gap-1.5">
@@ -129,27 +112,52 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
             </span>
           )}
         </div>
+
+        {/* View details toggle */}
+        {hasPending && (
+          <button
+            onClick={() => setExpanded(prev => !prev)}
+            className="mt-2 flex items-center gap-1 text-xs text-[#C8922A] font-semibold hover:text-[#b07e22] transition-colors cursor-pointer"
+          >
+            {expanded ? 'Hide' : 'View'} pending activities
+            <svg className={`w-3 h-3 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        )}
       </div>
 
-      {/* Expandable activity detail — grouped by activity */}
+      {/* Expandable activity detail — grouped by status, then activity */}
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"
-        style={{ gridTemplateRows: activeFilter ? '1fr' : '0fr' }}
+        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden">
-          {activeFilter && grouped.length > 0 && (
-            <div className="px-3 pb-3 pt-1 border-t border-gray-200/60 space-y-2">
-              {grouped.map(([activity, flats]) => (
-                <div key={activity}>
-                  <div className="text-xs font-semibold text-gray-700 mb-1">{activity}</div>
-                  <div className="flex flex-wrap gap-1">
-                    {flats.map(flat => (
-                      <span
-                        key={flat}
-                        className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-700 tabular-nums"
-                      >
-                        {flat}
-                      </span>
+          {expanded && statusGroups.length > 0 && (
+            <div className="px-3 pb-3 pt-1 border-t border-gray-200/60 space-y-3">
+              {statusGroups.map(group => (
+                <div key={group.status}>
+                  {/* Status header */}
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className={`w-2 h-2 rounded-full ${group.dot}`} />
+                    <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">{group.label}</span>
+                  </div>
+                  {/* Activities under this status */}
+                  <div className="space-y-1.5 pl-3.5">
+                    {group.items.map(([activity, flats]) => (
+                      <div key={activity}>
+                        <div className="text-xs font-semibold text-gray-700 mb-1">{activity}</div>
+                        <div className="flex flex-wrap gap-1">
+                          {flats.map(flat => (
+                            <span
+                              key={flat}
+                              className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded bg-white border border-gray-200 text-gray-700 tabular-nums"
+                            >
+                              {flat}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
