@@ -42,107 +42,64 @@ function pctBadgeBg(pct: number): string {
   return 'bg-gray-100 text-gray-500';
 }
 
-type StatusFilter = 'in_progress' | 'yet_to_start' | 'on_hold' | null;
-
-/** Group activities by activity name → list of flat numbers */
-function groupByActivity(activities: FloorActivityDetail[], filter: 'in_progress' | 'yet_to_start' | 'on_hold') {
-  const map = new Map<string, number[]>();
+/** Group ALL non-completed activities by activity name → list of flat numbers */
+function groupAllPending(activities: FloorActivityDetail[]) {
+  const map = new Map<string, Set<number>>();
   for (const a of activities) {
-    if (a.status !== filter) continue;
-    if (!map.has(a.activity)) map.set(a.activity, []);
-    map.get(a.activity)!.push(a.flatNumber);
+    if (!map.has(a.activity)) map.set(a.activity, new Set());
+    map.get(a.activity)!.add(a.flatNumber);
   }
-  // Sort flats within each activity
-  for (const flats of map.values()) flats.sort((a, b) => a - b);
-  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  return [...map.entries()]
+    .map(([activity, flatSet]) => [activity, [...flatSet].sort((a, b) => a - b)] as [string, number[]])
+    .sort((a, b) => a[0].localeCompare(b[0]));
 }
 
 function FloorCard({ b }: { b: StageFloorBreakdown }) {
-  const [activeFilter, setActiveFilter] = useState<StatusFilter>(null);
+  const [expanded, setExpanded] = useState(false);
   const onHoldCount = b.onHoldFlats.length;
-
-  function toggleFilter(filter: 'in_progress' | 'yet_to_start' | 'on_hold') {
-    setActiveFilter(prev => prev === filter ? null : filter);
-  }
 
   let borderColor = 'border-gray-200';
   let bgColor = 'bg-gray-50';
-  if (b.completed === b.total) { borderColor = 'border-emerald-300'; bgColor = 'bg-emerald-50'; }
-  else if (b.hasOverdue) { borderColor = 'border-red-300'; bgColor = 'bg-red-50'; }
-  else if (b.inProgress > 0) { borderColor = 'border-amber-300'; bgColor = 'bg-amber-50'; }
+  if (b.completedUnits === b.totalUnits) { borderColor = 'border-emerald-300'; bgColor = 'bg-emerald-50'; }
+  else if (b.inProgressUnits > 0) { borderColor = 'border-amber-300'; bgColor = 'bg-amber-50'; }
 
-  const grouped = activeFilter ? groupByActivity(b.activities, activeFilter) : [];
+  const grouped = expanded ? groupAllPending(b.activities) : [];
 
   return (
     <div className={`rounded-lg border-l-[3px] ${borderColor} ${bgColor}`}>
       <div className="p-3">
-        <div className="text-sm font-bold text-gray-900 mb-2">Floor {b.floor}</div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-bold text-gray-900">Floor {b.floor}</span>
+          <span className="text-xs text-gray-400 tabular-nums">{b.totalUnits} units</span>
+        </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs">
-          {b.completed > 0 && (
+          {b.completedUnits > 0 && (
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="text-gray-600">{b.completed} done</span>
+              <span className="text-gray-600">{b.completedUnits} completed</span>
             </span>
           )}
-          {b.inProgress > 0 && (
+          {b.inProgressUnits > 0 && (
             <button
-              onClick={() => toggleFilter('in_progress')}
+              onClick={() => setExpanded(prev => !prev)}
               className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors cursor-pointer ${
-                activeFilter === 'in_progress'
+                expanded
                   ? 'bg-amber-100 ring-1 ring-amber-400'
                   : 'hover:bg-amber-50'
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-              <span className="text-amber-700 font-medium">{b.inProgress} in progress</span>
-              {activeFilter === 'in_progress' && (
-                <svg className="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              )}
+              <span className="text-amber-700 font-medium">{b.inProgressUnits} in progress</span>
+              <svg className={`w-3 h-3 text-amber-500 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
-          )}
-          {b.yetToStart > 0 && (
-            <button
-              onClick={() => toggleFilter('yet_to_start')}
-              className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors cursor-pointer ${
-                activeFilter === 'yet_to_start'
-                  ? 'bg-gray-200 ring-1 ring-gray-400'
-                  : 'hover:bg-gray-100'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-              <span className="text-gray-600 font-medium">{b.yetToStart} yet to start</span>
-              {activeFilter === 'yet_to_start' && (
-                <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              )}
-            </button>
-          )}
-          {b.hasOverdue && (
-            <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-              <span className="text-red-600 font-semibold">{b.overdueCount} overdue</span>
-            </span>
           )}
           {onHoldCount > 0 && (
-            <button
-              onClick={() => toggleFilter('on_hold')}
-              className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-colors cursor-pointer ${
-                activeFilter === 'on_hold'
-                  ? 'bg-orange-100 ring-1 ring-orange-400'
-                  : 'hover:bg-orange-50'
-              }`}
-            >
+            <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
               <span className="text-orange-700 font-medium">{onHoldCount} on hold</span>
-              {activeFilter === 'on_hold' && (
-                <svg className="w-3 h-3 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              )}
-            </button>
+            </span>
           )}
         </div>
       </div>
@@ -150,10 +107,10 @@ function FloorCard({ b }: { b: StageFloorBreakdown }) {
       {/* Expandable activity detail — grouped by activity */}
       <div
         className="grid transition-[grid-template-rows] duration-200 ease-out"
-        style={{ gridTemplateRows: activeFilter ? '1fr' : '0fr' }}
+        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden">
-          {activeFilter && grouped.length > 0 && (
+          {expanded && grouped.length > 0 && (
             <div className="px-3 pb-3 pt-1 border-t border-gray-200/60 space-y-2">
               {grouped.map(([activity, flats]) => (
                 <div key={activity}>

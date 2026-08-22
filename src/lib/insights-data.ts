@@ -96,12 +96,12 @@ export interface FloorActivityDetail {
 
 export interface StageFloorBreakdown {
   floor: number;
-  completed: number;
-  inProgress: number;
-  yetToStart: number;
-  total: number;
-  hasOverdue: boolean;
-  overdueCount: number;
+  /** Number of flats where ALL activities are completed */
+  completedUnits: number;
+  /** Number of flats where at least one activity is not completed */
+  inProgressUnits: number;
+  /** Total flats on this floor for this stage */
+  totalUnits: number;
   onHoldFlats: OnHoldFlat[];
   /** Activity-level detail for drill-down (non-completed items only) */
   activities: FloorActivityDetail[];
@@ -801,12 +801,14 @@ export function computeManagement(
   const stageFloorBreakdowns: Record<string, StageFloorBreakdown[]> = {};
   for (const stage of PIPELINE_STAGES) {
     const breakdowns: StageFloorBreakdown[] = [];
-    // Collect non-completed activities for this stage, keyed by floor
-    const stageRows = rows.filter(r => r.stage === stage && !isComplete(r.status) && r.status !== 'not_applicable');
+
+    // ALL rows for this stage (including completed) to compute flat-level counts
+    const allStageRows = rows.filter(r => r.stage === stage && r.status !== 'not_applicable');
+
+    // Non-completed rows for the drill-down activities list
+    const pendingRows = allStageRows.filter(r => !isComplete(r.status));
     const activityByFloor = new Map<number, FloorActivityDetail[]>();
-    const overdueCountByFloor = new Map<number, number>();
-    for (const r of stageRows) {
-      const isOverdue = !!(r.expected_end && r.expected_end < TODAY);
+    for (const r of pendingRows) {
       const isInProg = r.status === 'in_progress' || r.status === 'in_progress_delayed';
       const isOnHold = r.status === 'on_hold';
       const detail: FloorActivityDetail = {
@@ -816,30 +818,42 @@ export function computeManagement(
       };
       if (!activityByFloor.has(r.floor)) activityByFloor.set(r.floor, []);
       activityByFloor.get(r.floor)!.push(detail);
-      if (isOverdue) {
-        overdueCountByFloor.set(r.floor, (overdueCountByFloor.get(r.floor) || 0) + 1);
-      }
+    }
+
+    // Compute flat-level counts per floor: group all rows by floor→flat
+    const floorFlatRows = new Map<number, Map<number, { total: number; completed: number }>>();
+    for (const r of allStageRows) {
+      if (!floorFlatRows.has(r.floor)) floorFlatRows.set(r.floor, new Map());
+      const flatMap = floorFlatRows.get(r.floor)!;
+      if (!flatMap.has(r.flat_number)) flatMap.set(r.flat_number, { total: 0, completed: 0 });
+      const fc = flatMap.get(r.flat_number)!;
+      fc.total++;
+      if (isComplete(r.status)) fc.completed++;
     }
 
     for (const floorRow of heatmap.floors) {
       const cell = floorRow.stages[stage];
       if (!cell || cell.total === 0) continue;
-      const overdueKey = `${stage}|${floorRow.floor}`;
-      const hasOverdue = stageFloorOverdue.has(overdueKey);
       const stageOnHold = (onHoldByStage.get(stage) || []).filter(oh => oh.floor === floorRow.floor);
       const activities = (activityByFloor.get(floorRow.floor) || [])
         .sort((a, b) => a.flatNumber - b.flatNumber);
-      // Derive counts from activities array so badge always matches drill-down
-      const ipCount = activities.filter(a => a.status === 'in_progress').length;
-      const ytsCount = activities.filter(a => a.status === 'yet_to_start').length;
+
+      // Flat-level counts
+      const flatMap = floorFlatRows.get(floorRow.floor);
+      let completedUnits = 0;
+      let totalUnits = 0;
+      if (flatMap) {
+        for (const fc of flatMap.values()) {
+          totalUnits++;
+          if (fc.completed === fc.total) completedUnits++;
+        }
+      }
+
       breakdowns.push({
         floor: floorRow.floor,
-        completed: cell.completed,
-        inProgress: ipCount,
-        yetToStart: ytsCount,
-        total: cell.total,
-        hasOverdue,
-        overdueCount: overdueCountByFloor.get(floorRow.floor) || 0,
+        completedUnits,
+        inProgressUnits: totalUnits - completedUnits,
+        totalUnits,
         onHoldFlats: stageOnHold,
         activities,
       });
