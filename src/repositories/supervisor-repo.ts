@@ -95,8 +95,20 @@ export async function getSupervisorAssignments(supervisorId: string): Promise<Ar
 export async function assignSupervisorToProject(
   supervisorId: string,
   projectId: string,
-  floors: number[]
+  floors: number[],
+  /** When true, deletes ALL existing assignments for this supervisor before inserting the new one (project transfer). */
+  replaceExisting = false,
 ): Promise<void> {
+  if (replaceExisting) {
+    // Delete all old assignments — supervisor is moving to a new project
+    const { error: delError } = await supabase
+      .from('supervisor_assignments')
+      .delete()
+      .eq('supervisor_id', supervisorId)
+      .neq('project_id', projectId);
+    if (delError) throw delError;
+  }
+
   const { error } = await supabase.from('supervisor_assignments').upsert({
     supervisor_id: supervisorId,
     project_id: projectId,

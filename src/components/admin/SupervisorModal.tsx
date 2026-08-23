@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Modal from '@/components/shared/Modal';
 import { Supervisor } from '@/lib/types';
 import { ManagedProject } from '@/lib/project-store';
@@ -21,6 +21,12 @@ export interface SupervisorFormData {
   project_id: string;
   assigned_floors: number[];
   allow_vendor_reassignment: boolean;
+  /** True when editing and the project was changed (transfer) */
+  isProjectTransfer?: boolean;
+  /** Name of the old project (for confirmation dialog) */
+  oldProjectName?: string;
+  /** Floors on the old project (for confirmation dialog) */
+  oldFloors?: number[];
 }
 
 export default function SupervisorModal({ open, onClose, supervisor, onSave }: SupervisorModalProps) {
@@ -34,6 +40,18 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
   const [realProjects, setRealProjects] = useState<ManagedProject[]>([]);
   const [availableFloors, setAvailableFloors] = useState<number[]>([]);
   const isEditing = !!supervisor;
+
+  // Track original project for detecting transfers
+  const originalProjectId = useRef<string>('');
+  const originalFloors = useRef<number[]>([]);
+
+  const isProjectTransfer = isEditing && originalProjectId.current !== '' && projectId !== originalProjectId.current;
+
+  // Get project name by ID
+  function getProjectName(pid: string): string {
+    const p = realProjects.find(pr => pr.id === pid);
+    return p ? `${p.name} — ${p.location}` : 'Unknown';
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -49,9 +67,13 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
         if (assignments.length > 0) {
           setProjectId(assignments[0].project_id);
           setSelectedFloors(assignments[0].assigned_floors || []);
+          originalProjectId.current = assignments[0].project_id;
+          originalFloors.current = assignments[0].assigned_floors || [];
         } else if (list.length > 0) {
           setProjectId(list[0].id);
           setSelectedFloors([]);
+          originalProjectId.current = '';
+          originalFloors.current = [];
         }
       } else {
         setName('');
@@ -61,6 +83,8 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
         setProjectId(list.length > 0 ? list[0].id : '');
         setSelectedFloors([]);
         setAllowReassignment(false);
+        originalProjectId.current = '';
+        originalFloors.current = [];
       }
     });
   }, [supervisor, open]);
@@ -72,6 +96,17 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
       setAvailableFloors([]);
     }
   }, [projectId]);
+
+  function handleProjectChange(newProjectId: string) {
+    setProjectId(newProjectId);
+    // Clear floor selections when project changes (floors belong to the project)
+    if (newProjectId !== originalProjectId.current) {
+      setSelectedFloors([]);
+    } else {
+      // Switching back to original project — restore original floors
+      setSelectedFloors(originalFloors.current);
+    }
+  }
 
   function toggleFloor(floor: number) {
     setSelectedFloors((prev) =>
@@ -89,12 +124,32 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
       project_id: projectId,
       assigned_floors: selectedFloors.sort((a, b) => a - b),
       allow_vendor_reassignment: allowReassignment,
+      isProjectTransfer,
+      oldProjectName: isProjectTransfer ? getProjectName(originalProjectId.current) : undefined,
+      oldFloors: isProjectTransfer ? originalFloors.current : undefined,
     });
   }
 
   return (
     <Modal open={open} onClose={onClose} title="Add / Edit Supervisor" maxWidth="max-w-3xl">
       <form onSubmit={handleSubmit}>
+        {/* Project transfer warning banner */}
+        {isProjectTransfer && (
+          <div className="mb-5 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+            <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <div className="text-sm">
+              <p className="font-medium text-amber-800">Project Transfer</p>
+              <p className="text-amber-700 mt-0.5">
+                This will remove <strong>{supervisor?.full_name}</strong> from{' '}
+                <strong>{getProjectName(originalProjectId.current)}</strong>{' '}
+                (Floors {originalFloors.current.join(', ')}). Those floors will have no supervisor until reassigned.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Left Column */}
           <div className="space-y-4">
@@ -161,8 +216,10 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
               </label>
               <select
                 value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white"
+                onChange={(e) => handleProjectChange(e.target.value)}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors bg-white ${
+                  isProjectTransfer ? 'border-amber-400' : 'border-gray-300'
+                }`}
               >
                 {realProjects.length === 0 && (
                   <option value="">No projects — create one first</option>
@@ -251,9 +308,13 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
           </button>
           <button
             type="submit"
-            className="px-5 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors"
+            className={`px-5 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
+              isProjectTransfer
+                ? 'bg-amber-600 hover:bg-amber-700'
+                : 'bg-primary hover:bg-primary-dark'
+            }`}
           >
-            Save Supervisor
+            {isProjectTransfer ? 'Transfer & Save' : 'Save Supervisor'}
           </button>
         </div>
       </form>

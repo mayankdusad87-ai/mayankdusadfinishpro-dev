@@ -51,12 +51,28 @@ export default function SupervisorsPage() {
   }
 
   async function handleSave(data: SupervisorFormData) {
+    // If this is a project transfer, show confirmation dialog first
+    if (data.isProjectTransfer) {
+      const confirmed = confirm(
+        `⚠️ Project Transfer\n\n` +
+        `You are transferring ${data.full_name} from "${data.oldProjectName}" (Floors ${data.oldFloors?.join(', ')}) to a new project.\n\n` +
+        `Their old floor assignments will be removed. Those floors will have no supervisor until reassigned.\n\n` +
+        `This action will be logged in assignment history.\n\nContinue?`
+      );
+      if (!confirmed) return;
+    }
+
     setSaving(true);
     setError('');
     try {
       if (editingSupervisor) {
         if (data.project_id && data.assigned_floors.length > 0) {
-          await assignSupervisorToProject(editingSupervisor.id, data.project_id, data.assigned_floors);
+          await assignSupervisorToProject(
+            editingSupervisor.id,
+            data.project_id,
+            data.assigned_floors,
+            data.isProjectTransfer, // replaceExisting — deletes old project assignment
+          );
         }
       } else {
         const result = await createSupervisor(data.email, data.password!, data.full_name, data.phone);
