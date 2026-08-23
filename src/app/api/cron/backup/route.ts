@@ -122,7 +122,10 @@ export async function GET(request: NextRequest) {
   const dateStr = new Date().toISOString().slice(0, 10); // e.g. "2026-08-22"
   const results: Record<string, { rows?: number; error?: string }> = {};
 
-  console.log(`[Backup] Starting daily backup for ${dateStr}`);
+  console.log(`[Backup] Starting daily backup for ${dateStr}`, {
+    r2Endpoint: process.env.R2_ENDPOINT ? '✓ set' : '✗ missing',
+    r2Key: process.env.R2_ACCESS_KEY_ID ? '✓ set' : '✗ missing',
+  });
 
   // 1. Back up all database tables
   for (const table of TABLES) {
