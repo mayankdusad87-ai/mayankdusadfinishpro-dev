@@ -297,6 +297,16 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
           </div>
         </div>
 
+        {/* Floor validation warning */}
+        {availableFloors.length > 0 && selectedFloors.length === 0 && (
+          <p className="text-sm text-red-600 mt-4 flex items-center gap-1.5">
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Select at least one floor before saving.
+          </p>
+        )}
+
         {/* Footer Buttons */}
         <div className="flex items-center justify-end gap-3 mt-6 pt-5 border-t border-gray-200">
           <button
@@ -308,10 +318,13 @@ export default function SupervisorModal({ open, onClose, supervisor, onSave }: S
           </button>
           <button
             type="submit"
+            disabled={selectedFloors.length === 0}
             className={`px-5 py-2 text-sm font-medium text-white rounded-lg transition-colors ${
-              isProjectTransfer
-                ? 'bg-amber-600 hover:bg-amber-700'
-                : 'bg-primary hover:bg-primary-dark'
+              selectedFloors.length === 0
+                ? 'bg-gray-300 cursor-not-allowed'
+                : isProjectTransfer
+                  ? 'bg-amber-600 hover:bg-amber-700'
+                  : 'bg-primary hover:bg-primary-dark'
             }`}
           >
             {isProjectTransfer ? 'Transfer & Save' : 'Save Supervisor'}
