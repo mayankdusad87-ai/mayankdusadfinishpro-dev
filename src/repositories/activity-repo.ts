@@ -193,10 +193,8 @@ export async function computeMergeSummary(
   projectId: string,
   newActivities: UploadedActivity[],
 ): Promise<MergeSummary> {
-  // 1. Fetch all existing activities
-  const existing = await getActivitiesFromSupabase(projectId);
+  // 1. Fetch all existing activities as raw rows (need ActivityRow for isTouched check)
   const existingMap = new Map<string, ActivityRow>();
-  // We need the raw rows for isTouched check — re-fetch with full types
   const PAGE = 1000;
   const rawRows: ActivityRow[] = [];
   let from = 0;
@@ -266,8 +264,9 @@ export async function computeMergeSummary(
   }
 
   // 4. Orphaned rows (in DB but not in new Excel)
-  const orphanedRows = rawRows.filter(r => !matchedKeys.has(activityKey(r)) &&
-    !newActivities.some(a => activityKey(a) === activityKey(r))).length;
+  // Build a set of all new-activity keys for O(1) lookup
+  const newActivityKeys = new Set(newActivities.map(a => activityKey(a)));
+  const orphanedRows = rawRows.filter(r => !newActivityKeys.has(activityKey(r))).length;
 
   return {
     newRows,
