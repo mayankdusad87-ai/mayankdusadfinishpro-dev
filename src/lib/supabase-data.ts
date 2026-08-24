@@ -21,6 +21,8 @@ export {
 export {
   getActivitiesFromSupabase,
   saveActivitiesToSupabase,
+  mergeActivitiesToSupabase,
+  computeMergeSummary,
   updateActivityInSupabase,
   getActivitiesPage,
   getCriticalDelays,
@@ -32,7 +34,7 @@ export {
   getDashboardData,
   getInsightActivities,
 } from '@/repositories/activity-repo';
-export type { ActivitiesPage, SubstageRollup, DashboardData, InsightRow } from '@/repositories/activity-repo';
+export type { ActivitiesPage, SubstageRollup, DashboardData, InsightRow, UploadMode, MergeSummary } from '@/repositories/activity-repo';
 
 export {
   uploadActivityPhoto,

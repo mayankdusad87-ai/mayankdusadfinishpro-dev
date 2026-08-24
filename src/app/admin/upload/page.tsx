@@ -5,7 +5,8 @@ import { parseExcelFile, ProjectData, UploadedActivity } from '@/lib/project-dat
 import { useProject } from '@/lib/project-context';
 import { getProjectDataFromSupabase, updateActivityInSupabase } from '@/lib/supabase-data';
 import { useAuth } from '@/lib/auth-context';
-import { uploadTemplate, clearTemplate, countModifiedActivities } from '@/services/project-service';
+import { uploadTemplate, clearTemplate, countModifiedActivities, getUploadMergeSummary } from '@/services/project-service';
+import type { UploadMode, MergeSummary } from '@/services/project-service';
 
 type UploadStep = 'pick' | 'preview' | 'saved';
 
@@ -27,6 +28,13 @@ export default function UploadPage() {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 20;
 
+  // Smart merge state
+  const [mergeSummary, setMergeSummary] = useState<MergeSummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [uploadMode, setUploadMode] = useState<UploadMode>('smart_merge');
+  const [showProtectedDetails, setShowProtectedDetails] = useState(false);
+  const isReupload = !!projectData; // true when existing data exists
+
   useEffect(() => {
     setProjectData(null);
     setPreviewData(null);
@@ -34,6 +42,8 @@ export default function UploadPage() {
     setError('');
     setFileName('');
     setPage(0);
+    setMergeSummary(null);
+    setUploadMode('smart_merge');
 
     if (!currentProject) return;
     getProjectDataFromSupabase(currentProject.id).then(existing => {
@@ -57,6 +67,9 @@ export default function UploadPage() {
     setUploading(true);
     setError('');
     setFileName(file.name);
+    setMergeSummary(null);
+    setUploadMode('smart_merge');
+    setShowProtectedDetails(false);
 
     try {
       const buffer = await file.arrayBuffer();
@@ -65,6 +78,20 @@ export default function UploadPage() {
       data.name = currentProject.name;
       setPreviewData(data);
       setStep('preview');
+
+      // If re-uploading, compute merge summary
+      if (projectData) {
+        setLoadingSummary(true);
+        try {
+          const summary = await getUploadMergeSummary(currentProject.id, data.activities);
+          setMergeSummary(summary);
+        } catch {
+          // If summary fails, fall back to simple upload
+          setMergeSummary(null);
+        } finally {
+          setLoadingSummary(false);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse Excel file');
     } finally {
@@ -76,11 +103,44 @@ export default function UploadPage() {
     if (!previewData || !currentProject) return;
     setUploading(true);
     setError('');
+
+    // Determine the mode:
+    // - First upload (no existing data) → delete_all (simple insert)
+    // - Re-upload → user-chosen mode (smart_merge, force_overwrite, or delete_all)
+    const mode: UploadMode = isReupload ? uploadMode : 'delete_all';
+
+    // Extra confirmation for destructive modes during re-upload
+    if (isReupload && mode === 'delete_all') {
+      const modifiedCount = projectData ? countModifiedActivities(projectData.activities) : 0;
+      const msg = modifiedCount > 0
+        ? `⚠️ DELETE ALL & RE-UPLOAD\n\nThis will permanently delete ALL ${projectData?.totalRows.toLocaleString()} existing activities, including ${modifiedCount} that have been updated by supervisors (status changes, actual dates, photos).\n\nAll supervisor work will be lost. This cannot be undone.\n\nContinue?`
+        : `This will delete all existing activities and replace with the new upload. Continue?`;
+      if (!confirm(msg)) {
+        setUploading(false);
+        return;
+      }
+    }
+
+    if (isReupload && mode === 'force_overwrite') {
+      const protectedCount = mergeSummary?.protectedRows || 0;
+      if (protectedCount > 0) {
+        const msg = `⚠️ FORCE OVERWRITE\n\nThis will overwrite ${protectedCount} activities that have been updated by supervisors. Their status changes, actual dates, and remarks will be replaced with data from the Excel file.\n\nPhotos will NOT be deleted, but their associated activity data will be reset.\n\nContinue?`;
+        if (!confirm(msg)) {
+          setUploading(false);
+          return;
+        }
+      }
+    }
+
     try {
-      await uploadTemplate(currentProject, previewData.activities, previewData.fileName, previewData.totalRows, user?.id || '');
+      await uploadTemplate(currentProject, previewData.activities, previewData.fileName, previewData.totalRows, user?.id || '', mode);
       await refreshProjects();
-      setProjectData(previewData);
+
+      // Reload fresh data from DB (merge may have preserved/modified rows)
+      const fresh = await getProjectDataFromSupabase(currentProject.id);
+      setProjectData(fresh || previewData);
       setPreviewData(null);
+      setMergeSummary(null);
       setStep('saved');
     } catch (err: unknown) {
       const e = err as { message?: string; details?: string; code?: string };
@@ -92,6 +152,9 @@ export default function UploadPage() {
 
   function cancelPreview() {
     setPreviewData(null);
+    setMergeSummary(null);
+    setUploadMode('smart_merge');
+    setShowProtectedDetails(false);
     setStep(projectData ? 'saved' : 'pick');
     if (fileRef.current) fileRef.current.value = '';
   }
@@ -277,27 +340,264 @@ export default function UploadPage() {
       {/* Step 2: Preview before save */}
       {step === 'preview' && previewData && (
         <div className="space-y-6">
-          <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-            <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-            </svg>
-            <div className="flex-1">
-              <span className="text-sm font-semibold text-blue-800">Preview Mode</span>
-              <span className="text-xs text-blue-600 block">
-                Review the data below. Click <strong>Confirm &amp; Save</strong> to store it, or <strong>Cancel</strong> to discard.
-              </span>
+          {/* Re-upload merge summary panel */}
+          {isReupload && (
+            <div className="space-y-4">
+              {loadingSummary ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-6 text-center">
+                  <svg className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-3" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-sm font-medium text-blue-800">Analyzing changes...</span>
+                  <span className="text-xs text-blue-600 block mt-1">Comparing with existing data to protect supervisor work</span>
+                </div>
+              ) : mergeSummary ? (
+                <>
+                  {/* Merge impact summary */}
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-200 bg-blue-50/50">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                        </svg>
+                        <h3 className="text-sm font-semibold text-gray-900">Re-upload Impact Analysis</h3>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Comparing {previewData.totalRows.toLocaleString()} Excel rows against {mergeSummary.totalExistingRows.toLocaleString()} existing activities
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-gray-100">
+                      <MergeStat
+                        label="New Activities"
+                        value={mergeSummary.newRows}
+                        color="text-green-700"
+                        bg="bg-green-50"
+                        icon={<path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />}
+                      />
+                      <MergeStat
+                        label="Will Update"
+                        value={mergeSummary.updatedRows}
+                        color="text-blue-700"
+                        bg="bg-blue-50"
+                        icon={<path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />}
+                      />
+                      <MergeStat
+                        label="Protected"
+                        value={mergeSummary.protectedRows}
+                        color="text-amber-700"
+                        bg="bg-amber-50"
+                        icon={<path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />}
+                      />
+                      <MergeStat
+                        label="Orphaned"
+                        value={mergeSummary.orphanedRows}
+                        color="text-gray-600"
+                        bg="bg-gray-50"
+                        icon={<path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />}
+                      />
+                    </div>
+
+                    {/* Protected rows explanation */}
+                    {mergeSummary.protectedRows > 0 && (
+                      <div className="px-5 py-3 bg-amber-50 border-t border-amber-200">
+                        <div className="flex items-start gap-2">
+                          <svg className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                          </svg>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-amber-800">
+                              {mergeSummary.protectedRows} activities have supervisor updates
+                            </p>
+                            <p className="text-xs text-amber-700 mt-0.5">
+                              These rows have status changes, actual dates, remarks, or photos. Only template fields (vendor, expected dates) will be updated. Supervisor work is preserved.
+                            </p>
+                            {mergeSummary.protectedDetails.length > 0 && (
+                              <button
+                                onClick={() => setShowProtectedDetails(!showProtectedDetails)}
+                                className="text-xs text-amber-800 font-medium mt-2 hover:underline flex items-center gap-1"
+                              >
+                                {showProtectedDetails ? 'Hide' : 'Show'} protected rows
+                                <svg className={`w-3 h-3 transition-transform ${showProtectedDetails ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {showProtectedDetails && (
+                          <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-amber-200 bg-white">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-amber-100/50">
+                                  <th className="text-left px-3 py-1.5 font-medium text-amber-800">Floor</th>
+                                  <th className="text-left px-3 py-1.5 font-medium text-amber-800">Flat</th>
+                                  <th className="text-left px-3 py-1.5 font-medium text-amber-800">Activity</th>
+                                  <th className="text-left px-3 py-1.5 font-medium text-amber-800">Status</th>
+                                  <th className="text-left px-3 py-1.5 font-medium text-amber-800">Why Protected</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-amber-100">
+                                {mergeSummary.protectedDetails.map((d, i) => (
+                                  <tr key={i}>
+                                    <td className="px-3 py-1.5 text-gray-700">{d.floor}</td>
+                                    <td className="px-3 py-1.5 text-gray-700">{d.flat_number}</td>
+                                    <td className="px-3 py-1.5 text-gray-700">{d.activity}</td>
+                                    <td className="px-3 py-1.5">
+                                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${(STATUS_LABELS[d.status] || {}).color || 'bg-gray-100 text-gray-700'}`}>
+                                        {(STATUS_LABELS[d.status] || {}).label || d.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-1.5 text-gray-500">{d.reasons.join(', ')}</td>
+                                  </tr>
+                                ))}
+                                {mergeSummary.protectedRows > mergeSummary.protectedDetails.length && (
+                                  <tr>
+                                    <td colSpan={5} className="px-3 py-1.5 text-center text-amber-600 font-medium">
+                                      ... and {mergeSummary.protectedRows - mergeSummary.protectedDetails.length} more
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {mergeSummary.orphanedRows > 0 && (
+                      <div className="px-5 py-3 bg-gray-50 border-t border-gray-200">
+                        <p className="text-xs text-gray-600">
+                          <strong>{mergeSummary.orphanedRows} orphaned rows</strong> exist in the database but not in the new Excel file. They will be kept to preserve any supervisor work.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload mode selector */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Upload Mode</h4>
+                    <div className="space-y-3">
+                      {/* Smart Merge (default) */}
+                      <label className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                        uploadMode === 'smart_merge' ? 'border-primary bg-orange-50/30' : 'border-gray-200 hover:border-gray-300'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="uploadMode"
+                          value="smart_merge"
+                          checked={uploadMode === 'smart_merge'}
+                          onChange={() => setUploadMode('smart_merge')}
+                          className="mt-0.5 accent-[#C8922A]"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">Smart Merge</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 ml-2">Recommended</span>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Add new activities, update untouched ones, <strong>protect supervisor work</strong> (status, dates, photos, remarks). Only template fields like vendor and expected dates are updated on protected rows.
+                          </p>
+                        </div>
+                      </label>
+
+                      {/* Force Overwrite */}
+                      <label className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                        uploadMode === 'force_overwrite' ? 'border-amber-400 bg-amber-50/30' : 'border-gray-200 hover:border-gray-300'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="uploadMode"
+                          value="force_overwrite"
+                          checked={uploadMode === 'force_overwrite'}
+                          onChange={() => setUploadMode('force_overwrite')}
+                          className="mt-0.5 accent-[#C8922A]"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-amber-800">Force Overwrite</span>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Overwrite <strong>all</strong> matching activities with Excel data, including supervisor work. New rows are added. Photos are kept but their activity data resets.
+                          </p>
+                        </div>
+                      </label>
+
+                      {/* Delete All */}
+                      <label className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                        uploadMode === 'delete_all' ? 'border-red-400 bg-red-50/30' : 'border-gray-200 hover:border-gray-300'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="uploadMode"
+                          value="delete_all"
+                          checked={uploadMode === 'delete_all'}
+                          onChange={() => setUploadMode('delete_all')}
+                          className="mt-0.5 accent-[#C8922A]"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-red-700">Delete Everything &amp; Re-upload</span>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            <strong>Permanently delete</strong> all existing activities and upload from scratch. All supervisor work, status updates, and remarks will be lost. Use only for a complete reset.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* No merge summary available — first upload or summary failed */
+                <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                  <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                  </svg>
+                  <div className="flex-1">
+                    <span className="text-sm font-semibold text-blue-800">Preview Mode</span>
+                    <span className="text-xs text-blue-600 block">
+                      Review the data below. Click <strong>Confirm &amp; Save</strong> to store it, or <strong>Cancel</strong> to discard.
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* First upload — simple preview banner */}
+          {!isReupload && (
+            <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+              <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+              <div className="flex-1">
+                <span className="text-sm font-semibold text-blue-800">Preview Mode</span>
+                <span className="text-xs text-blue-600 block">
+                  Review the data below. Click <strong>Confirm &amp; Save</strong> to store it, or <strong>Cancel</strong> to discard.
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Confirm/Cancel bar */}
-          <div className="flex gap-3 sticky top-0 z-10 bg-gray-50 py-3 -mx-3 px-3 md:-mx-6 md:px-6 border-b border-gray-200">
+          <div className="flex flex-wrap gap-3 sticky top-0 z-10 bg-gray-50 py-3 -mx-3 px-3 md:-mx-6 md:px-6 border-b border-gray-200">
             <button
               onClick={confirmSave}
-              disabled={uploading}
-              className="px-6 py-2.5 bg-primary hover:bg-primary-dark text-white font-semibold rounded-lg text-sm transition-colors disabled:opacity-50"
+              disabled={uploading || loadingSummary}
+              className={`px-6 py-2.5 font-semibold rounded-lg text-sm transition-colors disabled:opacity-50 ${
+                uploadMode === 'delete_all' && isReupload
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : uploadMode === 'force_overwrite' && isReupload
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                    : 'bg-primary hover:bg-primary-dark text-white'
+              }`}
             >
-              {uploading ? 'Saving...' : 'Confirm & Save'}
+              {uploading ? 'Saving...' : (
+                isReupload
+                  ? uploadMode === 'delete_all'
+                    ? 'Delete All & Re-upload'
+                    : uploadMode === 'force_overwrite'
+                      ? 'Force Overwrite & Save'
+                      : 'Smart Merge & Save'
+                  : 'Confirm & Save'
+              )}
             </button>
             <button
               onClick={cancelPreview}
@@ -606,6 +906,26 @@ function MetricCard({ label, value, icon }: { label: string; value: string; icon
     <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
       <div className="text-2xl mb-1">{icon}</div>
       <div className="text-xl font-bold text-gray-900">{value}</div>
+      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+function MergeStat({ label, value, color, bg, icon }: {
+  label: string;
+  value: number;
+  color: string;
+  bg: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className={`${bg} p-4 text-center`}>
+      <div className="flex items-center justify-center mb-1">
+        <svg className={`w-4 h-4 ${color}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          {icon}
+        </svg>
+      </div>
+      <div className={`text-xl font-bold ${color}`}>{value.toLocaleString()}</div>
       <div className="text-xs text-gray-500 mt-0.5">{label}</div>
     </div>
   );

@@ -2,7 +2,24 @@ import { supabase } from '@/lib/supabase';
 import type { ManagedProject } from '@/lib/project-store';
 import type { UploadedActivity } from '@/lib/project-data-store';
 import { saveProjectToSupabase, recordUpload } from '@/repositories/project-repo';
-import { saveActivitiesToSupabase } from '@/repositories/activity-repo';
+import {
+  saveActivitiesToSupabase,
+  mergeActivitiesToSupabase,
+  computeMergeSummary,
+} from '@/repositories/activity-repo';
+import type { UploadMode, MergeSummary } from '@/repositories/activity-repo';
+
+export type { UploadMode, MergeSummary } from '@/repositories/activity-repo';
+
+/**
+ * Preview what a re-upload will do without writing anything.
+ */
+export async function getUploadMergeSummary(
+  projectId: string,
+  activities: UploadedActivity[],
+): Promise<MergeSummary> {
+  return computeMergeSummary(projectId, activities);
+}
 
 export async function uploadTemplate(
   project: ManagedProject,
@@ -10,11 +27,21 @@ export async function uploadTemplate(
   fileName: string,
   totalRows: number,
   userId: string,
-): Promise<void> {
+  /** Upload mode — defaults to smart_merge for re-uploads, delete_all for first upload */
+  mode: UploadMode = 'delete_all',
+): Promise<MergeSummary | void> {
   await supabase.auth.refreshSession();
-  await saveActivitiesToSupabase(project.id, activities);
+
+  let summary: MergeSummary | undefined;
+  if (mode === 'delete_all') {
+    await saveActivitiesToSupabase(project.id, activities);
+  } else {
+    summary = await mergeActivitiesToSupabase(project.id, activities, mode);
+  }
+
   await saveProjectToSupabase({ ...project, hasTemplate: true });
   await recordUpload(project.id, fileName, totalRows, userId);
+  return summary;
 }
 
 export async function clearTemplate(

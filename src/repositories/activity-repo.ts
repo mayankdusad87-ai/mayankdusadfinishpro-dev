@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { UploadedActivity } from '@/lib/project-data-store';
-import type { ActivityRow, ActivityUpdate } from '@/types/database.types';
+import type { ActivityRow, ActivityInsert, ActivityUpdate } from '@/types/database.types';
 import { friendlyError } from './errors';
 
 function activityRowToUploaded(row: ActivityRow): UploadedActivity {
@@ -134,6 +134,347 @@ export async function saveActivitiesToSupabase(
     const { error } = await supabase.from('activities').insert(chunk);
     if (error) throw error;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Smart merge for re-upload — protects supervisor work by default
+// ---------------------------------------------------------------------------
+
+export type UploadMode = 'smart_merge' | 'force_overwrite' | 'delete_all';
+
+export interface MergeSummary {
+  /** Rows in Excel that don't exist in DB — will be inserted */
+  newRows: number;
+  /** Rows in both, untouched by supervisor — will be updated from Excel */
+  updatedRows: number;
+  /** Rows in both, touched by supervisor — preserved (smart_merge only) */
+  protectedRows: number;
+  /** Rows in DB but not in new Excel — kept (not deleted) */
+  orphanedRows: number;
+  totalExcelRows: number;
+  totalExistingRows: number;
+  /** First N protected rows with details for the UI summary */
+  protectedDetails: Array<{
+    floor: number;
+    flat_number: number;
+    activity: string;
+    stage: string;
+    status: string;
+    reasons: string[];
+  }>;
+}
+
+/** Composite key to match activities between Excel and DB */
+function activityKey(a: { floor: number; flat_number: number; stage: string; stage_gate: string | null; activity: string }): string {
+  return `${a.floor}|${a.flat_number}|${a.stage}|${a.stage_gate || ''}|${a.activity}`;
+}
+
+/** Check if a DB row has been touched by a supervisor */
+function isTouchedBySupvisor(
+  row: ActivityRow,
+  hasPhotos: boolean,
+): { touched: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  if (row.status && row.status !== 'not_started') reasons.push(`Status: ${row.status.replace(/_/g, ' ')}`);
+  if (row.actual_start) reasons.push('Has actual start date');
+  if (row.actual_end) reasons.push('Has actual end date');
+  if (row.remarks) reasons.push('Has remarks');
+  if (row.delay_reason) reasons.push('Has delay reason');
+  if (row.revised_start || row.revised_end) reasons.push('Has revised dates');
+  if (hasPhotos) reasons.push('Has uploaded photos');
+  return { touched: reasons.length > 0, reasons };
+}
+
+/**
+ * Compute a merge summary without writing anything.
+ * Call this to show the user what will happen before they confirm.
+ */
+export async function computeMergeSummary(
+  projectId: string,
+  newActivities: UploadedActivity[],
+): Promise<MergeSummary> {
+  // 1. Fetch all existing activities
+  const existing = await getActivitiesFromSupabase(projectId);
+  const existingMap = new Map<string, ActivityRow>();
+  // We need the raw rows for isTouched check — re-fetch with full types
+  const PAGE = 1000;
+  const rawRows: ActivityRow[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .eq('project_id', projectId)
+      .range(from, from + PAGE - 1);
+    if (error || !data || data.length === 0) break;
+    rawRows.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  for (const row of rawRows) {
+    existingMap.set(activityKey(row), row);
+  }
+
+  // 2. Batch-check which activity IDs have photos
+  const existingIds = rawRows.map(r => r.id);
+  const photosSet = new Set<string>();
+  // Query in chunks of 500 to avoid URL-length issues
+  for (let i = 0; i < existingIds.length; i += 500) {
+    const chunk = existingIds.slice(i, i + 500);
+    const { data: photoRows } = await supabase
+      .from('activity_photos')
+      .select('activity_id')
+      .in('activity_id', chunk);
+    if (photoRows) {
+      for (const p of photoRows) photosSet.add(p.activity_id);
+    }
+  }
+
+  // 3. Walk through new activities and classify
+  let newRows = 0;
+  let updatedRows = 0;
+  let protectedRows = 0;
+  const protectedDetails: MergeSummary['protectedDetails'] = [];
+  const matchedKeys = new Set<string>();
+
+  for (const act of newActivities) {
+    const key = activityKey(act);
+    const existingRow = existingMap.get(key);
+
+    if (!existingRow) {
+      newRows++;
+    } else {
+      matchedKeys.add(key);
+      const { touched, reasons } = isTouchedBySupvisor(existingRow, photosSet.has(existingRow.id));
+      if (touched) {
+        protectedRows++;
+        if (protectedDetails.length < 50) {
+          protectedDetails.push({
+            floor: existingRow.floor,
+            flat_number: existingRow.flat_number,
+            activity: existingRow.activity,
+            stage: existingRow.stage,
+            status: existingRow.status || 'not_started',
+            reasons,
+          });
+        }
+      } else {
+        updatedRows++;
+      }
+    }
+  }
+
+  // 4. Orphaned rows (in DB but not in new Excel)
+  const orphanedRows = rawRows.filter(r => !matchedKeys.has(activityKey(r)) &&
+    !newActivities.some(a => activityKey(a) === activityKey(r))).length;
+
+  return {
+    newRows,
+    updatedRows,
+    protectedRows,
+    orphanedRows,
+    totalExcelRows: newActivities.length,
+    totalExistingRows: rawRows.length,
+    protectedDetails,
+  };
+}
+
+/**
+ * Smart merge: insert new rows, update untouched rows, protect supervisor work.
+ * - smart_merge: protect touched rows, update untouched, insert new, keep orphans
+ * - force_overwrite: update ALL rows from Excel (overwrite supervisor work), insert new, keep orphans
+ * - delete_all: wipe everything and re-insert (original behavior)
+ */
+export async function mergeActivitiesToSupabase(
+  projectId: string,
+  newActivities: UploadedActivity[],
+  mode: UploadMode,
+): Promise<MergeSummary> {
+  // delete_all: use the original destructive approach
+  if (mode === 'delete_all') {
+    await saveActivitiesToSupabase(projectId, newActivities);
+    return {
+      newRows: newActivities.length,
+      updatedRows: 0,
+      protectedRows: 0,
+      orphanedRows: 0,
+      totalExcelRows: newActivities.length,
+      totalExistingRows: 0,
+      protectedDetails: [],
+    };
+  }
+
+  // 1. Fetch existing rows
+  const PAGE = 1000;
+  const rawRows: ActivityRow[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('activities')
+      .select('*')
+      .eq('project_id', projectId)
+      .range(from, from + PAGE - 1);
+    if (error || !data || data.length === 0) break;
+    rawRows.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  const existingMap = new Map<string, ActivityRow>();
+  for (const row of rawRows) {
+    existingMap.set(activityKey(row), row);
+  }
+
+  // 2. Batch-check photos
+  const existingIds = rawRows.map(r => r.id);
+  const photosSet = new Set<string>();
+  for (let i = 0; i < existingIds.length; i += 500) {
+    const chunk = existingIds.slice(i, i + 500);
+    const { data: photoRows } = await supabase
+      .from('activity_photos')
+      .select('activity_id')
+      .in('activity_id', chunk);
+    if (photoRows) {
+      for (const p of photoRows) photosSet.add(p.activity_id);
+    }
+  }
+
+  // 3. Classify and execute
+  const toInsert: ActivityInsert[] = [];
+  const toUpdate: Array<{ id: string; data: ActivityUpdate }> = [];
+  let protectedCount = 0;
+  const protectedDetails: MergeSummary['protectedDetails'] = [];
+
+  for (const act of newActivities) {
+    const key = activityKey(act);
+    const existingRow = existingMap.get(key);
+
+    // Template fields — safe to update even on protected rows
+    const templateFields: ActivityUpdate = {
+      project_id: projectId,
+      series: act.series,
+      floor: act.floor,
+      flat_number: act.flat_number,
+      configuration: act.configuration,
+      stage: act.stage,
+      stage_gate: act.stage_gate,
+      activity: act.activity,
+      vendor: act.vendor,
+      applicable: act.applicable,
+      expected_start: act.expected_start,
+      expected_end: act.expected_end,
+      sort_order: act.sort_order,
+      sub_stage_status: act.sub_stage_status,
+      flat_status: act.flat_status,
+      floor_status: act.floor_status,
+      risk_status: act.risk_status,
+    };
+
+    // Supervisor fields — only written on new/untouched/force rows
+    const supervisorFields: ActivityUpdate = {
+      actual_start: act.actual_start,
+      actual_end: act.actual_end,
+      status: act.status,
+      delay_days: act.delay_days,
+      delay_reason: act.delay_reason,
+      remarks: act.remarks,
+      rooms: act.rooms,
+      revised_start: act.revised_start,
+      revised_end: act.revised_end,
+    };
+
+    if (!existingRow) {
+      // New row — insert with all fields
+      const insertRow: ActivityInsert = {
+        project_id: projectId,
+        floor: act.floor,
+        flat_number: act.flat_number,
+        stage: act.stage,
+        activity: act.activity,
+        series: act.series,
+        configuration: act.configuration,
+        stage_gate: act.stage_gate,
+        vendor: act.vendor,
+        applicable: act.applicable,
+        expected_start: act.expected_start,
+        expected_end: act.expected_end,
+        sort_order: act.sort_order,
+        sub_stage_status: act.sub_stage_status,
+        flat_status: act.flat_status,
+        floor_status: act.floor_status,
+        risk_status: act.risk_status,
+        actual_start: act.actual_start,
+        actual_end: act.actual_end,
+        status: act.status,
+        delay_days: act.delay_days,
+        delay_reason: act.delay_reason,
+        remarks: act.remarks,
+        rooms: act.rooms,
+        revised_start: act.revised_start,
+        revised_end: act.revised_end,
+      };
+      toInsert.push(insertRow);
+    } else {
+      const { touched, reasons } = isTouchedBySupvisor(existingRow, photosSet.has(existingRow.id));
+
+      if (touched && mode === 'smart_merge') {
+        // Protected — only update template fields, preserve supervisor work
+        protectedCount++;
+        if (protectedDetails.length < 50) {
+          protectedDetails.push({
+            floor: existingRow.floor,
+            flat_number: existingRow.flat_number,
+            activity: existingRow.activity,
+            stage: existingRow.stage,
+            status: existingRow.status || 'not_started',
+            reasons,
+          });
+        }
+        toUpdate.push({ id: existingRow.id, data: templateFields });
+      } else {
+        // Untouched OR force_overwrite — update everything from Excel
+        toUpdate.push({
+          id: existingRow.id,
+          data: { ...templateFields, ...supervisorFields },
+        });
+      }
+    }
+  }
+
+  // 4. Execute inserts in chunks
+  const CHUNK = 500;
+  for (let i = 0; i < toInsert.length; i += CHUNK) {
+    const chunk = toInsert.slice(i, i + CHUNK);
+    const { error } = await supabase.from('activities').insert(chunk);
+    if (error) throw error;
+  }
+
+  // 5. Execute updates individually (each row may have different fields)
+  // Batch by grouping rows with the same field set for efficiency
+  for (let i = 0; i < toUpdate.length; i += CHUNK) {
+    const chunk = toUpdate.slice(i, i + CHUNK);
+    const updatePromises = chunk.map(({ id, data }) =>
+      supabase.from('activities').update(data).eq('id', id)
+    );
+    const results = await Promise.all(updatePromises);
+    const failed = results.find(r => r.error);
+    if (failed?.error) throw failed.error;
+  }
+
+  // Orphaned rows (in DB but not in Excel) are deliberately kept — no deletion
+  const matchedKeys = new Set(newActivities.map(a => activityKey(a)));
+  const orphanedRows = rawRows.filter(r => !matchedKeys.has(activityKey(r))).length;
+
+  return {
+    newRows: toInsert.length,
+    updatedRows: toUpdate.length - protectedCount,
+    protectedRows: protectedCount,
+    orphanedRows,
+    totalExcelRows: newActivities.length,
+    totalExistingRows: rawRows.length,
+    protectedDetails,
+  };
 }
 
 export async function updateActivityInSupabase(
