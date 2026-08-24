@@ -33,6 +33,31 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.24',
+    headline: 'Smart Excel Re-upload',
+    date: 'August 24, 2026',
+    features: [
+      {
+        emoji: '🛡️',
+        title: 'Smart Merge on Re-upload',
+        description: 'Re-uploading an Excel template now protects supervisor work by default. Status changes, actual dates, remarks, and photos are preserved while template fields (vendor, expected dates) are updated.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '⚙️',
+        title: 'Upload Mode Selection',
+        description: 'Choose between Smart Merge (default — protects supervisor work), Force Overwrite (replaces everything), or Delete All & Re-upload (clean slate) when re-uploading a template.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '📊',
+        title: 'Re-upload Impact Analysis',
+        description: 'Before saving, see exactly how many activities will be added, updated, protected, or orphaned — with a detailed breakdown of which rows have supervisor work.',
+        roles: ['admin'],
+      },
+    ],
+  },
+  {
     version: '2026.08.22b',
     headline: 'Automated Daily Backups',
     date: 'August 22, 2026',
