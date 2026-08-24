@@ -65,14 +65,14 @@ export default function BulkUpdateBar({
     <>
       {/* Toast for skipped activities */}
       {toast && (
-        <div className="fixed bottom-16 left-0 right-0 max-w-md md:max-w-3xl lg:max-w-4xl mx-auto px-4 z-50">
+        <div className="fixed bottom-16 left-0 right-0 max-w-md md:max-w-3xl lg:max-w-5xl xl:max-w-6xl mx-auto px-4 z-50">
           <div className="bg-amber-600 text-white text-sm font-medium px-4 py-2.5 rounded-xl text-center shadow-lg">
             {toast}
           </div>
         </div>
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 bg-navy-dark border-t border-white/10 px-4 py-3 max-w-md md:max-w-3xl lg:max-w-4xl mx-auto">
+      <div className="fixed bottom-0 left-0 right-0 bg-navy-dark border-t border-white/10 px-4 py-3 max-w-md md:max-w-3xl lg:max-w-5xl xl:max-w-6xl mx-auto">
         {bulkMode && selectedIds.size > 0 ? (
           <div className="flex items-center justify-between gap-2">
             <span className="text-white text-sm font-medium flex-shrink-0">

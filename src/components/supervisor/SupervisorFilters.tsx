@@ -30,7 +30,7 @@ export default function SupervisorFilters({
   onStatusChange,
 }: SupervisorFiltersProps) {
   return (
-    <div className="grid grid-cols-2 gap-2 mb-3">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
       <select
         value={stageFilter}
         onChange={(e) => onStageChange(e.target.value)}

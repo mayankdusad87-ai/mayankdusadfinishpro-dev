@@ -21,17 +21,17 @@ function PriorityCard({ row, savingId, onDetail, onQuickAction }: PriorityCardPr
     <div className="bg-white rounded-xl border border-gray-200 p-4">
       <div className="flex items-start justify-between" onClick={onDetail}>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-bold text-gray-900">{row.activity}</div>
-          <div className="text-xs text-gray-500 mt-1">F{row.floor} &bull; Flat {row.flat_number}</div>
-          <div className="text-xs text-primary font-medium mt-0.5">{row.stage} → {row.stage_gate}</div>
-          <div className="text-xs text-gray-400 mt-0.5">{row.vendor}</div>
+          <div className="text-sm md:text-base font-bold text-gray-900">{row.activity}</div>
+          <div className="text-xs md:text-sm text-gray-500 mt-1">F{row.floor} &bull; Flat {row.flat_number}</div>
+          <div className="text-xs md:text-sm text-primary font-medium mt-0.5">{row.stage} → {row.stage_gate}</div>
+          <div className="text-xs md:text-sm text-gray-400 mt-0.5">{row.vendor}</div>
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${sc.bg} ${sc.text}`}>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] md:text-xs font-bold ${sc.bg} ${sc.text}`}>
             {sc.label}
           </span>
           {overdueDays > 0 && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] md:text-xs font-bold">
               {overdueDays}d overdue
             </span>
           )}
@@ -44,7 +44,7 @@ function PriorityCard({ row, savingId, onDetail, onQuickAction }: PriorityCardPr
             <button
               onClick={() => onQuickAction('start')}
               disabled={isSaving}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-colors ${
                 isSaving ? 'bg-blue-100 text-blue-400 cursor-not-allowed' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
               }`}
             >
@@ -61,7 +61,7 @@ function PriorityCard({ row, savingId, onDetail, onQuickAction }: PriorityCardPr
           <button
             onClick={() => onQuickAction('complete')}
             disabled={isSaving}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-colors ${
               isSaving ? 'bg-green-100 text-green-400 cursor-not-allowed' : 'bg-green-50 text-green-700 hover:bg-green-100'
             }`}
           >

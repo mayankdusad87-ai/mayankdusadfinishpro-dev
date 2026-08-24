@@ -170,7 +170,7 @@ export default function ActivityDetailSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end max-w-md md:max-w-2xl mx-auto">
+    <div className="fixed inset-0 z-50 flex flex-col justify-end max-w-md md:max-w-3xl mx-auto">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto">
         <div className="flex justify-center pt-3 pb-2">
@@ -180,11 +180,11 @@ export default function ActivityDetailSheet({
         <div className="px-5 pb-24">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">{activity.activity}</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <h2 className="text-lg md:text-xl font-bold text-gray-900">{activity.activity}</h2>
+              <p className="text-xs md:text-sm text-gray-500 mt-0.5">
                 Floor {activity.floor} &bull; Flat {activity.flat_number} &bull; {activity.stage}
               </p>
-              <p className="text-xs text-primary font-medium mt-0.5">Sub Stage: {activity.stage_gate}</p>
+              <p className="text-xs md:text-sm text-primary font-medium mt-0.5">Sub Stage: {activity.stage_gate}</p>
             </div>
             <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
               <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -206,24 +206,24 @@ export default function ActivityDetailSheet({
 
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-[11px] text-gray-500 uppercase tracking-wide">Expected Start</div>
-              <div className="text-sm font-medium text-gray-900 mt-1">{formatDDMMYYYY(activity.expected_start)}</div>
+              <div className="text-[11px] md:text-xs text-gray-500 uppercase tracking-wide">Expected Start</div>
+              <div className="text-sm md:text-base font-medium text-gray-900 mt-1">{formatDDMMYYYY(activity.expected_start)}</div>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-[11px] text-gray-500 uppercase tracking-wide">Expected End</div>
-              <div className="text-sm font-medium text-gray-900 mt-1">{formatDDMMYYYY(activity.expected_end)}</div>
+              <div className="text-[11px] md:text-xs text-gray-500 uppercase tracking-wide">Expected End</div>
+              <div className="text-sm md:text-base font-medium text-gray-900 mt-1">{formatDDMMYYYY(activity.expected_end)}</div>
             </div>
           </div>
 
           {(activity.revised_start || activity.revised_end) && (
             <div className="grid grid-cols-2 gap-3 mb-5">
               <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
-                <div className="text-[11px] text-indigo-600 uppercase tracking-wide">Revised Start</div>
-                <div className="text-sm font-medium text-indigo-900 mt-1">{formatDDMMYYYY(activity.revised_start)}</div>
+                <div className="text-[11px] md:text-xs text-indigo-600 uppercase tracking-wide">Revised Start</div>
+                <div className="text-sm md:text-base font-medium text-indigo-900 mt-1">{formatDDMMYYYY(activity.revised_start)}</div>
               </div>
               <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
-                <div className="text-[11px] text-indigo-600 uppercase tracking-wide">Revised End</div>
-                <div className="text-sm font-medium text-indigo-900 mt-1">{formatDDMMYYYY(activity.revised_end)}</div>
+                <div className="text-[11px] md:text-xs text-indigo-600 uppercase tracking-wide">Revised End</div>
+                <div className="text-sm md:text-base font-medium text-indigo-900 mt-1">{formatDDMMYYYY(activity.revised_end)}</div>
               </div>
             </div>
           )}
@@ -237,10 +237,10 @@ export default function ActivityDetailSheet({
             </div>
           )}
 
-          <div className="space-y-4">
+          <div className="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
             {/* 1. Status (primary action) */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+              <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
                 value={detailStatus}
                 onChange={(e) => {
@@ -264,7 +264,7 @@ export default function ActivityDetailSheet({
             {/* 2. Delay reason (right after status) */}
             {isDelayReasonVisible(detailStatus, activity.expected_end) && (
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">
                   {detailStatus === 'not_started'
                     ? <>Reason for Non-Start {isDelayReasonRequired(detailStatus, activity.expected_end) ? <span className="text-red-500">*</span> : <span className="text-gray-400 font-normal">(optional)</span>}</>
                     : detailStatus === 'on_hold'
@@ -287,8 +287,8 @@ export default function ActivityDetailSheet({
             )}
 
             {detailReason === '__other__' && (
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+              <div className="md:col-span-2">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">
                   Remarks <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -302,9 +302,9 @@ export default function ActivityDetailSheet({
             )}
 
             {/* 3. Actual dates */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 md:col-span-2">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Actual Start</label>
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">Actual Start</label>
                 <input
                   type="date"
                   value={detailActualStart}
@@ -314,7 +314,7 @@ export default function ActivityDetailSheet({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Actual End</label>
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">Actual End</label>
                 <input
                   type="date"
                   value={detailActualEnd}
@@ -326,13 +326,13 @@ export default function ActivityDetailSheet({
             </div>
 
             {/* 4. Vendor (read-only) */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Vendor</label>
+            <div className="md:col-span-2">
+              <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">Vendor</label>
               <input type="text" defaultValue={activity.vendor} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50" readOnly />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-2">
+            <div className="md:col-span-2">
+              <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                 Photo Evidence <span className="text-gray-400 font-normal">({detailPhotos.length + pendingPhotos.length}/3)</span>
                 {pendingPhotos.length > 0 && (
                   <span className="text-amber-600 font-normal ml-1">• {pendingPhotos.length} unsaved</span>
