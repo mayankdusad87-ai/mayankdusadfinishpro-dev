@@ -55,6 +55,12 @@ export const CHANGELOG: ChangelogEntry[] = [
         description: 'Blockers are now grouped by problem (stage + vendor) instead of individual floors — 22 floor cards become 3 actionable issue cards. Each card shows affected floors, flats impacted, and auto-links to the relevant target with status and deadline.',
         roles: ['admin', 'management'],
       },
+      {
+        emoji: '⏸️',
+        title: 'Bulk On Hold',
+        description: 'Put entire flats or floors on hold with one tap — select activities, tap On Hold, pick a reason, done. Completed work stays untouched, in-progress activities show a warning before pausing.',
+        roles: ['supervisor'],
+      },
     ],
   },
   {
