@@ -236,6 +236,10 @@ function DrilldownPanel({ stage, breakdowns, onClose, handoverMap }: { stage: st
 function ManagementView({ data, projectName, projectId, stores = [], handovers = [] }: Props) {
   const { pipeline, bottlenecks, stageFloorBreakdowns, sitePulse, pendingWork } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  const [showAllBlockers, setShowAllBlockers] = useState(false);
+  const BLOCKERS_INITIAL = 6;
+  const visibleBottlenecks = showAllBlockers ? bottlenecks : bottlenecks.slice(0, BLOCKERS_INITIAL);
+  const hasMoreBlockers = bottlenecks.length > BLOCKERS_INITIAL;
 
   // Build handover lookup: floor → FloorHandover
   const handoverMap = useMemo(() => {
@@ -404,8 +408,9 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
             <p className="text-sm text-emerald-700 font-medium">All floors progressing on schedule. No action items.</p>
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {bottlenecks.map(b => (
+            {visibleBottlenecks.map(b => (
               <div key={`${b.floor}-${b.blockedStage}`} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
                 <div className="h-[3px] bg-gradient-to-r from-red-500 to-red-400" />
                 <div className="p-4">
@@ -421,8 +426,8 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
                       <span className="font-semibold text-gray-900">{b.blockedVendor || '—'}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-gray-500">Overdue</span>
-                      <span className="font-semibold text-red-600">{b.overdueCount} {b.overdueCount === 1 ? 'activity' : 'activities'}</span>
+                      <span className="text-gray-500">Flats affected</span>
+                      <span className="font-semibold text-red-600">{b.totalFlatsAffected} {b.totalFlatsAffected === 1 ? 'flat' : 'flats'}</span>
                     </div>
                   </div>
 
@@ -456,6 +461,30 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
               </div>
             ))}
           </div>
+          {/* Show all / collapse button */}
+          {hasMoreBlockers && (
+            <button
+              onClick={() => setShowAllBlockers(prev => !prev)}
+              className="mt-3 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition-colors cursor-pointer"
+            >
+              {showAllBlockers ? (
+                <>
+                  Show less
+                  <svg className="w-4 h-4 rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </>
+              ) : (
+                <>
+                  Show all {bottlenecks.length} blockers
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </>
+              )}
+            </button>
+          )}
+          </>
         )}
         </div>
       </div>

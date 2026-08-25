@@ -888,7 +888,7 @@ export function computeManagement(
     health,
     pipeline,
     floors,
-    bottlenecks: bottlenecks.slice(0, 3),
+    bottlenecks,
     stageFloorBreakdowns,
     sitePulse,
     pendingWork,
