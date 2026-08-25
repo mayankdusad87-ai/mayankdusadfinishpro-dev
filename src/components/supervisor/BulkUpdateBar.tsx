@@ -40,16 +40,7 @@ export default function BulkUpdateBar({
   const [selectedReason, setSelectedReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Show bulk bar for floor view always; for "all" view only when scope is narrowed
-  if (activeView === 'floor') {
-    // always show
-  } else if (activeView === 'all' && (stageFilter || search.trim())) {
-    // show — scope is narrowed by filter or search
-  } else {
-    return null;
-  }
-
-  // Compute flat-level expansion for On Hold
+  // Compute flat-level expansion for On Hold (hook must be before any early return)
   // Find all flats that have at least one selected activity, then gather ALL activities of those flats
   const holdSummary = useMemo(() => {
     // 1. Find affected flats (floor+flat_number combos)
@@ -105,6 +96,10 @@ export default function BulkUpdateBar({
       alreadyOnHold: allFlatActivities.length - completedIds.length - holdableIds.length,
     };
   }, [selectedIds, allActivities]);
+
+  // Show bulk bar for floor view always; for "all" view only when scope is narrowed
+  const visible = activeView === 'floor' || (activeView === 'all' && !!(stageFilter || search.trim()));
+  if (!visible) return null;
 
   async function handleBulkAction(newStatus: 'in_progress' | 'completed') {
     const result = await bulkUpdateStatus(
