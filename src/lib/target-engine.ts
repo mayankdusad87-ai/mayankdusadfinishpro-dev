@@ -31,7 +31,7 @@ export interface TargetRow {
   title: string;
 }
 
-/** Activity-level status counts for a target's scope */
+/** Flat-level status counts for a target's scope */
 export interface StatusBreakdown {
   notStarted: number;
   inProgress: number;
@@ -45,7 +45,7 @@ export interface TargetScopeData {
   completedFlats: number;      // flats where ALL activities are completed
   lastCompletionDate: string | null;  // latest actual_end across completed activities
   delayReasons: { reason: string; count: number }[];  // top 3 reasons
-  statusBreakdown: StatusBreakdown;  // activity-level status counts
+  statusBreakdown: StatusBreakdown;  // flat-level status counts
 }
 
 /** Computed result for one target */
@@ -64,7 +64,7 @@ export interface TargetAchievementResult {
   daysRemaining: number;       // negative = overdue
   daysLate: number | null;     // only for 'delayed' status: how many days late
   delayReasons: { reason: string; count: number }[];
-  statusBreakdown: StatusBreakdown;  // activity-level status counts
+  statusBreakdown: StatusBreakdown;  // flat-level status counts
 }
 
 /** Summary across all targets for a project */
@@ -250,38 +250,37 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
     return { totalFlats: 0, completedFlats: 0, lastCompletionDate: null, delayReasons: [], statusBreakdown: { notStarted: 0, inProgress: 0, completed: 0, onHold: 0 } };
   }
 
-  // Count activity-level status breakdown
-  const statusBreakdown: StatusBreakdown = { notStarted: 0, inProgress: 0, completed: 0, onHold: 0 };
-  for (const row of rows) {
-    const s = row.status;
-    if (s === 'completed' || s === 'completed_delayed') statusBreakdown.completed++;
-    else if (s === 'in_progress') statusBreakdown.inProgress++;
-    else if (s === 'on_hold') statusBreakdown.onHold++;
-    else statusBreakdown.notStarted++;  // not_started, yet_to_start, etc.
-  }
-
-  // Group by flat key
-  const flatMap = new Map<string, { total: number; completed: number; latestEnd: string | null }>();
+  // Group by flat key — track per-flat activity statuses
+  const flatMap = new Map<string, {
+    total: number;
+    completed: number;
+    inProgress: number;
+    onHold: number;
+    latestEnd: string | null;
+  }>();
 
   for (const row of rows) {
     const key = `${row.floor}-${row.flat_number}`;
     let entry = flatMap.get(key);
     if (!entry) {
-      entry = { total: 0, completed: 0, latestEnd: null };
+      entry = { total: 0, completed: 0, inProgress: 0, onHold: 0, latestEnd: null };
       flatMap.set(key, entry);
     }
 
     entry.total++;
 
-    const isComplete = row.status === 'completed' || row.status === 'completed_delayed';
-    if (isComplete) {
+    const s = row.status;
+    if (s === 'completed' || s === 'completed_delayed') {
       entry.completed++;
-      // Track latest completion date
       if (row.actual_end) {
         if (!entry.latestEnd || row.actual_end > entry.latestEnd) {
           entry.latestEnd = row.actual_end;
         }
       }
+    } else if (s === 'in_progress') {
+      entry.inProgress++;
+    } else if (s === 'on_hold') {
+      entry.onHold++;
     }
   }
 
@@ -289,16 +288,30 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
   let completedFlats = 0;
   let lastCompletionDate: string | null = null;
 
+  // Flat-level status breakdown
+  const statusBreakdown: StatusBreakdown = { notStarted: 0, inProgress: 0, completed: 0, onHold: 0 };
+
   for (const entry of flatMap.values()) {
     totalFlats++;
-    // A flat is complete only when ALL activities are completed
+
     if (entry.completed === entry.total) {
+      // ALL activities completed → flat is "completed"
       completedFlats++;
+      statusBreakdown.completed++;
       if (entry.latestEnd) {
         if (!lastCompletionDate || entry.latestEnd > lastCompletionDate) {
           lastCompletionDate = entry.latestEnd;
         }
       }
+    } else if (entry.onHold > 0) {
+      // ANY activity on hold → flat is "on hold"
+      statusBreakdown.onHold++;
+    } else if (entry.inProgress > 0) {
+      // ANY activity in progress → flat is "in progress"
+      statusBreakdown.inProgress++;
+    } else {
+      // All remaining activities are not started
+      statusBreakdown.notStarted++;
     }
   }
 

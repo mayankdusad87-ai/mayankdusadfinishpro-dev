@@ -206,10 +206,11 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
 
 // ---- Target card sub-component ----
 
-/** Build a concise status breakdown string, e.g. "38 not started · 4 in progress" */
+/** Build a concise flat-level breakdown string, e.g. "5 flats not started · 2 in progress" */
 function formatStatusBreakdown(sb: StatusBreakdown): string {
   const parts: string[] = [];
-  if (sb.notStarted > 0) parts.push(`${sb.notStarted} not started`);
+  const f = (n: number) => n === 1 ? 'flat' : 'flats';
+  if (sb.notStarted > 0) parts.push(`${sb.notStarted} ${f(sb.notStarted)} not started`);
   if (sb.inProgress > 0) parts.push(`${sb.inProgress} in progress`);
   if (sb.onHold > 0) parts.push(`${sb.onHold} on hold`);
   return parts.join(' · ');
@@ -225,10 +226,10 @@ function getWhyMessage(t: TargetAchievementResult): string | null {
     return `Work not started on any flat`;
   }
   if (sb.inProgress > 0 && sb.completed === 0) {
-    return `${sb.inProgress} activities in progress but no completions yet`;
+    return `${sb.inProgress} ${sb.inProgress === 1 ? 'flat' : 'flats'} in progress but no completions yet`;
   }
   if (sb.onHold > 0) {
-    return `${sb.onHold} ${sb.onHold === 1 ? 'activity' : 'activities'} on hold — blocking progress`;
+    return `${sb.onHold} ${sb.onHold === 1 ? 'flat' : 'flats'} on hold — blocking progress`;
   }
   return null;
 }
@@ -303,13 +304,13 @@ function TargetCard({ target: t }: { target: TargetAchievementResult }) {
           )}
         </div>
 
-        {/* Activity status breakdown (one-liner) */}
+        {/* Flat-level status breakdown (one-liner) */}
         {breakdownText && t.status !== 'achieved' && (
           <div className="flex items-center gap-1.5 mt-1.5 text-xs text-gray-500">
             {t.statusBreakdown.notStarted > 0 && (
               <span className="inline-flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                {t.statusBreakdown.notStarted} not started
+                {t.statusBreakdown.notStarted} {t.statusBreakdown.notStarted === 1 ? 'flat' : 'flats'} not started
               </span>
             )}
             {t.statusBreakdown.inProgress > 0 && (
