@@ -1,9 +1,18 @@
 -- =============================================================
 -- Fix: Add ON DELETE CASCADE to tables that reference projects
--- but were created after the initial schema without CASCADE.
+-- but were created after the initial schema without CASCADE,
+-- and fix the supervisor_assignment_history trigger conflict.
 -- Run this in Supabase SQL Editor (Dashboard > SQL Editor > New Query)
 -- Date: 2026-08-25
 -- =============================================================
+
+-- 0. supervisor_assignment_history — the trigger on supervisor_assignments
+--    fires an INSERT into this table during CASCADE delete, which fails
+--    because the project row is already gone. Change to CASCADE.
+ALTER TABLE supervisor_assignment_history
+  DROP CONSTRAINT IF EXISTS supervisor_assignment_history_project_id_fkey,
+  ADD CONSTRAINT supervisor_assignment_history_project_id_fkey
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
 
 -- 1. project_milestones (targets)
 ALTER TABLE project_milestones
