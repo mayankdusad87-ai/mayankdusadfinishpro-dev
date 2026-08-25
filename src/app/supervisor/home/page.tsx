@@ -984,6 +984,7 @@ export default function SupervisorHomePage() {
       {allowBulk && <BulkUpdateBar
         activeView={activeView}
         stageFilter={stageFilter}
+        search={search}
         bulkMode={bulkMode}
         selectedIds={selectedIds}
         allActivities={allActivities}

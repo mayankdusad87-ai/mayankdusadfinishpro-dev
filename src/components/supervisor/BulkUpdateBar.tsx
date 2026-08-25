@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { UploadedActivity } from '@/lib/project-data-store';
 import { bulkUpdateStatus } from '@/services/activity-service';
 import { normalizeStatus, PriorityView } from './supervisor-utils';
@@ -9,6 +9,7 @@ import type { Reason } from '@/lib/supabase-data';
 interface BulkUpdateBarProps {
   activeView: PriorityView;
   stageFilter: string;
+  search: string;
   bulkMode: boolean;
   selectedIds: Set<string>;
   allActivities: UploadedActivity[];
@@ -23,6 +24,7 @@ interface BulkUpdateBarProps {
 export default function BulkUpdateBar({
   activeView,
   stageFilter,
+  search,
   bulkMode,
   selectedIds,
   allActivities,
@@ -38,7 +40,71 @@ export default function BulkUpdateBar({
   const [selectedReason, setSelectedReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (activeView !== 'floor' && !(activeView === 'all' && stageFilter)) return null;
+  // Show bulk bar for floor view always; for "all" view only when scope is narrowed
+  if (activeView === 'floor') {
+    // always show
+  } else if (activeView === 'all' && (stageFilter || search.trim())) {
+    // show — scope is narrowed by filter or search
+  } else {
+    return null;
+  }
+
+  // Compute flat-level expansion for On Hold
+  // Find all flats that have at least one selected activity, then gather ALL activities of those flats
+  const holdSummary = useMemo(() => {
+    // 1. Find affected flats (floor+flat_number combos)
+    const affectedFlats = new Set<string>();
+    for (const id of selectedIds) {
+      const act = allActivities.find(a => a.id === id);
+      if (act) affectedFlats.add(`${act.floor}|${act.flat_number}`);
+    }
+
+    // 2. Gather all activities for those flats
+    const allFlatActivities = allActivities.filter(a =>
+      affectedFlats.has(`${a.floor}|${a.flat_number}`)
+    );
+
+    // 3. Categorize
+    const completedIds: string[] = [];
+    const inProgressIds: string[] = [];
+    const holdableIds: string[] = [];
+
+    for (const a of allFlatActivities) {
+      const status = normalizeStatus(a.status);
+      if (status === 'completed') {
+        completedIds.push(a.id);
+      } else if (status === 'in_progress') {
+        inProgressIds.push(a.id);
+        holdableIds.push(a.id);
+      } else if (status !== 'on_hold') {
+        // not_started, delayed — holdable
+        holdableIds.push(a.id);
+      }
+      // already on_hold — skip (no change needed)
+    }
+
+    // 4. Unique flat labels for display
+    const flatLabels = [...affectedFlats]
+      .map(key => {
+        const [floor, flat] = key.split('|');
+        return `Flat ${flat}`;
+      })
+      .sort();
+
+    // Unique floor count
+    const floors = new Set([...affectedFlats].map(k => k.split('|')[0]));
+
+    return {
+      affectedFlats: affectedFlats.size,
+      floorCount: floors.size,
+      flatLabels,
+      completedCount: completedIds.length,
+      inProgressCount: inProgressIds.length,
+      holdableCount: holdableIds.length,
+      holdableIds,
+      alreadyOnHold: allFlatActivities.length - completedIds.length - holdableIds.length,
+    };
+  }, [selectedIds, allActivities]);
 
   async function handleBulkAction(newStatus: 'in_progress' | 'completed') {
     const result = await bulkUpdateStatus(
@@ -68,11 +134,11 @@ export default function BulkUpdateBar({
   }
 
   async function handleBulkHold() {
-    if (!selectedReason) return;
+    if (!selectedReason || holdSummary.holdableCount === 0) return;
     setSubmitting(true);
 
-    const result = await bulkUpdateStatus(
-      [...selectedIds],
+    await bulkUpdateStatus(
+      holdSummary.holdableIds,
       allActivities.map(a => ({
         id: a.id,
         status: a.status,
@@ -93,14 +159,7 @@ export default function BulkUpdateBar({
     setShowHoldPicker(false);
     setSelectedReason('');
 
-    if (result.skippedNoPhoto && result.skippedNoPhoto > 0) {
-      const msg = `${result.skippedNoPhoto} skipped — no photos uploaded yet`;
-      setToast(msg);
-      setTimeout(() => setToast(null), 4000);
-    }
-
-    const count = selectedIds.size;
-    setToast(`${count} activit${count === 1 ? 'y' : 'ies'} put on hold`);
+    setToast(`${holdSummary.holdableCount} activit${holdSummary.holdableCount === 1 ? 'y' : 'ies'} put on hold`);
     setTimeout(() => setToast(null), 3000);
 
     onBulkComplete();
@@ -127,7 +186,7 @@ export default function BulkUpdateBar({
                 <div>
                   <h3 className="text-base font-semibold text-gray-900">Put On Hold</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {selectedIds.size} activit{selectedIds.size === 1 ? 'y' : 'ies'} selected
+                    {holdSummary.affectedFlats} flat{holdSummary.affectedFlats !== 1 ? 's' : ''} across {holdSummary.floorCount} floor{holdSummary.floorCount !== 1 ? 's' : ''}
                   </p>
                 </div>
                 <button
@@ -139,6 +198,31 @@ export default function BulkUpdateBar({
                   </svg>
                 </button>
               </div>
+            </div>
+
+            {/* Impact summary */}
+            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 space-y-1.5">
+              {holdSummary.inProgressCount > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-amber-600 font-semibold">⚠️ {holdSummary.inProgressCount} in progress</span>
+                  <span className="text-gray-500">will be paused</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-orange-600 font-medium">{holdSummary.holdableCount} activit{holdSummary.holdableCount !== 1 ? 'ies' : 'y'}</span>
+                <span className="text-gray-500">will be put on hold</span>
+              </div>
+              {holdSummary.completedCount > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-green-600 font-medium">{holdSummary.completedCount} completed</span>
+                  <span className="text-gray-500">unchanged</span>
+                </div>
+              )}
+              {holdSummary.alreadyOnHold > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-500">{holdSummary.alreadyOnHold} already on hold</span>
+                </div>
+              )}
             </div>
 
             {/* Reason list */}
@@ -171,7 +255,7 @@ export default function BulkUpdateBar({
               </button>
               <button
                 onClick={handleBulkHold}
-                disabled={!selectedReason || submitting}
+                disabled={!selectedReason || submitting || holdSummary.holdableCount === 0}
                 className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitting ? (
