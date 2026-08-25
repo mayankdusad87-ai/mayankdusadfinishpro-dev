@@ -43,6 +43,12 @@ export const CHANGELOG: ChangelogEntry[] = [
         description: 'Every Monday at 7 AM, active management users receive a project snapshot — monthly target pace with progress bars, executive summary, and current blockers. One email per project.',
         roles: ['management'],
       },
+      {
+        emoji: '🏠',
+        title: 'Flat-Level Target Breakdown',
+        description: 'Target Achievement now shows flat-level status counts (e.g. "7 flats not started") instead of individual activity counts — clearer at a glance.',
+        roles: ['admin', 'management'],
+      },
     ],
   },
   {
