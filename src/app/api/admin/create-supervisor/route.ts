@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
   }
   const { email, password, fullName, phone } = parsed.data;
 
+  // Try to create the auth user
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
@@ -29,6 +30,22 @@ export async function POST(req: NextRequest) {
   });
 
   if (error) {
+    // If user already exists, look them up and return their ID
+    // so the frontend can assign them to the new project
+    if (error.message?.toLowerCase().includes('already') || error.status === 422) {
+      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+      const existing = existingUsers?.users?.find(
+        (u) => u.email?.toLowerCase() === email.toLowerCase()
+      );
+      if (existing) {
+        // Update profile in case name/phone changed
+        await supabaseAdmin
+          .from('profiles')
+          .update({ phone, full_name: fullName })
+          .eq('id', existing.id);
+        return NextResponse.json({ userId: existing.id, existing: true });
+      }
+    }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 

@@ -98,9 +98,17 @@ export default function ProjectList() {
 
   async function handleDelete(p: ManagedProject) {
     if (!confirm(`Delete project "${p.name}"? This will also remove any uploaded template data.`)) return;
-    await deleteProjectFromSupabase(p.id);
-    await loadProjects();
-    await refreshProjects();
+    try {
+      await deleteProjectFromSupabase(p.id);
+      await loadProjects();
+      await refreshProjects();
+    } catch (err) {
+      const e = err as { message?: string; details?: string; code?: string };
+      const msg = e?.code === '23503'
+        ? `Cannot delete "${p.name}" — it has linked data (targets, stores, etc.). Remove those first.`
+        : (e?.message || e?.details || 'Failed to delete project');
+      alert(msg);
+    }
   }
 
   async function openRefugeSettings(p: ManagedProject) {

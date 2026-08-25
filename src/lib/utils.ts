@@ -7,7 +7,9 @@ export function todayISO(): string {
 
 export function formatDate(d: string | null): string {
   if (!d) return '';
-  return d.slice(0, 10);
+  const iso = d.slice(0, 10); // YYYY-MM-DD
+  const [y, m, day] = iso.split('-');
+  return `${day}/${m}/${y}`;
 }
 
 export function formatTimestamp(iso: string): { date: string; time: string } {
