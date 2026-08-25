@@ -33,6 +33,25 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.25b',
+    headline: 'Audit Log Search & Date Fix',
+    date: 'August 25, 2026',
+    features: [
+      {
+        emoji: '🔍',
+        title: 'Audit Log Search',
+        description: 'Search the audit log by supervisor name, activity, floor, flat, or status — find any change instantly.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📅',
+        title: 'Date Filter Fix',
+        description: 'Date filters in the audit log now correctly match your local timezone — no more missing entries near midnight.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.25',
     headline: 'Tablet Optimization & Target Insights',
     date: 'August 25, 2026',
