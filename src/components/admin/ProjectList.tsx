@@ -103,8 +103,9 @@ export default function ProjectList() {
       await loadProjects();
       await refreshProjects();
     } catch (err) {
-      const e = err as { message?: string; details?: string; code?: string; hint?: string };
-      alert(`[${e?.code}] ${e?.message}\n${e?.details}\n${e?.hint}`);
+      const e = err as { message?: string; details?: string; code?: string };
+      const msg = e?.message || e?.details || 'Failed to delete project';
+      alert(msg);
     }
   }
 

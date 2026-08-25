@@ -8,11 +8,10 @@
 
 -- 0. supervisor_assignment_history — the trigger on supervisor_assignments
 --    fires an INSERT into this table during CASCADE delete, which fails
---    because the project row is already gone. Change to CASCADE.
+--    because the project row is already gone. Drop the FK entirely —
+--    it's a log table, referential integrity is not needed.
 ALTER TABLE supervisor_assignment_history
-  DROP CONSTRAINT IF EXISTS supervisor_assignment_history_project_id_fkey,
-  ADD CONSTRAINT supervisor_assignment_history_project_id_fkey
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+  DROP CONSTRAINT IF EXISTS supervisor_assignment_history_project_id_fkey;
 
 -- 1. project_milestones (targets)
 ALTER TABLE project_milestones
