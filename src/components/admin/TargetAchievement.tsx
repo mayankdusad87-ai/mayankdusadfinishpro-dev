@@ -7,6 +7,7 @@ import {
   type TargetAchievementResult,
   type TargetSummary,
   type TargetStatus,
+  type StatusBreakdown,
 } from '@/lib/target-engine';
 
 interface Props {
@@ -205,6 +206,33 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
 
 // ---- Target card sub-component ----
 
+/** Build a concise status breakdown string, e.g. "38 not started · 4 in progress" */
+function formatStatusBreakdown(sb: StatusBreakdown): string {
+  const parts: string[] = [];
+  if (sb.notStarted > 0) parts.push(`${sb.notStarted} not started`);
+  if (sb.inProgress > 0) parts.push(`${sb.inProgress} in progress`);
+  if (sb.onHold > 0) parts.push(`${sb.onHold} on hold`);
+  return parts.join(' · ');
+}
+
+/** Smart "why" message for missed/at-risk targets without delay reasons */
+function getWhyMessage(t: TargetAchievementResult): string | null {
+  if (t.status !== 'missed' && t.status !== 'at_risk') return null;
+  if (t.delayReasons.length > 0) return null; // delay reasons table will show instead
+
+  const sb = t.statusBreakdown;
+  if (sb.notStarted > 0 && sb.inProgress === 0 && sb.completed === 0) {
+    return `Work not started on any flat`;
+  }
+  if (sb.inProgress > 0 && sb.completed === 0) {
+    return `${sb.inProgress} activities in progress but no completions yet`;
+  }
+  if (sb.onHold > 0) {
+    return `${sb.onHold} ${sb.onHold === 1 ? 'activity' : 'activities'} on hold — blocking progress`;
+  }
+  return null;
+}
+
 function TargetCard({ target: t }: { target: TargetAchievementResult }) {
   const cfg = TARGET_STATUS_CONFIG[t.status];
   const floorLabel = formatFloorRange(t.floorFrom, t.floorTo);
@@ -234,6 +262,9 @@ function TargetCard({ target: t }: { target: TargetAchievementResult }) {
     timingText = `${t.daysRemaining} day${t.daysRemaining === 1 ? '' : 's'} left — pace slow`;
     timingColor = 'text-orange-600';
   }
+
+  const breakdownText = formatStatusBreakdown(t.statusBreakdown);
+  const whyMessage = getWhyMessage(t);
 
   return (
     <div className="px-5 py-4 flex gap-4 items-start hover:bg-gray-50/50 transition-colors">
@@ -272,6 +303,42 @@ function TargetCard({ target: t }: { target: TargetAchievementResult }) {
           )}
         </div>
 
+        {/* Activity status breakdown (one-liner) */}
+        {breakdownText && t.status !== 'achieved' && (
+          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-gray-500">
+            {t.statusBreakdown.notStarted > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                {t.statusBreakdown.notStarted} not started
+              </span>
+            )}
+            {t.statusBreakdown.inProgress > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <span className="text-gray-300">·</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                {t.statusBreakdown.inProgress} in progress
+              </span>
+            )}
+            {t.statusBreakdown.onHold > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <span className="text-gray-300">·</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                {t.statusBreakdown.onHold} on hold
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Smart "why" one-liner for missed/at-risk without delay reasons */}
+        {whyMessage && (
+          <div className="flex items-center gap-1.5 mt-2 text-xs">
+            <svg className="w-3.5 h-3.5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            </svg>
+            <span className="text-red-600 font-medium">{whyMessage}</span>
+          </div>
+        )}
+
         {/* Delay reasons table (for missed/at_risk/delayed) */}
         {t.delayReasons.length > 0 && (t.status === 'missed' || t.status === 'at_risk' || t.status === 'delayed') && (
           <div className="mt-2.5 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
@@ -292,6 +359,22 @@ function TargetCard({ target: t }: { target: TargetAchievementResult }) {
               </tbody>
             </table>
           </div>
+        )}
+
+        {/* "See blockers" link for missed targets — scrolls to Fix This section */}
+        {t.status === 'missed' && (
+          <button
+            onClick={() => {
+              const fixThis = document.getElementById('fix-this-section');
+              if (fixThis) fixThis.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#C8922A] hover:text-[#b07e22] transition-colors"
+          >
+            See blockers
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5" />
+            </svg>
+          </button>
         )}
 
         {/* Notes */}

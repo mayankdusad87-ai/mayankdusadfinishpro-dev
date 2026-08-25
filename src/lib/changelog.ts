@@ -33,6 +33,25 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.25',
+    headline: 'Tablet Optimization & Target Insights',
+    date: 'August 25, 2026',
+    features: [
+      {
+        emoji: '📱',
+        title: 'Samsung Galaxy Tab Optimization',
+        description: 'Supervisor app is now optimized for Samsung Galaxy Tab S10 FE 5G — wider layout, 3-column cards in landscape, larger touch targets, and better-spaced filters on tablet screens.',
+        roles: ['supervisor'],
+      },
+      {
+        emoji: '📊',
+        title: 'Target Achievement Insights',
+        description: 'Missed or at-risk targets now show activity status breakdowns (not started, in progress, on hold) and a smart explanation of why the target is behind — plus a quick link to the Fix This section for details.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.24',
     headline: 'Smart Excel Re-upload',
     date: 'August 24, 2026',

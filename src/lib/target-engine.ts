@@ -31,12 +31,21 @@ export interface TargetRow {
   title: string;
 }
 
+/** Activity-level status counts for a target's scope */
+export interface StatusBreakdown {
+  notStarted: number;
+  inProgress: number;
+  completed: number;
+  onHold: number;
+}
+
 /** Aggregated flat-level data for a single target's scope */
 export interface TargetScopeData {
   totalFlats: number;          // distinct (floor, flat_number) combos
   completedFlats: number;      // flats where ALL activities are completed
   lastCompletionDate: string | null;  // latest actual_end across completed activities
   delayReasons: { reason: string; count: number }[];  // top 3 reasons
+  statusBreakdown: StatusBreakdown;  // activity-level status counts
 }
 
 /** Computed result for one target */
@@ -55,6 +64,7 @@ export interface TargetAchievementResult {
   daysRemaining: number;       // negative = overdue
   daysLate: number | null;     // only for 'delayed' status: how many days late
   delayReasons: { reason: string; count: number }[];
+  statusBreakdown: StatusBreakdown;  // activity-level status counts
 }
 
 /** Summary across all targets for a project */
@@ -85,7 +95,7 @@ export function computeTargetStatus(
   const targetDate = stripTime(new Date(target.target_date));
   const daysRemaining = diffDays(today, targetDate);
 
-  const { totalFlats, completedFlats, lastCompletionDate, delayReasons } = scope;
+  const { totalFlats, completedFlats, lastCompletionDate, delayReasons, statusBreakdown } = scope;
 
   // Guard: no flats in scope → 0%
   const progressPct = totalFlats > 0
@@ -137,6 +147,7 @@ export function computeTargetStatus(
     daysRemaining,
     daysLate,
     delayReasons,
+    statusBreakdown,
   };
 }
 
@@ -236,7 +247,17 @@ export interface RawActivityRow {
  */
 export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
   if (rows.length === 0) {
-    return { totalFlats: 0, completedFlats: 0, lastCompletionDate: null, delayReasons: [] };
+    return { totalFlats: 0, completedFlats: 0, lastCompletionDate: null, delayReasons: [], statusBreakdown: { notStarted: 0, inProgress: 0, completed: 0, onHold: 0 } };
+  }
+
+  // Count activity-level status breakdown
+  const statusBreakdown: StatusBreakdown = { notStarted: 0, inProgress: 0, completed: 0, onHold: 0 };
+  for (const row of rows) {
+    const s = row.status;
+    if (s === 'completed' || s === 'completed_delayed') statusBreakdown.completed++;
+    else if (s === 'in_progress') statusBreakdown.inProgress++;
+    else if (s === 'on_hold') statusBreakdown.onHold++;
+    else statusBreakdown.notStarted++;  // not_started, yet_to_start, etc.
   }
 
   // Group by flat key
@@ -300,7 +321,7 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
     .sort((a, b) => b.count - a.count)
     .slice(0, 3);
 
-  return { totalFlats, completedFlats, lastCompletionDate, delayReasons };
+  return { totalFlats, completedFlats, lastCompletionDate, delayReasons, statusBreakdown };
 }
 
 // ---- Helpers ----

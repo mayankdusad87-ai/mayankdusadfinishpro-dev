@@ -379,7 +379,7 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
       )}
 
       {/* ---- SECTION 3: FIX THIS ---- */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div id="fix-this-section" className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 md:px-6 py-3.5 bg-gradient-to-r from-[#162032] to-[#1e2d45] flex items-center justify-between">
           <h3 className="text-sm md:text-base font-bold text-white">Fix This</h3>
           {bottlenecks.length > 0 ? (
