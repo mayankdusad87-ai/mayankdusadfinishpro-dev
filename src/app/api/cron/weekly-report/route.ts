@@ -43,16 +43,26 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // 1. Fetch active management users
-    const { data: mgmtUsers } = await supabaseAdmin
-      .from('profiles')
-      .select('email')
-      .eq('role', 'management')
-      .eq('is_active', true);
+    // Test override: ?to=email@example.com sends only to that address
+    const testEmail = req.nextUrl.searchParams.get('to');
 
-    const mgmtEmails = (mgmtUsers || [])
-      .map(u => u.email)
-      .filter((e): e is string => !!e);
+    // 1. Fetch active management users (or use test override)
+    let mgmtEmails: string[];
+
+    if (testEmail) {
+      mgmtEmails = [testEmail];
+      console.log(`[cron/weekly-report] TEST MODE: sending to ${testEmail} only`);
+    } else {
+      const { data: mgmtUsers } = await supabaseAdmin
+        .from('profiles')
+        .select('email')
+        .eq('role', 'management')
+        .eq('is_active', true);
+
+      mgmtEmails = (mgmtUsers || [])
+        .map(u => u.email)
+        .filter((e): e is string => !!e);
+    }
 
     if (mgmtEmails.length === 0) {
       return NextResponse.json({ message: 'No active management users', sent: 0 });
