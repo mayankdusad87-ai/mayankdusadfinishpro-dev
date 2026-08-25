@@ -44,10 +44,13 @@ export async function getAuditLog(
     .order('created_at', { ascending: false });
 
   if (filters?.startDate) {
-    projectQuery = projectQuery.gte('created_at', `${filters.startDate}T00:00:00`);
+    // Convert local date to UTC so the filter matches the user's calendar day
+    const utcStart = new Date(`${filters.startDate}T00:00:00`).toISOString();
+    projectQuery = projectQuery.gte('created_at', utcStart);
   }
   if (filters?.endDate) {
-    projectQuery = projectQuery.lte('created_at', `${filters.endDate}T23:59:59`);
+    const utcEnd = new Date(`${filters.endDate}T23:59:59`).toISOString();
+    projectQuery = projectQuery.lte('created_at', utcEnd);
   }
 
   const { data: projectData, error: projectError } = await projectQuery.limit(500);
@@ -61,10 +64,12 @@ export async function getAuditLog(
     .order('created_at', { ascending: false });
 
   if (filters?.startDate) {
-    authQuery = authQuery.gte('created_at', `${filters.startDate}T00:00:00`);
+    const utcStart = new Date(`${filters.startDate}T00:00:00`).toISOString();
+    authQuery = authQuery.gte('created_at', utcStart);
   }
   if (filters?.endDate) {
-    authQuery = authQuery.lte('created_at', `${filters.endDate}T23:59:59`);
+    const utcEnd = new Date(`${filters.endDate}T23:59:59`).toISOString();
+    authQuery = authQuery.lte('created_at', utcEnd);
   }
 
   const { data: authData } = await authQuery.limit(100);
