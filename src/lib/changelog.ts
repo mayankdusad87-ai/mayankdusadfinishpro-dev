@@ -49,6 +49,12 @@ export const CHANGELOG: ChangelogEntry[] = [
         description: 'Missed or at-risk targets now show activity status breakdowns (not started, in progress, on hold) and a smart explanation of why the target is behind — plus a quick link to the Fix This section for details.',
         roles: ['admin', 'management'],
       },
+      {
+        emoji: '🔧',
+        title: 'Fix This — Smarter Blockers',
+        description: 'Blockers are now grouped by problem (stage + vendor) instead of individual floors — 22 floor cards become 3 actionable issue cards. Each card shows affected floors, flats impacted, and auto-links to the relevant target with status and deadline.',
+        roles: ['admin', 'management'],
+      },
     ],
   },
   {
