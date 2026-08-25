@@ -990,6 +990,7 @@ export default function SupervisorHomePage() {
         allFloorGrouped={allFloorGrouped}
         projectId={selectedProjectId}
         userId={user?.id || ''}
+        reasons={reasons}
         onToggleBulkMode={() => { setBulkMode(!bulkMode); setSelectedIds(new Set()); }}
         onBulkComplete={() => { setBulkMode(false); setSelectedIds(new Set()); setRefreshKey(k => k + 1); }}
       />}

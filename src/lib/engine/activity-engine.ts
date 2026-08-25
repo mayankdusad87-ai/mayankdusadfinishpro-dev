@@ -135,13 +135,16 @@ export function computeSupervisorUpdate(input: {
 export function computeBulkUpdate(
   currentStatus: string,
   currentActualStart: string | null,
-  newStatus: 'in_progress' | 'completed'
+  newStatus: 'in_progress' | 'completed' | 'on_hold',
+  delayReason?: string,
 ): ActivityUpdate {
   const today = todayISO();
   const updates: ActivityUpdate = { status: newStatus };
 
   if (newStatus === 'in_progress') {
     updates.actual_start = today;
+  } else if (newStatus === 'on_hold') {
+    updates.delay_reason = delayReason || null;
   } else {
     updates.actual_end = today;
     if (!currentActualStart) updates.actual_start = today;

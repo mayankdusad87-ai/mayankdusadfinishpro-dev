@@ -219,9 +219,10 @@ export async function saveActivityDetail(input: SupervisorSaveInput): Promise<St
 export async function bulkUpdateStatus(
   activityIds: string[],
   allActivities: Array<{ id: string; status: string; actual_start: string | null; floor: number; flat_number: number; stage: string; stage_gate: string; activity: string }>,
-  newStatus: 'in_progress' | 'completed',
+  newStatus: 'in_progress' | 'completed' | 'on_hold',
   projectId: string,
   userId: string,
+  delayReason?: string,
 ): Promise<{ error: string | null; skippedNoPhoto?: number }> {
   let skippedNoPhoto = 0;
 
@@ -238,7 +239,7 @@ export async function bulkUpdateStatus(
       }
     }
 
-    const updates = computeBulkUpdate(row.status, row.actual_start, newStatus);
+    const updates = computeBulkUpdate(row.status, row.actual_start, newStatus, delayReason);
 
     await updateActivityWithAudit(id, updates, {
       projectId,
