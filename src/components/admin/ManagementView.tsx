@@ -253,8 +253,8 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
   useEffect(() => {
     if (!projectId) return;
     fetch(`/api/targets/achievement?projectId=${projectId}`)
-      .then(r => r.ok ? r.json() : { results: [] })
-      .then(d => setTargetResults(d.results || []))
+      .then(r => r.ok ? r.json() : { targets: [] })
+      .then(d => setTargetResults(d.targets || []))
       .catch(() => {});
   }, [projectId]);
 
