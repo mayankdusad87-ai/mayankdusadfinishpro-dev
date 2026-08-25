@@ -103,10 +103,8 @@ export default function ProjectList() {
       await loadProjects();
       await refreshProjects();
     } catch (err) {
-      const e = err as { message?: string; details?: string; code?: string };
-      const msg = e?.code === '23503'
-        ? `Cannot delete "${p.name}" — it has linked data (targets, stores, etc.). Remove those first.`
-        : (e?.message || e?.details || 'Failed to delete project');
+      const e = err as { message?: string; details?: string; code?: string; hint?: string };
+      const msg = `Delete failed [${e?.code || 'unknown'}]: ${e?.message || 'No message'}\nDetails: ${e?.details || 'none'}\nHint: ${e?.hint || 'none'}`;
       alert(msg);
     }
   }
