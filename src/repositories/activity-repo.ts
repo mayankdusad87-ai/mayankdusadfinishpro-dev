@@ -349,21 +349,6 @@ export async function mergeActivitiesToSupabase(
     const key = activityKey(act);
     const existingRow = existingMap.get(key);
 
-    // DEBUG: trace flat 201 Fire Pipe Installation
-    if (act.flat_number === 201 && act.activity.includes('Fire Pipe')) {
-      console.log('[MERGE-DEBUG] Flat 201 Fire Pipe:', {
-        excelKey: key,
-        foundInDB: !!existingRow,
-        dbId: existingRow?.id ?? 'N/A',
-        excelStatus: act.status,
-        excelActualStart: act.actual_start,
-        dbStatus: existingRow?.status ?? 'N/A',
-        dbActualStart: existingRow?.actual_start ?? 'N/A',
-        hasPhotos: existingRow ? photosSet.has(existingRow.id) : false,
-        touched: existingRow ? isTouchedBySupvisor(existingRow, photosSet.has(existingRow.id)) : 'N/A',
-        mode,
-      });
-    }
 
     // Template fields — safe to update even on protected rows
     const templateFields: ActivityUpdate = {
