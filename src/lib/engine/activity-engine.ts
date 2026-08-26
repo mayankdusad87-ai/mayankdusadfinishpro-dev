@@ -69,8 +69,11 @@ export function computeStatusUpdate(input: StatusChangeInput): StatusChangeResul
 
   const updates: ActivityUpdate = { status: resolved };
 
-  if (input.userStatus === 'not_started') {
-    // Reversal — clear actual dates and delay reason
+  // Only clear dates/reason on actual reversals (e.g. in_progress → not_started)
+  const isReversalToNotStarted = input.userStatus === 'not_started' &&
+    input.oldStatus !== 'not_started' && input.oldStatus !== 'delayed';
+
+  if (isReversalToNotStarted) {
     updates.actual_start = null;
     updates.actual_end = null;
     updates.delay_reason = null;
@@ -105,8 +108,12 @@ export function computeSupervisorUpdate(input: {
   let actualStart = input.actualStart;
   let actualEnd = input.actualEnd;
 
-  if (input.status === 'not_started') {
-    // Reversal — clear actual dates and delay reason
+  // Only clear dates/reason on actual reversals (e.g. in_progress → not_started),
+  // NOT when the status was already not_started (user just adding delay reason).
+  const isReversalToNotStarted = input.status === 'not_started' &&
+    input.oldStatus !== 'not_started' && input.oldStatus !== 'delayed';
+
+  if (isReversalToNotStarted) {
     actualStart = '';
     actualEnd = '';
   } else if (input.status === 'completed') {
@@ -120,8 +127,8 @@ export function computeSupervisorUpdate(input: {
     status: resolved,
     actual_start: actualStart || null,
     actual_end: actualEnd || null,
-    delay_reason: input.status === 'not_started' ? null : reasonValue,
-    remarks: input.status === 'not_started' ? '' : (input.delayReasonIsOther ? input.remarks.trim() : ''),
+    delay_reason: isReversalToNotStarted ? null : (reasonValue || null),
+    remarks: isReversalToNotStarted ? '' : (input.delayReasonIsOther ? input.remarks.trim() : ''),
   };
 
   return {

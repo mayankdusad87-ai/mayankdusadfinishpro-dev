@@ -630,13 +630,16 @@ export async function updateActivityWithAudit(
   const { error } = await supabase.from('activities').update(updates).eq('id', activityId);
   if (error) return { error: friendlyError(error.message, 'update activity status', actCtx) };
 
-  if (auditInfo.oldStatus && auditInfo.newStatus && auditInfo.oldStatus !== auditInfo.newStatus) {
+  const statusChanged = auditInfo.oldStatus && auditInfo.newStatus && auditInfo.oldStatus !== auditInfo.newStatus;
+  const delayReasonSet = updates.delay_reason !== undefined && updates.delay_reason !== null && updates.delay_reason !== '';
+
+  if (statusChanged || delayReasonSet) {
     await supabase.from('audit_log').insert({
       activity_id: activityId,
       project_id: auditInfo.projectId,
       changed_by: auditInfo.changedBy || null,
-      old_status: auditInfo.oldStatus,
-      new_status: auditInfo.newStatus,
+      old_status: auditInfo.oldStatus || null,
+      new_status: auditInfo.newStatus || auditInfo.oldStatus || null,
       floor: auditInfo.floor,
       flat_number: auditInfo.flatNumber,
       stage: auditInfo.stage,

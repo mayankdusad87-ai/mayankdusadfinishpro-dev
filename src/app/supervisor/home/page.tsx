@@ -379,7 +379,7 @@ export default function SupervisorHomePage() {
 
     // overdue_capture: save delay_reason to DB immediately, then open detail sheet
     const updates: ActivityUpdate = { delay_reason: reason };
-    await updateActivityWithAudit(row.id, updates, {
+    const result = await updateActivityWithAudit(row.id, updates, {
       projectId: selectedProjectId,
       changedBy: user?.id || '',
       oldStatus: row.status,
@@ -392,6 +392,12 @@ export default function SupervisorHomePage() {
     });
     setDelayPromptRow(null);
     setDelayPromptMode('overdue_capture');
+    if (result.error) {
+      showActionToast('Failed to save delay reason');
+      setPendingDetailRow(null);
+      return;
+    }
+    showActionToast('Delay reason saved ✓');
     // Open detail sheet with updated row
     if (pendingDetailRow) {
       setSelectedDetail({ ...pendingDetailRow, delay_reason: reason });
