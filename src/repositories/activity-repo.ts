@@ -449,16 +449,26 @@ export async function mergeActivitiesToSupabase(
     if (error) throw error;
   }
 
-  // 5. Execute updates individually (each row may have different fields)
-  // Batch by grouping rows with the same field set for efficiency
-  for (let i = 0; i < toUpdate.length; i += CHUNK) {
-    const chunk = toUpdate.slice(i, i + CHUNK);
-    const updatePromises = chunk.map(({ id, data }) =>
-      supabase.from('activities').update(data).eq('id', id)
-    );
-    const results = await Promise.all(updatePromises);
-    const failed = results.find(r => r.error);
-    if (failed?.error) throw failed.error;
+  // 5. Execute updates via upsert for bulk efficiency
+  // Each row includes id + all fields being updated. Upsert on id conflict
+  // sends one request per 500-row chunk instead of one per row (~18x fewer requests).
+  const upsertRows: ActivityInsert[] = toUpdate.map(({ id, data }) => ({
+    id,
+    // Required Insert fields — always present in both templateFields and supervisorFields
+    activity: (data.activity ?? '') as string,
+    floor: (data.floor ?? 0) as number,
+    flat_number: (data.flat_number ?? 0) as number,
+    project_id: projectId,
+    stage: (data.stage ?? '') as string,
+    // Spread remaining update fields
+    ...data,
+  }));
+  for (let i = 0; i < upsertRows.length; i += CHUNK) {
+    const chunk = upsertRows.slice(i, i + CHUNK);
+    const { error } = await supabase
+      .from('activities')
+      .upsert(chunk, { onConflict: 'id' });
+    if (error) throw error;
   }
 
   // Orphaned rows (in DB but not in Excel) are deliberately kept — no deletion
