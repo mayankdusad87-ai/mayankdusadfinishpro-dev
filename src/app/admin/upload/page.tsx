@@ -33,6 +33,7 @@ export default function UploadPage() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [uploadMode, setUploadMode] = useState<UploadMode>('smart_merge');
   const [showProtectedDetails, setShowProtectedDetails] = useState(false);
+  const [summaryFailed, setSummaryFailed] = useState(false);
   const isReupload = !!projectData; // true when existing data exists
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function UploadPage() {
     setPage(0);
     setMergeSummary(null);
     setUploadMode('smart_merge');
+    setSummaryFailed(false);
 
     if (!currentProject) return;
     getProjectDataFromSupabase(currentProject.id).then(existing => {
@@ -70,6 +72,7 @@ export default function UploadPage() {
     setMergeSummary(null);
     setUploadMode('smart_merge');
     setShowProtectedDetails(false);
+    setSummaryFailed(false);
 
     try {
       const buffer = await file.arrayBuffer();
@@ -85,9 +88,11 @@ export default function UploadPage() {
         try {
           const summary = await getUploadMergeSummary(currentProject.id, data.activities);
           setMergeSummary(summary);
+          setSummaryFailed(false);
         } catch {
-          // If summary fails, fall back to simple upload
+          // Summary failed — flag it so the UI shows a warning
           setMergeSummary(null);
+          setSummaryFailed(true);
         } finally {
           setLoadingSummary(false);
         }
@@ -106,11 +111,26 @@ export default function UploadPage() {
 
     // Determine the mode:
     // - First upload (no existing data) → delete_all (simple insert)
-    // - Re-upload → user-chosen mode (smart_merge, force_overwrite, or delete_all)
-    const mode: UploadMode = isReupload ? uploadMode : 'delete_all';
+    // - Re-upload with merge summary → user-chosen mode
+    // - Re-upload without merge summary (failed) → delete_all with extra warning
+    const mode: UploadMode = isReupload
+      ? (summaryFailed ? 'delete_all' : uploadMode)
+      : 'delete_all';
+
+    // If merge summary failed during re-upload, warn the user before proceeding
+    if (isReupload && summaryFailed) {
+      const modifiedCount = projectData ? countModifiedActivities(projectData.activities) : 0;
+      const msg = modifiedCount > 0
+        ? `⚠️ IMPACT ANALYSIS UNAVAILABLE\n\nCould not compare with existing data. This will delete ALL ${projectData?.totalRows.toLocaleString()} existing activities (including ${modifiedCount} with supervisor updates) and replace with the new upload.\n\nAll supervisor work will be lost. Continue?`
+        : `⚠️ IMPACT ANALYSIS UNAVAILABLE\n\nCould not compare with existing data. This will delete all existing activities and replace with the new upload.\n\nContinue?`;
+      if (!confirm(msg)) {
+        setUploading(false);
+        return;
+      }
+    }
 
     // Extra confirmation for destructive modes during re-upload
-    if (isReupload && mode === 'delete_all') {
+    if (isReupload && !summaryFailed && mode === 'delete_all') {
       const modifiedCount = projectData ? countModifiedActivities(projectData.activities) : 0;
       const msg = modifiedCount > 0
         ? `⚠️ DELETE ALL & RE-UPLOAD\n\nThis will permanently delete ALL ${projectData?.totalRows.toLocaleString()} existing activities, including ${modifiedCount} that have been updated by supervisors (status changes, actual dates, photos).\n\nAll supervisor work will be lost. This cannot be undone.\n\nContinue?`
@@ -121,7 +141,7 @@ export default function UploadPage() {
       }
     }
 
-    if (isReupload && mode === 'force_overwrite') {
+    if (isReupload && !summaryFailed && mode === 'force_overwrite') {
       const protectedCount = mergeSummary?.protectedRows || 0;
       if (protectedCount > 0) {
         const msg = `⚠️ FORCE OVERWRITE\n\nThis will overwrite ${protectedCount} activities that have been updated by supervisors. Their status changes, actual dates, and remarks will be replaced with data from the Excel file.\n\nPhotos will NOT be deleted, but their associated activity data will be reset.\n\nContinue?`;
@@ -542,8 +562,24 @@ export default function UploadPage() {
                     </div>
                   </div>
                 </>
+              ) : summaryFailed ? (
+                /* Merge summary failed — warn the user */
+                <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                  <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                  <div className="flex-1">
+                    <span className="text-sm font-semibold text-red-800">Impact Analysis Failed</span>
+                    <span className="text-xs text-red-700 block mt-0.5">
+                      Could not compare with existing data. Smart Merge and Force Overwrite are unavailable. Saving will <strong>delete all existing activities</strong> and replace them with the new upload.
+                    </span>
+                    <span className="text-xs text-red-600 block mt-1">
+                      ⚠️ Any supervisor work (status changes, actual dates, photos, remarks) will be lost.
+                    </span>
+                  </div>
+                </div>
               ) : (
-                /* No merge summary available — first upload or summary failed */
+                /* Still loading or no summary yet */
                 <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
                   <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
@@ -582,7 +618,7 @@ export default function UploadPage() {
               onClick={confirmSave}
               disabled={uploading || loadingSummary}
               className={`px-6 py-2.5 font-semibold rounded-lg text-sm transition-colors disabled:opacity-50 ${
-                uploadMode === 'delete_all' && isReupload
+                (summaryFailed || uploadMode === 'delete_all') && isReupload
                   ? 'bg-red-600 hover:bg-red-700 text-white'
                   : uploadMode === 'force_overwrite' && isReupload
                     ? 'bg-amber-600 hover:bg-amber-700 text-white'
@@ -591,11 +627,13 @@ export default function UploadPage() {
             >
               {uploading ? 'Saving...' : (
                 isReupload
-                  ? uploadMode === 'delete_all'
+                  ? summaryFailed
                     ? 'Delete All & Re-upload'
-                    : uploadMode === 'force_overwrite'
-                      ? 'Force Overwrite & Save'
-                      : 'Smart Merge & Save'
+                    : uploadMode === 'delete_all'
+                      ? 'Delete All & Re-upload'
+                      : uploadMode === 'force_overwrite'
+                        ? 'Force Overwrite & Save'
+                        : 'Smart Merge & Save'
                   : 'Confirm & Save'
               )}
             </button>
