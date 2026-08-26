@@ -11,8 +11,8 @@ import { computeManagement, computeOperations } from '@/lib/insights-data';
 import { getFloorHandovers } from '@/repositories/handover-repo';
 import type { FloorHandover } from '@/repositories/handover-repo';
 import { getInsightsSettings } from '@/repositories/settings-repo';
-import { getSupervisorActivity, getRecentReversals, getSiteActivity } from '@/repositories/audit-repo';
-import type { SupervisorPulse, RecentReversal, SiteActivityEntry } from '@/repositories/audit-repo';
+import { getSupervisorActivity, getRecentReversals } from '@/repositories/audit-repo';
+import type { SupervisorPulse, RecentReversal } from '@/repositories/audit-repo';
 import { getUnitStores } from '@/repositories/store-repo';
 import type { UnitStore } from '@/repositories/store-repo';
 import type { ManagementData, OperationsData } from '@/lib/insights-data';
@@ -43,7 +43,6 @@ export default function InsightsPage() {
   const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null);
   const [supervisors, setSupervisors] = useState<SupervisorPulse[]>([]);
   const [reversals, setReversals] = useState<RecentReversal[]>([]);
-  const [siteActivity, setSiteActivity] = useState<SiteActivityEntry[]>([]);
   const [unitStores, setUnitStores] = useState<UnitStore[]>([]);
   const [activityRows, setActivityRows] = useState<InsightRow[]>([]);
   const [stageList, setStageList] = useState<string[]>([]);
@@ -91,7 +90,7 @@ export default function InsightsPage() {
   const loadData = useCallback(async () => {
     if (!currentProject) {
       setMgmt(null); setOps(null); setHeatmapData(null);
-      setSupervisors([]); setReversals([]); setSiteActivity([]);
+      setSupervisors([]); setReversals([]);
       setActivityRows([]); setStageList([]);
       setLoading(false);
       opsLoadedForProject.current = null;
@@ -157,7 +156,7 @@ export default function InsightsPage() {
       // Only clear state if we don't have cached data showing
       if (!cached) {
         setMgmt(null); setOps(null); setHeatmapData(null);
-        setSupervisors([]); setReversals([]); setSiteActivity([]); setUnitStores([]);
+        setSupervisors([]); setReversals([]); setUnitStores([]);
         setActivityRows([]); setStageList([]);
       }
     }
@@ -170,15 +169,13 @@ export default function InsightsPage() {
     setOpsLoading(true);
     try {
       const pid = currentProject.id;
-      const [supActivity, recentReversals, siteAct] = await Promise.all([
+      const [supActivity, recentReversals] = await Promise.all([
         getSupervisorActivity(pid),
         getRecentReversals(pid),
-        getSiteActivity(pid),
       ]);
 
       setSupervisors(supActivity);
       setReversals(recentReversals);
-      setSiteActivity(siteAct);
 
       // Compute operations insights from the already-loaded activity rows
       if (activityRows.length > 0) {
@@ -207,7 +204,6 @@ export default function InsightsPage() {
     setHeatmapData(null);
     setSupervisors([]);
     setReversals([]);
-    setSiteActivity([]);
     loadData();
   }, [loadData]);
 
@@ -349,7 +345,7 @@ export default function InsightsPage() {
               </div>
             </div>
           ) : ops ? (
-            <OperationsView data={ops} supervisors={supervisors} reversals={reversals} siteActivity={siteActivity} />
+            <OperationsView data={ops} supervisors={supervisors} reversals={reversals} activityRows={activityRows} />
           ) : null)}
         </>
       )}

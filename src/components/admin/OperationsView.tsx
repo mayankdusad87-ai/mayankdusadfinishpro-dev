@@ -2,8 +2,8 @@
 
 import { memo, useState, useMemo } from 'react';
 import type { OperationsData, ActionItem, InProgressDetail } from '@/lib/insights-data';
-import type { SupervisorPulse, RecentReversal, SiteActivityEntry } from '@/repositories/audit-repo';
-import { STATUS_RANK } from '@/lib/constants';
+import type { SupervisorPulse, RecentReversal } from '@/repositories/audit-repo';
+import type { InsightRow } from '@/repositories/activity-repo';
 
 // ---- Types ----
 
@@ -14,11 +14,9 @@ interface FloorActivityGroup {
     stage: string;
     started: number[];
     completed: number[];
-    reversed: number[];
   }[];
   startedCount: number;
   completedCount: number;
-  reversedCount: number;
 }
 
 interface InProgressFloorGroup {
@@ -34,7 +32,7 @@ interface InProgressFloorGroup {
 type TimeRange = 'today' | 'week' | 'month';
 type ExpandedTile = 'started' | 'completed' | 'inProgress' | null;
 
-// ---- Helpers ----
+// ---- Helpers (actual_start / actual_end based) ----
 
 function todayDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -52,57 +50,47 @@ function firstOfMonth(): string {
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
 }
 
-function isStartTransition(oldStatus: string, newStatus: string): boolean {
-  const oldRank = STATUS_RANK[oldStatus] ?? 0;
-  const newRank = STATUS_RANK[newStatus] ?? 0;
-  return oldRank === 0 && newRank >= 1;
+function sinceDate(range: TimeRange): string {
+  if (range === 'today') return todayDate();
+  if (range === 'week') return mondayOfWeek();
+  return firstOfMonth();
 }
 
-function isCompleteTransition(_oldStatus: string, newStatus: string): boolean {
-  return newStatus === 'completed' || newStatus === 'completed_delayed';
+/** Get activities that started within the given range (actual_start >= since) */
+function getStartedInRange(rows: InsightRow[], range: TimeRange): InsightRow[] {
+  const since = sinceDate(range);
+  return rows.filter(r => r.actual_start && r.actual_start.slice(0, 10) >= since);
 }
 
-function isReversalTransition(oldStatus: string, newStatus: string): boolean {
-  const oldRank = STATUS_RANK[oldStatus] ?? 0;
-  const newRank = STATUS_RANK[newStatus] ?? 0;
-  if (oldRank === -1 || newRank === -1) return false;
-  return oldRank > newRank;
+/** Get activities that completed within the given range (actual_end >= since) */
+function getCompletedInRange(rows: InsightRow[], range: TimeRange): InsightRow[] {
+  const since = sinceDate(range);
+  return rows.filter(r => r.actual_end && r.actual_end.slice(0, 10) >= since);
 }
 
-function filterByRange(entries: SiteActivityEntry[], range: TimeRange): SiteActivityEntry[] {
-  let since: string;
-  if (range === 'today') since = todayDate();
-  else if (range === 'week') since = mondayOfWeek();
-  else since = firstOfMonth();
-  return entries.filter(e => e.createdAt.slice(0, 10) >= since);
-}
-
-function groupByFloor(entries: SiteActivityEntry[]): FloorActivityGroup[] {
+/** Group InsightRows into FloorActivityGroups for the Site Activity drill-down */
+function groupByFloor(started: InsightRow[], completed: InsightRow[]): FloorActivityGroup[] {
   const floorMap = new Map<number, Map<string, {
     activityName: string;
     stage: string;
     started: Set<number>;
     completed: Set<number>;
-    reversed: Set<number>;
   }>>();
 
-  for (const e of entries) {
-    if (!floorMap.has(e.floor)) floorMap.set(e.floor, new Map());
-    const actMap = floorMap.get(e.floor)!;
-    const key = `${e.stage}|${e.activityName}`;
-    if (!actMap.has(key)) {
-      actMap.set(key, { activityName: e.activityName, stage: e.stage, started: new Set(), completed: new Set(), reversed: new Set() });
-    }
-    const act = actMap.get(key)!;
-
-    if (isReversalTransition(e.oldStatus, e.newStatus)) {
-      act.reversed.add(e.flatNumber);
-    } else if (isCompleteTransition(e.oldStatus, e.newStatus)) {
-      act.completed.add(e.flatNumber);
-    } else if (isStartTransition(e.oldStatus, e.newStatus)) {
-      act.started.add(e.flatNumber);
+  function addToMap(rows: InsightRow[], bucket: 'started' | 'completed') {
+    for (const r of rows) {
+      if (!floorMap.has(r.floor)) floorMap.set(r.floor, new Map());
+      const actMap = floorMap.get(r.floor)!;
+      const key = `${r.stage}|${r.activity}`;
+      if (!actMap.has(key)) {
+        actMap.set(key, { activityName: r.activity, stage: r.stage, started: new Set(), completed: new Set() });
+      }
+      actMap.get(key)![bucket].add(r.flat_number);
     }
   }
+
+  addToMap(started, 'started');
+  addToMap(completed, 'completed');
 
   const groups: FloorActivityGroup[] = [];
   for (const [floor, actMap] of floorMap) {
@@ -111,8 +99,7 @@ function groupByFloor(entries: SiteActivityEntry[]): FloorActivityGroup[] {
       stage: a.stage,
       started: [...a.started].sort((x, y) => x - y),
       completed: [...a.completed].sort((x, y) => x - y),
-      reversed: [...a.reversed].sort((x, y) => x - y),
-    })).filter(a => a.started.length > 0 || a.completed.length > 0 || a.reversed.length > 0);
+    })).filter(a => a.started.length > 0 || a.completed.length > 0);
 
     if (activities.length === 0) continue;
 
@@ -121,7 +108,6 @@ function groupByFloor(entries: SiteActivityEntry[]): FloorActivityGroup[] {
       activities,
       startedCount: activities.reduce((s, a) => s + a.started.length, 0),
       completedCount: activities.reduce((s, a) => s + a.completed.length, 0),
-      reversedCount: activities.reduce((s, a) => s + a.reversed.length, 0),
     });
   }
 
@@ -159,20 +145,15 @@ function groupInProgressByFloor(details: InProgressDetail[]): InProgressFloorGro
   return groups.sort((a, b) => a.floor - b.floor);
 }
 
-/** Build subtitle like "Plumbing (F5), Tiling (F7)" from entries */
-function buildActivitySubtitle(
-  entries: SiteActivityEntry[],
-  filterFn: (e: SiteActivityEntry) => boolean,
-  maxItems = 3,
-): string {
-  const filtered = entries.filter(filterFn);
-  if (filtered.length === 0) return 'No activity';
+/** Build subtitle like "Plumbing (F5), Tiling (F7)" from InsightRows */
+function buildSubtitle(rows: InsightRow[], maxItems = 3): string {
+  if (rows.length === 0) return 'No activity';
 
   // Group by activity name → set of floors
   const actFloors = new Map<string, Set<number>>();
-  for (const e of filtered) {
-    if (!actFloors.has(e.activityName)) actFloors.set(e.activityName, new Set());
-    actFloors.get(e.activityName)!.add(e.floor);
+  for (const r of rows) {
+    if (!actFloors.has(r.activity)) actFloors.set(r.activity, new Set());
+    actFloors.get(r.activity)!.add(r.floor);
   }
 
   const items = [...actFloors.entries()].map(([name, floors]) => {
@@ -374,17 +355,10 @@ function FloorAccordion({ group }: { group: FloorActivityGroup }) {
                 {group.completedCount} completed
               </span>
             )}
-            {group.reversedCount > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold bg-red-50 text-red-700 border border-red-100">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                {group.reversedCount} reversed
-              </span>
-            )}
           </div>
           <div className="flex md:hidden items-center gap-1.5 text-[11px] font-semibold tabular-nums">
             {group.startedCount > 0 && <span className="text-blue-600">{group.startedCount}↗</span>}
             {group.completedCount > 0 && <span className="text-emerald-600">{group.completedCount}✓</span>}
-            {group.reversedCount > 0 && <span className="text-red-600">{group.reversedCount}↩</span>}
           </div>
           <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -420,15 +394,6 @@ function FloorAccordion({ group }: { group: FloorActivityGroup }) {
                     </div>
                   </div>
                 )}
-                {act.reversed.length > 0 && (
-                  <div className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
-                    <div>
-                      <span className="text-xs font-semibold text-red-700">Reversed: </span>
-                      <span className="text-xs text-gray-700">{act.reversed.map(f => `Flat ${f}`).join(', ')}</span>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           ))}
@@ -440,8 +405,8 @@ function FloorAccordion({ group }: { group: FloorActivityGroup }) {
 
 // ---- Drill-down content for KPI tiles ----
 
-/** Floor drill-down for Started / Completed tiles (from audit_log) */
-function AuditDrillDown({ floors, type }: { floors: FloorActivityGroup[]; type: 'started' | 'completed' }) {
+/** Floor drill-down for Started / Completed tiles (from actual dates) */
+function DateDrillDown({ floors, type }: { floors: FloorActivityGroup[]; type: 'started' | 'completed' }) {
   if (floors.length === 0) {
     return (
       <div className="text-center py-6">
@@ -569,56 +534,48 @@ interface Props {
   data: OperationsData;
   supervisors: SupervisorPulse[];
   reversals: RecentReversal[];
-  siteActivity: SiteActivityEntry[];
+  activityRows: InsightRow[];
 }
 
-function OperationsView({ data, supervisors, reversals, siteActivity }: Props) {
+function OperationsView({ data, supervisors, reversals, activityRows }: Props) {
   const { delayReasons, actionItems, kpi } = data;
   const maxReasonCount = delayReasons.length > 0 ? delayReasons[0].count : 1;
 
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
   const [expandedTile, setExpandedTile] = useState<ExpandedTile>(null);
 
-  // Filter site activity to today for KPI subtitles
-  const todayEntries = useMemo(() => filterByRange(siteActivity, 'today'), [siteActivity]);
+  // Activities started/completed today (for KPI tiles)
+  const startedToday = useMemo(() => getStartedInRange(activityRows, 'today'), [activityRows]);
+  const completedToday = useMemo(() => getCompletedInRange(activityRows, 'today'), [activityRows]);
 
-  // Filter + group entries by selected time range for Site Activity section
+  // Activities started/completed in selected time range (for Site Activity section)
   const { floors, startedTotal, completedTotal } = useMemo(() => {
-    const filtered = filterByRange(siteActivity, timeRange);
-    const grouped = groupByFloor(filtered);
+    const started = getStartedInRange(activityRows, timeRange);
+    const completed = getCompletedInRange(activityRows, timeRange);
+    const grouped = groupByFloor(started, completed);
     return {
       floors: grouped,
       startedTotal: grouped.reduce((s, g) => s + g.startedCount, 0),
       completedTotal: grouped.reduce((s, g) => s + g.completedCount, 0),
     };
-  }, [siteActivity, timeRange]);
+  }, [activityRows, timeRange]);
 
-  // Grouped floors for Started Today drill-down (audit-based, today only)
-  const startedTodayFloors = useMemo(() => {
-    const todayFiltered = filterByRange(siteActivity, 'today');
-    return groupByFloor(todayFiltered.filter(e => isStartTransition(e.oldStatus, e.newStatus)));
-  }, [siteActivity]);
+  // Grouped floors for Started Today drill-down
+  const startedTodayFloors = useMemo(() => groupByFloor(startedToday, []), [startedToday]);
 
   // Grouped floors for Completed Today drill-down
-  const completedTodayFloors = useMemo(() => {
-    const todayFiltered = filterByRange(siteActivity, 'today');
-    return groupByFloor(todayFiltered.filter(e => isCompleteTransition(e.oldStatus, e.newStatus)));
-  }, [siteActivity]);
+  const completedTodayFloors = useMemo(() => groupByFloor([], completedToday), [completedToday]);
 
   // In progress floor groups
   const inProgressGroups = useMemo(() => groupInProgressByFloor(kpi.inProgressDetails), [kpi.inProgressDetails]);
 
-  // KPI counts for today
-  const startedTodayCount = useMemo(() => {
-    return todayEntries.filter(e => isStartTransition(e.oldStatus, e.newStatus)).length;
-  }, [todayEntries]);
-  const completedTodayCount = useMemo(() => {
-    return todayEntries.filter(e => isCompleteTransition(e.oldStatus, e.newStatus)).length;
-  }, [todayEntries]);
+  // KPI counts
+  const startedTodayCount = startedToday.length;
+  const completedTodayCount = completedToday.length;
 
   // Subtitles
-  const startedSubtitle = buildActivitySubtitle(todayEntries, e => isStartTransition(e.oldStatus, e.newStatus));
-  const completedSubtitle = buildActivitySubtitle(todayEntries, e => isCompleteTransition(e.oldStatus, e.newStatus));
+  const startedSubtitle = buildSubtitle(startedToday);
+  const completedSubtitle = buildSubtitle(completedToday);
   const inProgressSubtitle = buildInProgressSubtitle(kpi.inProgressDetails);
 
   function toggleTile(tile: ExpandedTile) {
@@ -641,7 +598,7 @@ function OperationsView({ data, supervisors, reversals, siteActivity }: Props) {
           isExpanded={expandedTile === 'started'}
           onToggle={() => toggleTile('started')}
         >
-          <AuditDrillDown floors={startedTodayFloors} type="started" />
+          <DateDrillDown floors={startedTodayFloors} type="started" />
         </KpiTile>
 
         <KpiTile
@@ -655,7 +612,7 @@ function OperationsView({ data, supervisors, reversals, siteActivity }: Props) {
           isExpanded={expandedTile === 'completed'}
           onToggle={() => toggleTile('completed')}
         >
-          <AuditDrillDown floors={completedTodayFloors} type="completed" />
+          <DateDrillDown floors={completedTodayFloors} type="completed" />
         </KpiTile>
 
         <KpiTile
