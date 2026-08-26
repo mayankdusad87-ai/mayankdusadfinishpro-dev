@@ -33,6 +33,25 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.26',
+    headline: 'Faster Re-upload & Safety Warnings',
+    date: 'August 26, 2026',
+    features: [
+      {
+        emoji: '⚡',
+        title: 'Faster Template Re-upload',
+        description: 'Smart Merge now completes in seconds instead of 30+ seconds — updates are batched instead of sent one-by-one.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '🛡️',
+        title: 'Re-upload Safety Warning',
+        description: 'If impact analysis fails during re-upload, a clear red warning now shows instead of silently deleting data. You\'ll see exactly how many supervisor-modified activities are at risk before proceeding.',
+        roles: ['admin'],
+      },
+    ],
+  },
+  {
     version: '2026.08.25c',
     headline: 'Weekly Report & Audit Improvements',
     date: 'August 25, 2026',
