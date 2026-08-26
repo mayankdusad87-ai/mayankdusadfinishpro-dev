@@ -33,10 +33,22 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '2026.08.26',
-    headline: 'Faster Re-upload & Safety Warnings',
+    version: '2026.08.26b',
+    headline: 'Accurate Site Activity & Faster Re-upload',
     date: 'August 26, 2026',
     features: [
+      {
+        emoji: '📊',
+        title: 'Accurate Site Activity',
+        description: 'Site Activity (Insights → Operations) now uses actual start/end dates instead of audit log entries. No more false "272 started today" after an Excel re-upload — only real supervisor activity counts.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '🕐',
+        title: 'Timezone-Safe Date Filters',
+        description: 'Today / This Week / This Month filters now use local IST dates instead of UTC — no more off-by-one errors near midnight. Future dates from Excel are also excluded.',
+        roles: ['admin', 'management'],
+      },
       {
         emoji: '⚡',
         title: 'Faster Template Re-upload',
