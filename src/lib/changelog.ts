@@ -49,6 +49,12 @@ export const CHANGELOG: ChangelogEntry[] = [
         description: 'Target Achievement now shows flat-level status counts (e.g. "7 flats not started") instead of individual activity counts — clearer at a glance.',
         roles: ['admin', 'management'],
       },
+      {
+        emoji: '🔧',
+        title: 'Delay Reason Fix',
+        description: 'Delay reasons entered by supervisors for overdue not-started activities are now saved correctly and recorded in the audit log.',
+        roles: ['admin'],
+      },
     ],
   },
   {
