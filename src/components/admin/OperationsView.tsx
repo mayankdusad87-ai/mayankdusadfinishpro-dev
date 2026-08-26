@@ -34,20 +34,26 @@ type ExpandedTile = 'started' | 'completed' | 'inProgress' | null;
 
 // ---- Helpers (actual_start / actual_end based) ----
 
+/** Local YYYY-MM-DD (avoids UTC shift that .toISOString() causes in IST) */
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function todayDate(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateStr(new Date());
 }
 
 function mondayOfWeek(): string {
   const d = new Date();
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(d.setDate(diff)).toISOString().slice(0, 10);
+  d.setDate(diff);
+  return localDateStr(d);
 }
 
 function firstOfMonth(): string {
   const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
 function sinceDate(range: TimeRange): string {
@@ -56,16 +62,26 @@ function sinceDate(range: TimeRange): string {
   return firstOfMonth();
 }
 
-/** Get activities that started within the given range (actual_start >= since) */
+/** Get activities that started within the given range (since <= actual_start <= today) */
 function getStartedInRange(rows: InsightRow[], range: TimeRange): InsightRow[] {
   const since = sinceDate(range);
-  return rows.filter(r => r.actual_start && r.actual_start.slice(0, 10) >= since);
+  const today = todayDate();
+  return rows.filter(r => {
+    if (!r.actual_start) return false;
+    const d = r.actual_start.slice(0, 10);
+    return d >= since && d <= today;
+  });
 }
 
-/** Get activities that completed within the given range (actual_end >= since) */
+/** Get activities that completed within the given range (since <= actual_end <= today) */
 function getCompletedInRange(rows: InsightRow[], range: TimeRange): InsightRow[] {
   const since = sinceDate(range);
-  return rows.filter(r => r.actual_end && r.actual_end.slice(0, 10) >= since);
+  const today = todayDate();
+  return rows.filter(r => {
+    if (!r.actual_end) return false;
+    const d = r.actual_end.slice(0, 10);
+    return d >= since && d <= today;
+  });
 }
 
 /** Group InsightRows into FloorActivityGroups for the Site Activity drill-down */
