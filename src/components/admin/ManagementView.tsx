@@ -6,8 +6,9 @@ import type { UnitStore } from '@/repositories/store-repo';
 import type { FloorHandover } from '@/repositories/handover-repo';
 import MaterialStores from '@/components/admin/MaterialStores';
 import TargetAchievement from '@/components/admin/TargetAchievement';
-import { TARGET_STATUS_CONFIG, formatFloorRange } from '@/lib/target-engine';
-import type { TargetAchievementResult } from '@/lib/target-engine';
+// Fix This section imports (hidden for now — re-enable when logic is refined)
+// import { TARGET_STATUS_CONFIG, formatFloorRange } from '@/lib/target-engine';
+// import type { TargetAchievementResult } from '@/lib/target-engine';
 
 interface Props {
   data: ManagementData;
@@ -23,7 +24,8 @@ function formatDate(d: string | null): string {
   return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const REASON_COLORS = ['#EF4444', '#3B82F6', '#F59E0B'];
+// Fix This section constant (hidden for now)
+// const REASON_COLORS = ['#EF4444', '#3B82F6', '#F59E0B'];
 
 function barColor(pct: number): string {
   if (pct >= 80) return '#10B981';
@@ -236,7 +238,7 @@ function DrilldownPanel({ stage, breakdowns, onClose, handoverMap }: { stage: st
 }
 
 function ManagementView({ data, projectName, projectId, stores = [], handovers = [] }: Props) {
-  const { pipeline, bottlenecks, stageFloorBreakdowns, sitePulse, pendingWork } = data;
+  const { pipeline, /* bottlenecks, */ stageFloorBreakdowns, sitePulse, pendingWork } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
 
   // Build handover lookup: floor → FloorHandover
@@ -248,68 +250,19 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
   const [expandedPulseStage, setExpandedPulseStage] = useState<string | null>(null);
   const [weeklyDrillOpen, setWeeklyDrillOpen] = useState(false);
 
-  // --- Fix This: fetch targets for linkage ---
-  const [targetResults, setTargetResults] = useState<TargetAchievementResult[]>([]);
-  useEffect(() => {
+  // --- Fix This: fetch targets for linkage (hidden for now) ---
+  // const [targetResults, setTargetResults] = useState<TargetAchievementResult[]>([]);
+  /* useEffect(() => {
     if (!projectId) return;
     fetch(`/api/targets/achievement?projectId=${projectId}`)
       .then(r => r.ok ? r.json() : { targets: [] })
       .then(d => setTargetResults(d.targets || []))
       .catch(() => {});
-  }, [projectId]);
+  }, [projectId]); */
 
-  // --- Fix This: group bottlenecks by stage + vendor ---
-  const blockerGroups = useMemo(() => {
-    const groupMap = new Map<string, {
-      stage: string;
-      vendor: string;
-      floors: number[];
-      totalFlatsAffected: number;
-      maxDaysBehind: number;
-      reasonMap: Map<string, number>;
-    }>();
-
-    for (const b of bottlenecks) {
-      const key = `${b.blockedStage}|||${b.blockedVendor}`;
-      let group = groupMap.get(key);
-      if (!group) {
-        group = { stage: b.blockedStage, vendor: b.blockedVendor, floors: [], totalFlatsAffected: 0, maxDaysBehind: 0, reasonMap: new Map() };
-        groupMap.set(key, group);
-      }
-      group.floors.push(b.floor);
-      group.totalFlatsAffected += b.totalFlatsAffected;
-      if (b.maxDaysBehind > group.maxDaysBehind) group.maxDaysBehind = b.maxDaysBehind;
-      for (const dr of b.delayReasons) {
-        group.reasonMap.set(dr.category, (group.reasonMap.get(dr.category) || 0) + dr.flatCount);
-      }
-    }
-
-    return [...groupMap.values()]
-      .map(g => ({
-        stage: g.stage, vendor: g.vendor,
-        floors: g.floors.sort((a, b) => a - b),
-        totalFlatsAffected: g.totalFlatsAffected,
-        maxDaysBehind: g.maxDaysBehind,
-        delayReasons: [...g.reasonMap.entries()]
-          .map(([category, flatCount]) => ({ category, flatCount }))
-          .sort((a, b) => b.flatCount - a.flatCount)
-          .slice(0, 3),
-      }))
-      .sort((a, b) => b.maxDaysBehind - a.maxDaysBehind);
-  }, [bottlenecks]);
-
-  // Match a blocker group to the most relevant target
-  const findTarget = (stage: string, floors: number[]): TargetAchievementResult | null => {
-    const matches = targetResults.filter(t => {
-      if (t.stage !== stage) return false;
-      return floors.some(f => f >= t.floorFrom && f <= t.floorTo);
-    });
-    if (matches.length === 0) return null;
-    // Prioritize worst status: missed > at_risk > delayed > on_track > achieved
-    const priority: Record<string, number> = { missed: 0, at_risk: 1, delayed: 2, on_track: 3, achieved: 4 };
-    matches.sort((a, b) => (priority[a.status] ?? 5) - (priority[b.status] ?? 5));
-    return matches[0];
-  };
+  // --- Fix This section logic (hidden for now — re-enable when logic is refined) ---
+  // const blockerGroups = useMemo(() => { ... }, [bottlenecks]);
+  // const findTarget = (stage, floors) => { ... };
 
   return (
     <div className="space-y-6">
@@ -443,121 +396,7 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
         </div>
       )}
 
-      {/* ---- SECTION 3: FIX THIS ---- */}
-      <div id="fix-this-section" className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-4 md:px-6 py-3.5 bg-gradient-to-r from-[#162032] to-[#1e2d45] flex items-center justify-between">
-          <h3 className="text-sm md:text-base font-bold text-white">Fix This</h3>
-          {blockerGroups.length > 0 ? (
-            <span className="text-xs font-bold bg-red-500/20 text-red-300 px-2.5 py-0.5 rounded-full">
-              {blockerGroups.length} {blockerGroups.length === 1 ? 'issue' : 'issues'} · {bottlenecks.length} floors
-            </span>
-          ) : (
-            <span className="text-xs font-bold bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full">
-              All clear
-            </span>
-          )}
-        </div>
-        <div className="p-4 md:p-6">
-
-        {blockerGroups.length === 0 ? (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
-            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-2">
-              <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <p className="text-sm text-emerald-700 font-medium">All floors progressing on schedule. No action items.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {blockerGroups.map(group => {
-              const target = findTarget(group.stage, group.floors);
-              const statusCfg = target ? TARGET_STATUS_CONFIG[target.status] : null;
-              return (
-                <div key={`${group.stage}-${group.vendor}`} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="h-[3px] bg-gradient-to-r from-red-500 to-red-400" />
-                  <div className="p-4 md:p-5">
-                    {/* Header: stage name + days behind */}
-                    <div className="flex items-baseline justify-between mb-1">
-                      <h4 className="text-base font-bold text-gray-900">{group.stage}</h4>
-                      <span className="text-xs font-bold text-red-600 bg-red-50 px-2.5 py-0.5 rounded-full tabular-nums">{group.maxDaysBehind}d behind</span>
-                    </div>
-
-                    {/* Vendor */}
-                    <div className="text-sm text-gray-600 mb-3">
-                      Vendor: <span className="font-semibold text-gray-900">{group.vendor || '—'}</span>
-                    </div>
-
-                    {/* Floors + flats summary */}
-                    <div className="flex items-center gap-2 text-xs mb-2">
-                      <span className="font-semibold text-red-600">{group.floors.length} {group.floors.length === 1 ? 'floor' : 'floors'}</span>
-                      <span className="text-gray-300">·</span>
-                      <span className="font-semibold text-red-600">{group.totalFlatsAffected} {group.totalFlatsAffected === 1 ? 'flat' : 'flats'} affected</span>
-                    </div>
-
-                    {/* Floor chips */}
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {group.floors.map(f => (
-                        <span key={f} className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 tabular-nums">
-                          F{f}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Target linkage (if matched) */}
-                    {target && statusCfg && (
-                      <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border mb-3 ${statusCfg.bg} ${statusCfg.border}`}>
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${statusCfg.dot}`} />
-                        <div className="flex-1 min-w-0 text-xs">
-                          <span className={`font-bold ${statusCfg.text}`}>{statusCfg.label}</span>
-                          <span className="text-gray-400 mx-1">·</span>
-                          <span className="text-gray-600">
-                            {formatFloorRange(target.floorFrom, target.floorTo)} by{' '}
-                            <span className="font-semibold">
-                              {new Date(target.targetDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                            </span>
-                          </span>
-                          <span className="text-gray-400 mx-1">·</span>
-                          <span className="font-semibold text-gray-700 tabular-nums">{target.progressPct}% done</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Delay reasons */}
-                    {group.delayReasons.length > 0 && (
-                      <div className="border-t border-gray-100 pt-2.5">
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Why it&apos;s stuck</div>
-                        <div className="space-y-2">
-                          {group.delayReasons.map((dr, i) => {
-                            const isNoReason = dr.category === 'No reason logged';
-                            const barPct = group.totalFlatsAffected > 0 ? Math.round((dr.flatCount / group.totalFlatsAffected) * 100) : 0;
-                            const dotColor = isNoReason ? '#9CA3AF' : REASON_COLORS[i % REASON_COLORS.length];
-                            return (
-                              <div key={dr.category}>
-                                <div className="flex justify-between items-center mb-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
-                                    <span className={`text-xs ${isNoReason ? 'text-gray-500 italic' : 'text-gray-700'}`}>{dr.category}</span>
-                                  </div>
-                                  <span className={`text-xs font-semibold ${isNoReason ? 'text-gray-500' : 'text-gray-900'}`}>{dr.flatCount} {dr.flatCount === 1 ? 'flat' : 'flats'}</span>
-                                </div>
-                                <div className="w-full h-1.5 bg-gray-100 rounded-full">
-                                  <div className="h-1.5 rounded-full transition-all" style={{ width: `${barPct}%`, backgroundColor: dotColor, opacity: isNoReason ? 0.5 : 0.7 }} />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        </div>
-      </div>
+      {/* ---- SECTION 3: FIX THIS (hidden for now — re-enable when logic is refined) ---- */}
 
       {/* ---- SECTION 4: SITE PULSE ---- */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
