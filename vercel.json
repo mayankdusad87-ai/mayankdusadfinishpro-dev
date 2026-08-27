@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/weekly-report",
-      "schedule": "30 1 * * 1"
+      "schedule": "30 1 * * 2"
     }
   ]
 }

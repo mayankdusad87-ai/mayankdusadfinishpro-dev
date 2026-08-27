@@ -26,7 +26,7 @@ const DASHBOARD_URL = 'https://finishpro-dev.vercel.app/login';
  *  - Monthly target pace with progress bars
  *  - Current blockers (delay reasons from non-completed activities)
  *
- * Protected by CRON_SECRET. Vercel Cron triggers every Monday 7 AM IST.
+ * Protected by CRON_SECRET. Vercel Cron triggers every Tuesday 7 AM IST.
  */
 export async function GET(req: NextRequest) {
   // ---- Auth ----
