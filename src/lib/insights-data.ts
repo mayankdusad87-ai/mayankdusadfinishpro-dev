@@ -1,5 +1,5 @@
 import type { HeatmapData } from './floor-rollup';
-import { todayISO } from '@/lib/utils';
+import { todayISO, normalizeToBaseStatus } from '@/lib/utils';
 import { getInsightActivities } from '@/repositories/activity-repo';
 import type { InsightRow } from '@/repositories/activity-repo';
 import { STAGE_WEIGHTS as DEFAULT_STAGE_WEIGHTS, PAINT_DAYS_PER_FLAT as DEFAULT_PAINT_DAYS } from '@/lib/constants';
@@ -178,6 +178,33 @@ export interface PendingStage {
   subStages: PendingSubStage[];
 }
 
+// ---- Active Blockers (delay reason analytics) ----
+
+export interface BlockerFloor {
+  floor: number;
+  flatCount: number;
+}
+
+export interface BlockerStage {
+  stage: string;
+  floors: BlockerFloor[];
+}
+
+export interface BlockerGroup {
+  reason: string;
+  type: 'delayed' | 'on_hold';
+  floorCount: number;
+  flatCount: number;
+  stages: BlockerStage[];
+}
+
+export interface ActiveBlockers {
+  delayed: BlockerGroup[];   // not_started + overdue — sorted by floorCount desc, "Reason not captured" last
+  onHold: BlockerGroup[];    // on_hold — sorted by floorCount desc, "Reason not captured" last
+  totalFloors: number;       // distinct floors across all blockers
+  totalActivities: number;   // raw activity count for header badge
+}
+
 export interface ManagementData {
   health: HealthVerdict;
   pipeline: PipelineStage[];
@@ -186,6 +213,7 @@ export interface ManagementData {
   stageFloorBreakdowns: Record<string, StageFloorBreakdown[]>;
   sitePulse: SitePulse;
   pendingWork: PendingStage[];
+  activeBlockers: ActiveBlockers;
 }
 
 export interface VendorScore {
@@ -452,6 +480,115 @@ function computePendingWork(rows: InsightRow[]): PendingStage[] {
   }
 
   return result;
+}
+
+// ---- Active Blockers computation ----
+
+const NO_REASON = 'Reason not captured';
+
+function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
+  const today = todayISO();
+
+  // Step 1: Filter to currently stuck activities
+  type StuckRow = { reason: string; type: 'delayed' | 'on_hold'; stage: string; floor: number; flat: number };
+  const stuck: StuckRow[] = [];
+
+  for (const r of rows) {
+    const base = normalizeToBaseStatus(r.status);
+
+    // Rule A + B: not_started + overdue
+    if (base === 'not_started' && r.expected_end && r.expected_end < today) {
+      stuck.push({
+        reason: r.delay_reason?.trim() || NO_REASON,
+        type: 'delayed',
+        stage: r.stage,
+        floor: r.floor,
+        flat: r.flat_number,
+      });
+    }
+    // Rule C + D: on_hold
+    else if (base === 'on_hold') {
+      stuck.push({
+        reason: r.delay_reason?.trim() || NO_REASON,
+        type: 'on_hold',
+        stage: r.stage,
+        floor: r.floor,
+        flat: r.flat_number,
+      });
+    }
+  }
+
+  if (stuck.length === 0) {
+    return { delayed: [], onHold: [], totalFloors: 0, totalActivities: 0 };
+  }
+
+  // Step 2: Group by type → reason → stage → floor
+  function aggregate(items: StuckRow[], type: 'delayed' | 'on_hold'): BlockerGroup[] {
+    // reason → stage → floor → Set<flat>
+    const reasonMap = new Map<string, Map<string, Map<number, Set<number>>>>();
+
+    for (const item of items) {
+      if (!reasonMap.has(item.reason)) reasonMap.set(item.reason, new Map());
+      const stageMap = reasonMap.get(item.reason)!;
+      if (!stageMap.has(item.stage)) stageMap.set(item.stage, new Map());
+      const floorMap = stageMap.get(item.stage)!;
+      if (!floorMap.has(item.floor)) floorMap.set(item.floor, new Set());
+      floorMap.get(item.floor)!.add(item.flat);
+    }
+
+    const groups: BlockerGroup[] = [];
+    for (const [reason, stageMap] of reasonMap) {
+      const allFloors = new Set<number>();
+      let totalFlats = 0;
+      const stages: BlockerStage[] = [];
+
+      for (const [stage, floorMap] of stageMap) {
+        const floors: BlockerFloor[] = [];
+        for (const [floor, flats] of floorMap) {
+          allFloors.add(floor);
+          totalFlats += flats.size;
+          floors.push({ floor, flatCount: flats.size });
+        }
+        floors.sort((a, b) => a.floor - b.floor);
+        stages.push({ stage, floors });
+      }
+      // Sort stages alphabetically
+      stages.sort((a, b) => a.stage.localeCompare(b.stage));
+
+      groups.push({
+        reason,
+        type,
+        floorCount: allFloors.size,
+        flatCount: totalFlats,
+        stages,
+      });
+    }
+
+    // Sort: by floorCount desc, but "Reason not captured" always last
+    groups.sort((a, b) => {
+      if (a.reason === NO_REASON && b.reason !== NO_REASON) return 1;
+      if (b.reason === NO_REASON && a.reason !== NO_REASON) return -1;
+      return b.floorCount - a.floorCount;
+    });
+
+    return groups;
+  }
+
+  const delayedItems = stuck.filter(s => s.type === 'delayed');
+  const onHoldItems = stuck.filter(s => s.type === 'on_hold');
+
+  const delayed = aggregate(delayedItems, 'delayed');
+  const onHold = aggregate(onHoldItems, 'on_hold');
+
+  const allFloors = new Set<number>();
+  for (const s of stuck) allFloors.add(s.floor);
+
+  return {
+    delayed,
+    onHold,
+    totalFloors: allFloors.size,
+    totalActivities: stuck.length,
+  };
 }
 
 // ---- Management ----
@@ -883,6 +1020,7 @@ export function computeManagement(
 
   // --- Pending work matrix ---
   const pendingWork = computePendingWork(rows);
+  const activeBlockers = computeActiveBlockers(rows);
 
   return {
     health,
@@ -892,6 +1030,7 @@ export function computeManagement(
     stageFloorBreakdowns,
     sitePulse,
     pendingWork,
+    activeBlockers,
   };
 }
 

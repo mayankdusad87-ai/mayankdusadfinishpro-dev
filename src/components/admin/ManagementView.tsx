@@ -5,6 +5,7 @@ import type { ManagementData, StageFloorBreakdown, FloorActivityDetail } from '@
 import type { UnitStore } from '@/repositories/store-repo';
 import type { FloorHandover } from '@/repositories/handover-repo';
 import MaterialStores from '@/components/admin/MaterialStores';
+import ActiveBlockers from '@/components/admin/ActiveBlockers';
 import TargetAchievement from '@/components/admin/TargetAchievement';
 // Fix This section imports (hidden for now — re-enable when logic is refined)
 // import { TARGET_STATUS_CONFIG, formatFloorRange } from '@/lib/target-engine';
@@ -238,7 +239,7 @@ function DrilldownPanel({ stage, breakdowns, onClose, handoverMap }: { stage: st
 }
 
 function ManagementView({ data, projectName, projectId, stores = [], handovers = [] }: Props) {
-  const { pipeline, /* bottlenecks, */ stageFloorBreakdowns, sitePulse, pendingWork } = data;
+  const { pipeline, /* bottlenecks, */ stageFloorBreakdowns, sitePulse, pendingWork, activeBlockers } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
 
   // Build handover lookup: floor → FloorHandover
@@ -634,8 +635,11 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
         </div>
       </div>
 
-      {/* ---- SECTION 5: MATERIAL STORES ---- */}
-      <MaterialStores stores={stores} />
+      {/* ---- SECTION 5: ACTIVE BLOCKERS ---- */}
+      <ActiveBlockers data={activeBlockers} />
+
+      {/* ---- SECTION 6: MATERIAL STORES (compact pills) ---- */}
+      <MaterialStores stores={stores} compact />
     </div>
   );
 }
