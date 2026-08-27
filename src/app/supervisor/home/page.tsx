@@ -52,6 +52,7 @@ export default function SupervisorHomePage() {
   // UI optimization states
   const [floorDisplayCount, setFloorDisplayCount] = useState(20);
   const [priorityDisplayCount, setPriorityDisplayCount] = useState(30);
+  const [showAcknowledged, setShowAcknowledged] = useState(false);
   const [savingActionId, setSavingActionId] = useState<string | null>(null);
   const [actionToast, setActionToast] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -687,7 +688,7 @@ export default function SupervisorHomePage() {
         {(activeView === 'overdue' || activeView === 'due_today' || activeView === 'starting_today') && (
           <div className="flex items-center justify-between">
             <div className="text-white text-sm font-semibold">
-              {activeView === 'overdue' && `Overdue Activities (${priorities.overdue.length})`}
+              {activeView === 'overdue' && `Overdue (${priorities.overdue.filter(r => !r.delay_reason).length} pending · ${priorities.overdue.filter(r => !!r.delay_reason).length} captured)`}
               {activeView === 'due_today' && `Due Today (${priorities.dueToday.length})`}
               {activeView === 'starting_today' && `Starting Today (${priorities.startingToday.length})`}
             </div>
@@ -707,26 +708,16 @@ export default function SupervisorHomePage() {
       {/* Content area */}
       <div ref={contentRef} className="flex-1 bg-gray-50 rounded-t-3xl px-4 md:px-6 pt-4 pb-24">
 
-        {/* Priority view content */}
-        {(activeView === 'overdue' || activeView === 'due_today' || activeView === 'starting_today') && (
+        {/* Priority view content — due_today / starting_today */}
+        {(activeView === 'due_today' || activeView === 'starting_today') && (
           <div className="space-y-3 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4 md:space-y-0">
             {getPriorityRows().length === 0 ? (
               <div className="text-center py-12 md:col-span-2 lg:col-span-3">
-                {activeView === 'overdue' ? (
-                  <svg className="w-12 h-12 text-green-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                  </svg>
-                ) : (
-                  <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
-                  </svg>
-                )}
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {activeView === 'overdue' ? 'No overdue activities!' : 'Nothing here'}
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  {activeView === 'overdue' ? 'All activities are on track.' : 'No activities match this category today.'}
-                </p>
+                <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+                </svg>
+                <h3 className="text-lg font-semibold text-gray-900">Nothing here</h3>
+                <p className="text-sm text-gray-500 mt-1">No activities match this category today.</p>
               </div>
             ) : (
               <>
@@ -751,6 +742,101 @@ export default function SupervisorHomePage() {
             )}
           </div>
         )}
+
+        {/* Overdue view — split into Needs Attention vs Reason Captured */}
+        {activeView === 'overdue' && (() => {
+          const needsAttention = priorities.overdue.filter(r => !r.delay_reason);
+          const acknowledged = priorities.overdue.filter(r => !!r.delay_reason);
+          const allClear = needsAttention.length === 0 && acknowledged.length === 0;
+
+          return (
+            <div className="space-y-4">
+              {allClear ? (
+                <div className="text-center py-12">
+                  <svg className="w-12 h-12 text-green-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                  <h3 className="text-lg font-semibold text-gray-900">No overdue activities!</h3>
+                  <p className="text-sm text-gray-500 mt-1">All activities are on track.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Needs Attention section */}
+                  {needsAttention.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 rounded-full bg-red-500" />
+                        <span className="text-sm font-semibold text-gray-900">Needs Attention ({needsAttention.length})</span>
+                      </div>
+                      <div className="space-y-3 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4 md:space-y-0">
+                        {needsAttention.slice(0, priorityDisplayCount).map(row => (
+                          <PriorityCard
+                            key={row.id}
+                            row={row}
+                            savingId={savingActionId}
+                            onDetail={() => openDetail(row)}
+                            onQuickAction={(action) => handleQuickAction(row, action)}
+                          />
+                        ))}
+                        {needsAttention.length > priorityDisplayCount && (
+                          <button
+                            onClick={() => setPriorityDisplayCount(c => c + 30)}
+                            className="w-full md:col-span-2 lg:col-span-3 py-3 text-sm font-semibold text-primary bg-primary/5 rounded-xl hover:bg-primary/10 transition-colors"
+                          >
+                            Load More ({needsAttention.length - priorityDisplayCount} remaining)
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reason Captured section — collapsed by default */}
+                  {acknowledged.length > 0 && (
+                    <div>
+                      <button
+                        onClick={() => setShowAcknowledged(!showAcknowledged)}
+                        className="w-full flex items-center justify-between bg-gray-100 rounded-xl px-4 py-3 text-left hover:bg-gray-150 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                          <span className="text-sm font-semibold text-gray-700">Reason Captured ({acknowledged.length})</span>
+                        </div>
+                        <svg className={`w-4 h-4 text-gray-400 transition-transform ${showAcknowledged ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                        </svg>
+                      </button>
+                      {showAcknowledged && (
+                        <div className="mt-3 space-y-3 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4 md:space-y-0">
+                          {acknowledged.map(row => (
+                            <PriorityCard
+                              key={row.id}
+                              row={row}
+                              savingId={savingActionId}
+                              onDetail={() => openDetail(row)}
+                              onQuickAction={(action) => handleQuickAction(row, action)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* When all overdue have reasons captured — show success message */}
+                  {needsAttention.length === 0 && acknowledged.length > 0 && (
+                    <div className="text-center py-6">
+                      <svg className="w-10 h-10 text-green-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                      <p className="text-sm font-medium text-gray-600">All delay reasons captured!</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
 
         {/* All floors view content */}
         {activeView === 'all' && (
