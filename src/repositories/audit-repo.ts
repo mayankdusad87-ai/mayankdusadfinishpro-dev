@@ -39,7 +39,7 @@ export async function getAuditLog(
   // Fetch project-specific entries
   let projectQuery = supabase
     .from('audit_log')
-    .select('id, activity_id, project_id, changed_by, old_status, new_status, floor, flat_number, stage, stage_gate, activity_name, created_at')
+    .select('id, activity_id, project_id, changed_by, old_status, new_status, floor, flat_number, stage, stage_gate, activity_name, delay_reason, created_at')
     .eq('project_id', projectId)
     .order('created_at', { ascending: false });
 
@@ -58,7 +58,7 @@ export async function getAuditLog(
   // Also fetch auth events (stage = 'auth', project_id is null)
   let authQuery = supabase
     .from('audit_log')
-    .select('id, activity_id, project_id, changed_by, old_status, new_status, floor, flat_number, stage, stage_gate, activity_name, created_at')
+    .select('id, activity_id, project_id, changed_by, old_status, new_status, floor, flat_number, stage, stage_gate, activity_name, delay_reason, created_at')
     .eq('stage', 'auth')
     .is('project_id', null)
     .order('created_at', { ascending: false });

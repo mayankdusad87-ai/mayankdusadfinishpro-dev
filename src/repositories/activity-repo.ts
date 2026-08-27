@@ -645,18 +645,28 @@ export async function updateActivityWithAudit(
   const delayReasonSet = updates.delay_reason !== undefined && updates.delay_reason !== null && updates.delay_reason !== '';
 
   if (statusChanged || delayReasonSet) {
-    await supabase.from('audit_log').insert({
-      activity_id: activityId,
-      project_id: auditInfo.projectId,
-      changed_by: auditInfo.changedBy || null,
-      old_status: auditInfo.oldStatus || null,
-      new_status: auditInfo.newStatus || auditInfo.oldStatus || null,
-      floor: auditInfo.floor,
-      flat_number: auditInfo.flatNumber,
-      stage: auditInfo.stage,
-      stage_gate: auditInfo.stageGate,
-      activity_name: auditInfo.activityName,
-    });
+    // Post via API to bypass RLS (supervisors can't insert directly into audit_log)
+    try {
+      await fetch('/api/audit-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          activity_id: activityId,
+          project_id: auditInfo.projectId,
+          changed_by: auditInfo.changedBy || null,
+          old_status: auditInfo.oldStatus || null,
+          new_status: auditInfo.newStatus || auditInfo.oldStatus || null,
+          floor: auditInfo.floor,
+          flat_number: auditInfo.flatNumber,
+          stage: auditInfo.stage,
+          stage_gate: auditInfo.stageGate,
+          activity_name: auditInfo.activityName,
+          delay_reason: updates.delay_reason || null,
+        }),
+      });
+    } catch {
+      // best-effort — don't fail the activity update if audit logging fails
+    }
   }
 
   return { error: null };

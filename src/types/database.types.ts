@@ -241,6 +241,7 @@ export type Database = {
           activity_name: string | null
           changed_by: string | null
           created_at: string | null
+          delay_reason: string | null
           flat_number: number | null
           floor: number | null
           id: string
@@ -255,6 +256,7 @@ export type Database = {
           activity_name?: string | null
           changed_by?: string | null
           created_at?: string | null
+          delay_reason?: string | null
           flat_number?: number | null
           floor?: number | null
           id?: string
@@ -269,6 +271,7 @@ export type Database = {
           activity_name?: string | null
           changed_by?: string | null
           created_at?: string | null
+          delay_reason?: string | null
           flat_number?: number | null
           floor?: number | null
           id?: string
