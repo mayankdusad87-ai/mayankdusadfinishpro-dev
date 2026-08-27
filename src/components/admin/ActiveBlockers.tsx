@@ -20,6 +20,7 @@ function BarSection({ title, icon, groups, barFillColor, barTrackColor, chipDotC
 }) {
   const [expandedReason, setExpandedReason] = useState<string | null>(null);
   const [showOthers, setShowOthers] = useState(false);
+  const [expandedChip, setExpandedChip] = useState<string | null>(null);
 
   if (groups.length === 0) return null;
 
@@ -107,16 +108,51 @@ function BarSection({ title, icon, groups, barFillColor, barTrackColor, chipDotC
             {chipsToShow.length} other {chipsToShow.length === 1 ? 'reason' : 'reasons'} (1 floor each)
           </button>
           {showOthers && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {chipsToShow.map(g => (
-                <span
-                  key={g.reason}
-                  className="inline-flex items-center gap-1.5 text-xs bg-gray-100 text-gray-700 rounded-md px-2.5 py-1.5 font-medium"
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${chipDotColor}`} />
-                  {g.reason}
-                </span>
-              ))}
+            <div className="space-y-1.5 mt-2">
+              {chipsToShow.map(g => {
+                const isChipExpanded = expandedChip === g.reason;
+                return (
+                  <div key={g.reason}>
+                    <button
+                      onClick={() => setExpandedChip(isChipExpanded ? null : g.reason)}
+                      className="inline-flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md px-2.5 py-1.5 font-medium transition-colors cursor-pointer"
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${chipDotColor}`} />
+                      {g.reason}
+                      <span className="text-gray-400 ml-0.5">
+                        · {g.floorCount} {g.floorCount === 1 ? 'floor' : 'floors'}
+                      </span>
+                      <svg
+                        className={`w-3 h-3 text-gray-400 transition-transform ${isChipExpanded ? 'rotate-90' : ''}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </button>
+                    {isChipExpanded && (
+                      <div className="bg-gray-50 rounded-lg px-3 py-2 mt-1 ml-4 space-y-1.5">
+                        {g.stages.map(stage => (
+                          <div key={stage.stage}>
+                            <div className="text-[11px] font-semibold text-gray-500 mb-1">{stage.stage}</div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {stage.floors.map(f => (
+                                <span
+                                  key={f.floor}
+                                  className="inline-flex items-center gap-1 text-[11px] bg-white border border-gray-200 rounded-md px-2 py-1 tabular-nums"
+                                >
+                                  <span className="font-bold text-gray-700">Floor {f.floor}</span>
+                                  <span className="text-gray-300">·</span>
+                                  <span className="text-gray-500">{f.flatCount} {f.flatCount === 1 ? 'unit' : 'units'}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
