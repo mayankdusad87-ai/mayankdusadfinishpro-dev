@@ -12,6 +12,7 @@ import { TODAY, SupervisorStatus, PriorityView, normalizeStatus, daysOverdue, ge
 import ActivityCard from '@/components/supervisor/ActivityCard';
 import PriorityCard from '@/components/supervisor/PriorityCard';
 import SupervisorFilters from '@/components/supervisor/SupervisorFilters';
+import StageChipBar from '@/components/supervisor/StageChipBar';
 import ActivityDetailSheet from '@/components/supervisor/ActivityDetailSheet';
 import BulkUpdateBar from '@/components/supervisor/BulkUpdateBar';
 import PhotoPromptModal from '@/components/supervisor/PhotoPromptModal';
@@ -261,6 +262,18 @@ export default function SupervisorHomePage() {
       on_hold: rows.filter(r => normalizeStatus(r.status) === 'on_hold').length,
     };
   }, [allActivities, activeFloor]);
+
+  const stageCounts = useMemo(() => {
+    if (activeView !== 'floor' && activeView !== 'all') return { counts: {} as Record<string, number>, total: 0 };
+    const base = activeView === 'all' ? allActivities : allActivities.filter(r => r.floor === activeFloor);
+    const counts: Record<string, number> = {};
+    let total = 0;
+    for (const row of base) {
+      counts[row.stage] = (counts[row.stage] || 0) + 1;
+      total++;
+    }
+    return { counts, total };
+  }, [allActivities, activeFloor, activeView]);
 
   function toggleSelection(id: string) {
     setSelectedIds(prev => {
@@ -684,6 +697,17 @@ export default function SupervisorHomePage() {
           </div>
         )}
 
+        {/* Stage chip bar — floor & all views only */}
+        {(activeView === 'floor' || activeView === 'all') && (projectData?.stages?.length || 0) > 0 && (
+          <StageChipBar
+            stages={projectData?.stages || []}
+            stageCounts={stageCounts.counts}
+            totalCount={stageCounts.total}
+            activeStage={stageFilter}
+            onStageChange={(v) => { setStageFilter(v); setSubStageFilter(''); setActivityFilter(''); }}
+          />
+        )}
+
         {/* Priority view header */}
         {(activeView === 'overdue' || activeView === 'due_today' || activeView === 'starting_today') && (
           <div className="flex items-center justify-between">
@@ -884,14 +908,12 @@ export default function SupervisorHomePage() {
             {showFilters && (
               <>
                 <SupervisorFilters
-                  stages={projectData?.stages || []}
+                  stageFilter={stageFilter}
                   subStageOptions={subStageOptions}
                   activityOptions={activityOptions}
-                  stageFilter={stageFilter}
                   subStageFilter={subStageFilter}
                   activityFilter={activityFilter}
                   statusDropdown={statusDropdown}
-                  onStageChange={(v) => { setStageFilter(v); setSubStageFilter(''); setActivityFilter(''); setSelectedIds(new Set()); }}
                   onSubStageChange={(v) => { setSubStageFilter(v); setActivityFilter(''); setSelectedIds(new Set()); }}
                   onActivityChange={(v) => { setActivityFilter(v); setSelectedIds(new Set()); }}
                   onStatusChange={(v) => { setStatusDropdown(v); setSelectedIds(new Set()); }}
@@ -1025,14 +1047,12 @@ export default function SupervisorHomePage() {
             {showFilters && (
               <>
                 <SupervisorFilters
-                  stages={projectData?.stages || []}
+                  stageFilter={stageFilter}
                   subStageOptions={subStageOptions}
                   activityOptions={activityOptions}
-                  stageFilter={stageFilter}
                   subStageFilter={subStageFilter}
                   activityFilter={activityFilter}
                   statusDropdown={statusDropdown}
-                  onStageChange={(v) => { setStageFilter(v); setSubStageFilter(''); setActivityFilter(''); }}
                   onSubStageChange={(v) => { setSubStageFilter(v); setActivityFilter(''); }}
                   onActivityChange={(v) => setActivityFilter(v)}
                   onStatusChange={(v) => setStatusDropdown(v)}
