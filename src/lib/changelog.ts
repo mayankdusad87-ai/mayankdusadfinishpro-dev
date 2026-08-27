@@ -33,6 +33,31 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.27c',
+    headline: 'Active Blockers & Extended Backdate',
+    date: 'August 27, 2026',
+    features: [
+      {
+        emoji: '🚧',
+        title: 'Active Blockers Dashboard',
+        description: 'Management view now shows currently stuck activities — overdue (not started) and on hold — grouped by delay reason with a proportional bar chart. Tap any reason to see affected stages, floors, and units.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '💊',
+        title: 'Compact Material Stores',
+        description: 'Material Stores section in Management view now uses a compact pill format to save space.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📅',
+        title: 'Extended Backdate Limit',
+        description: 'Admins can now set the back-date limit up to 365 days (previously capped at 30).',
+        roles: ['admin'],
+      },
+    ],
+  },
+  {
     version: '2026.08.27b',
     headline: 'Backdate Controls & Dashboard Milestones',
     date: 'August 27, 2026',
