@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
 import { getProjectsFromSupabase, getSupervisorProjectData, getActiveReasons, getSupervisorAssignments, updateActivityWithAudit } from '@/lib/supabase-data';
-import { getBackdateLimit } from '@/repositories/settings-repo';
 import type { Reason } from '@/lib/supabase-data';
 import type { ActivityUpdate } from '@/types/database.types';
 import { useAuth } from '@/lib/auth-context';
@@ -96,16 +95,19 @@ export default function SupervisorHomePage() {
       setLoading(false);
     });
     getActiveReasons().then(setReasons).catch(() => {});
-    // Compute backdate cutoff date (fall back to 3 days if DB fetch fails)
-    getBackdateLimit().then(days => {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - days);
-      setBackdateCutoff(cutoff.toISOString().slice(0, 10));
-    }).catch(() => {
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 3);
-      setBackdateCutoff(cutoff.toISOString().slice(0, 10));
-    });
+    // Compute backdate cutoff date via API (bypasses RLS for supervisors)
+    fetch('/api/settings/backdate-limit')
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(({ days }: { days: number }) => {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        setBackdateCutoff(cutoff.toISOString().slice(0, 10));
+      })
+      .catch(() => {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 3);
+        setBackdateCutoff(cutoff.toISOString().slice(0, 10));
+      });
   }, []);
 
   useEffect(() => {
