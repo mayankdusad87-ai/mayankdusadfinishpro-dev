@@ -33,6 +33,37 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.27e',
+    headline: 'Supervisor UX & Weekly Report',
+    date: 'August 27, 2026',
+    features: [
+      {
+        emoji: '⏸️',
+        title: 'On Hold — Delay Reason Display',
+        description: 'Activities on hold now show the delay reason directly on the card instead of action buttons. Tap the reason to open the detail sheet.',
+        roles: ['supervisor'],
+      },
+      {
+        emoji: '🔴',
+        title: 'Overdue Split View',
+        description: 'Overdue activities are now split into "Needs Attention" (no reason yet) and "Reason Captured" (collapsed). Focus on what needs action first.',
+        roles: ['supervisor'],
+      },
+      {
+        emoji: '☑️',
+        title: 'Select All in Bulk Mode',
+        description: 'Bulk mode now includes a Select All checkbox to check/uncheck all visible activities at once. Completed activities are skipped automatically.',
+        roles: ['supervisor'],
+      },
+      {
+        emoji: '📧',
+        title: 'Weekly Report — Admin CC',
+        description: 'Tuesday weekly report emails are now sent to management with all admins in CC.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.27d',
     headline: 'Audit Log Security & Delay Reasons',
     date: 'August 27, 2026',
