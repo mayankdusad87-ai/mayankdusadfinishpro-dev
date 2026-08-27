@@ -14,6 +14,7 @@ interface ActivityDetailSheetProps {
   userId: string;
   projectId: string;
   projectName: string;
+  backdateCutoff?: string; // ISO date — earliest date supervisor can pick for actual dates
   onClose: () => void;
   onSaved: () => void;
 }
@@ -24,6 +25,7 @@ export default function ActivityDetailSheet({
   userId,
   projectId,
   projectName,
+  backdateCutoff,
   onClose,
   onSaved,
 }: ActivityDetailSheetProps) {
@@ -308,20 +310,28 @@ export default function ActivityDetailSheet({
                 <input
                   type="date"
                   value={detailActualStart}
+                  min={backdateCutoff || undefined}
                   max={TODAY}
                   onChange={(e) => { setDetailActualStart(e.target.value); setDetailError(''); }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
+                {backdateCutoff && (
+                  <p className="text-[10px] text-gray-400 mt-0.5">Earliest: {backdateCutoff}</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">Actual End</label>
                 <input
                   type="date"
                   value={detailActualEnd}
-                  min={detailActualStart || undefined}
+                  min={detailActualStart || backdateCutoff || undefined}
+                  max={TODAY}
                   onChange={(e) => { setDetailActualEnd(e.target.value); setDetailError(''); }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
+                {backdateCutoff && (
+                  <p className="text-[10px] text-gray-400 mt-0.5">Earliest: {backdateCutoff}</p>
+                )}
               </div>
             </div>
 

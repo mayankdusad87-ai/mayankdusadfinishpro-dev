@@ -848,7 +848,7 @@ export default function SupervisorHomePage() {
                           row={row}
                           bulkMode={bulkMode}
                           isSelected={selectedIds.has(row.id)}
-                          backdateCutoff={backdateCutoff}
+
                           onToggleSelect={toggleSelection}
                           onOpenDetail={openDetail}
                           onQuickAction={handleQuickAction}
@@ -975,7 +975,6 @@ export default function SupervisorHomePage() {
                       bulkMode={bulkMode}
                       isSelected={selectedIds.has(row.id)}
                       savingId={savingActionId}
-                      backdateCutoff={backdateCutoff}
                       onToggleSelect={toggleSelection}
                       onOpenDetail={openDetail}
                       onQuickAction={handleQuickAction}
@@ -1038,6 +1037,7 @@ export default function SupervisorHomePage() {
           userId={user?.id || ''}
           projectId={selectedProjectId}
           projectName={availableProjects.find(p => p.id === selectedProjectId)?.name || ''}
+          backdateCutoff={backdateCutoff}
           onClose={() => setSelectedDetail(null)}
           onSaved={() => { setSelectedDetail(null); setRefreshKey(k => k + 1); }}
         />
