@@ -629,8 +629,8 @@ export default function SupervisorHomePage() {
           </div>
         </div>
 
-        {/* Overdue without delay reason banner — slim single-line */}
-        {(() => {
+        {/* Overdue without delay reason banner — only on floor views, hidden in overdue view */}
+        {activeView !== 'overdue' && (() => {
           const needsReason = priorities.overdue.filter(r => normalizeStatus(r.status) === 'in_progress' && !r.delay_reason);
           if (needsReason.length === 0) return null;
           return (
