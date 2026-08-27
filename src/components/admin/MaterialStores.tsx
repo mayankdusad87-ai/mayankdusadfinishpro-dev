@@ -9,16 +9,6 @@ interface Props {
   showActions?: boolean;
 }
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return 'Today';
-  if (days === 1) return '1 day ago';
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.floor(days / 7)}w ago`;
-  return `${Math.floor(days / 30)}mo ago`;
-}
-
 function formatDate(d: string): string {
   return new Date(d).toLocaleDateString('en-IN', {
     day: 'numeric',
@@ -82,47 +72,22 @@ function MaterialStores({ stores, onUnmark, showActions = false }: Props) {
           {activeStores.map(store => (
             <div
               key={store.id}
-              className="relative bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-3.5 group"
+              className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-3.5"
             >
-              {/* Active indicator */}
-              <div className="absolute top-3 right-3">
-                <span className="flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
-                </span>
-              </div>
-
-              {/* Unit identifier */}
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg font-bold text-gray-900">
-                  F{store.floor}-{store.flatNumber}
-                </span>
-              </div>
-
-              {/* Meta info */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                  </svg>
-                  <span>Marked {timeAgo(store.markedAt)}</span>
-                  <span className="text-gray-300">·</span>
-                  <span className="text-gray-400">{formatDate(store.markedAt)}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                  </svg>
-                  <span>by {store.markedByName}</span>
-                </div>
+              {/* Unit + purpose as headline */}
+              <div className="text-sm font-bold text-gray-900">
+                F{store.floor}-{store.flatNumber}
                 {store.notes && (
-                  <div className="flex items-start gap-1.5 text-xs text-gray-500 mt-1">
-                    <svg className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.068-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
-                    </svg>
-                    <span className="italic">{store.notes}</span>
-                  </div>
+                  <span className="text-gray-600 font-semibold"> — {store.notes}</span>
                 )}
+              </div>
+
+              {/* Date only */}
+              <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1.5">
+                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+                </svg>
+                <span>Marked {formatDate(store.markedAt)}</span>
               </div>
 
               {/* Clear button (admin only) */}
