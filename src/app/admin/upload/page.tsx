@@ -34,9 +34,11 @@ export default function UploadPage() {
   const [uploadMode, setUploadMode] = useState<UploadMode>('smart_merge');
   const [showProtectedDetails, setShowProtectedDetails] = useState(false);
   const [summaryFailed, setSummaryFailed] = useState(false);
+  const [loadingProject, setLoadingProject] = useState(false);
   const isReupload = !!projectData; // true when existing data exists
 
   useEffect(() => {
+    // Immediately clear ALL stale data so the old project never leaks through
     setProjectData(null);
     setPreviewData(null);
     setStep('pick');
@@ -47,8 +49,19 @@ export default function UploadPage() {
     setUploadMode('smart_merge');
     setSummaryFailed(false);
 
-    if (!currentProject) return;
+    if (!currentProject) {
+      setLoadingProject(false);
+      return;
+    }
+
+    // Track which project we're loading — if user switches mid-fetch, ignore stale result
+    const loadingId = currentProject.id;
+    setLoadingProject(true);
+
     getProjectDataFromSupabase(currentProject.id).then(existing => {
+      // Guard: ignore if user already switched to a different project
+      if (loadingId !== currentProject.id) return;
+
       if (existing) {
         setProjectData(existing);
         setStep('saved');
@@ -56,9 +69,12 @@ export default function UploadPage() {
         setStep('pick');
         setProjectData(null);
       }
+      setLoadingProject(false);
     }).catch(() => {
+      if (loadingId !== currentProject.id) return;
       setStep('pick');
       setProjectData(null);
+      setLoadingProject(false);
     });
   }, [currentProject?.id]);
 
@@ -277,6 +293,25 @@ export default function UploadPage() {
           <p className="text-sm text-gray-600">
             Create a project in <strong>Manage Projects</strong> first, then select it from the dropdown in the top bar.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while fetching project data — prevents stale data flash
+  if (loadingProject) {
+    return (
+      <div className="max-w-5xl">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Upload Template</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Project: <strong>{currentProject.name}</strong> &bull; {currentProject.location}
+        </p>
+        <div className="flex items-center justify-center py-16 mt-6">
+          <svg className="w-8 h-8 text-primary animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="ml-3 text-sm text-gray-600">Loading template data...</span>
         </div>
       </div>
     );
