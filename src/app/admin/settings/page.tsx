@@ -78,8 +78,8 @@ export default function SettingsPage() {
 
   async function handleSaveBackdateLimit() {
     const days = parseInt(backdateInput, 10);
-    if (isNaN(days) || days < 1 || days > 30) {
-      setBackdateMsg({ type: 'error', text: 'Enter a value between 1 and 30 days.' });
+    if (isNaN(days) || days < 1 || days > 365) {
+      setBackdateMsg({ type: 'error', text: 'Enter a value between 1 and 365 days.' });
       return;
     }
     if (days === backdateDays) {
@@ -320,7 +320,7 @@ export default function SettingsPage() {
             <input
               type="number"
               min={1}
-              max={30}
+              max={365}
               value={backdateInput}
               onChange={e => { setBackdateInput(e.target.value); setBackdateMsg(null); }}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
