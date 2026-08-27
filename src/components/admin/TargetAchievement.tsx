@@ -50,6 +50,8 @@ const RING_COLORS: Record<TargetStatus, string> = {
   missed: '#EF4444',
   on_track: '#22C55E',
   at_risk: '#F97316',
+  not_started: '#9CA3AF',
+  behind: '#EF4444',
 };
 
 const DOT_COLORS: Record<TargetStatus, string> = {
@@ -58,6 +60,8 @@ const DOT_COLORS: Record<TargetStatus, string> = {
   missed: '#EF4444',
   on_track: '#22C55E',
   at_risk: '#F97316',
+  not_started: '#9CA3AF',
+  behind: '#EF4444',
 };
 
 // ---- Circular progress ring (SVG) ----
@@ -216,12 +220,22 @@ function formatStatusBreakdown(sb: StatusBreakdown): string {
   return parts.join(' · ');
 }
 
-/** Smart "why" message for missed/at-risk targets without delay reasons */
+/** Smart "why" message for actionable statuses */
 function getWhyMessage(t: TargetAchievementResult): string | null {
-  if (t.status !== 'missed' && t.status !== 'at_risk') return null;
+  // Show "why" for not_started, behind, at_risk, missed
+  if (t.status !== 'missed' && t.status !== 'at_risk' && t.status !== 'not_started' && t.status !== 'behind') return null;
   if (t.delayReasons.length > 0) return null; // delay reasons table will show instead
 
   const sb = t.statusBreakdown;
+
+  // not_started / behind: always say work hasn't begun
+  if (t.status === 'not_started' || t.status === 'behind') {
+    if (sb.inProgress > 0) {
+      return `${sb.inProgress} ${sb.inProgress === 1 ? 'flat' : 'flats'} in progress but no completions yet`;
+    }
+    return `Work not started on any of ${t.totalFlats} flats`;
+  }
+
   if (sb.notStarted > 0 && sb.inProgress === 0 && sb.completed === 0) {
     return `Work not started on any flat`;
   }
@@ -255,6 +269,12 @@ function TargetCard({ target: t }: { target: TargetAchievementResult }) {
   } else if (t.status === 'missed') {
     const overdue = Math.abs(t.daysRemaining);
     timingText = `${overdue} day${overdue === 1 ? '' : 's'} overdue`;
+    timingColor = 'text-red-600';
+  } else if (t.status === 'not_started' && t.daysRemaining > 0) {
+    timingText = `${t.daysRemaining} day${t.daysRemaining === 1 ? '' : 's'} remaining — not started`;
+    timingColor = 'text-gray-500';
+  } else if (t.status === 'behind' && t.daysRemaining > 0) {
+    timingText = `${t.daysRemaining} day${t.daysRemaining === 1 ? '' : 's'} left — no progress`;
     timingColor = 'text-red-600';
   } else if (t.status === 'on_track' && t.daysRemaining > 0) {
     timingText = `${t.daysRemaining} day${t.daysRemaining === 1 ? '' : 's'} remaining`;
@@ -333,15 +353,15 @@ function TargetCard({ target: t }: { target: TargetAchievementResult }) {
         {/* Smart "why" one-liner for missed/at-risk without delay reasons */}
         {whyMessage && (
           <div className="flex items-center gap-1.5 mt-2 text-xs">
-            <svg className="w-3.5 h-3.5 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className={`w-3.5 h-3.5 flex-shrink-0 ${t.status === 'not_started' ? 'text-gray-400' : 'text-red-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
             </svg>
-            <span className="text-red-600 font-medium">{whyMessage}</span>
+            <span className={`font-medium ${t.status === 'not_started' ? 'text-gray-500' : 'text-red-600'}`}>{whyMessage}</span>
           </div>
         )}
 
         {/* Delay reasons table (for missed/at_risk/delayed) */}
-        {t.delayReasons.length > 0 && (t.status === 'missed' || t.status === 'at_risk' || t.status === 'delayed') && (
+        {t.delayReasons.length > 0 && (t.status === 'missed' || t.status === 'at_risk' || t.status === 'delayed' || t.status === 'behind') && (
           <div className="mt-2.5 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
             <table className="w-full text-xs">
               <thead>

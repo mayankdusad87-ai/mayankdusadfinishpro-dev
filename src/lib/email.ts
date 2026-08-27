@@ -222,7 +222,7 @@ export interface WeeklyTargetRow {
   completedFlats: number;
   progressPct: number;
   daysRemaining: number;
-  status: 'achieved' | 'delayed' | 'missed' | 'on_track' | 'at_risk';
+  status: 'achieved' | 'delayed' | 'missed' | 'on_track' | 'at_risk' | 'not_started' | 'behind';
 }
 
 export interface WeeklyBlocker {
@@ -237,6 +237,8 @@ const PACE_BADGE: Record<string, { label: string; bg: string; color: string; bar
   at_risk: { label: 'AT RISK', bg: '#fef3c7', color: '#92400e', barColor: '#f59e0b' },
   delayed: { label: 'DELAYED', bg: '#fef3c7', color: '#92400e', barColor: '#f59e0b' },
   missed: { label: 'BEHIND', bg: '#fee2e2', color: '#991b1b', barColor: '#ef4444' },
+  not_started: { label: 'NOT STARTED', bg: '#f3f4f6', color: '#4b5563', barColor: '#9ca3af' },
+  behind: { label: 'BEHIND', bg: '#fee2e2', color: '#991b1b', barColor: '#ef4444' },
 };
 
 function floorRangeLabel(from: number, to: number): string {
@@ -252,8 +254,9 @@ export function weeklyReportEmailHtml(
 ): string {
   // Executive summary
   const onTrackCount = targets.filter(t => t.status === 'achieved' || t.status === 'on_track').length;
-  const behindTargets = targets.filter(t => t.status === 'missed');
+  const behindTargets = targets.filter(t => t.status === 'missed' || t.status === 'behind');
   const atRiskTargets = targets.filter(t => t.status === 'at_risk' || t.status === 'delayed');
+  const notStartedTargets = targets.filter(t => t.status === 'not_started');
 
   let summaryText: string;
   if (targets.length === 0) {
@@ -270,7 +273,7 @@ export function weeklyReportEmailHtml(
   // Target cards
   const targetCards = targets.map(t => {
     const badge = PACE_BADGE[t.status] || PACE_BADGE.on_track;
-    const isBehind = t.status === 'missed';
+    const isBehind = t.status === 'missed' || t.status === 'behind';
     const cardBorder = isBehind ? '#fecaca' : '#e2e8f0';
     const cardBg = isBehind ? '#fff5f5' : '#ffffff';
     const trackBg = isBehind ? '#fecaca' : '#e2e8f0';

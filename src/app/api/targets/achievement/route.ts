@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   if (!targets || targets.length === 0) {
     return NextResponse.json({
       targets: [],
-      summary: { total: 0, achieved: 0, delayed: 0, missed: 0, onTrack: 0, atRisk: 0 },
+      summary: { total: 0, achieved: 0, delayed: 0, missed: 0, onTrack: 0, atRisk: 0, notStarted: 0, behind: 0 },
     });
   }
 

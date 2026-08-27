@@ -5,16 +5,18 @@
  * Every edge case is handled here so the UI never needs to think.
  *
  * Status definitions:
- *  - achieved:  100% done on/before target date
- *  - delayed:   100% done but AFTER target date
- *  - missed:    target date passed, < 100% done
- *  - on_track:  target date in future, pace is healthy
- *  - at_risk:   target date in future, pace too slow to finish on time
+ *  - achieved:     100% done on/before target date
+ *  - delayed:      100% done but AFTER target date
+ *  - missed:       target date passed, < 100% done
+ *  - on_track:     target date in future, pace is healthy (velocity proves it)
+ *  - at_risk:      target date in future, pace too slow to finish on time
+ *  - not_started:  0% progress, < 15% time elapsed — work hasn't begun yet
+ *  - behind:       0% progress, > 30% time elapsed — no work and time is running out
  */
 
 // ---- Types ----
 
-export type TargetStatus = 'achieved' | 'delayed' | 'missed' | 'on_track' | 'at_risk';
+export type TargetStatus = 'achieved' | 'delayed' | 'missed' | 'on_track' | 'at_risk' | 'not_started' | 'behind';
 
 export interface TargetRow {
   id: string;
@@ -75,6 +77,8 @@ export interface TargetSummary {
   missed: number;
   onTrack: number;
   atRisk: number;
+  notStarted: number;
+  behind: number;
 }
 
 // ---- Core computation ----
@@ -176,11 +180,11 @@ function assessPace(
   const progressRatio = completedFlats / totalFlats;
   const timeRatio = elapsed / totalDuration;  // 0 = just started, 1 = target date
 
-  // No progress at all
+  // No progress at all — escalate with time
   if (completedFlats === 0) {
-    // If less than 30% time passed, still okay
-    if (timeRatio < 0.3) return 'on_track';
-    return 'at_risk';
+    if (timeRatio < 0.15) return 'not_started';   // < 15% time: work hasn't begun
+    if (timeRatio < 0.30) return 'at_risk';        // 15–30% time: should've started by now
+    return 'behind';                                // > 30% time: no work, time running out
   }
 
   // Velocity-based projection
@@ -212,6 +216,8 @@ export function computeTargetSummary(results: TargetAchievementResult[]): Target
     missed: 0,
     onTrack: 0,
     atRisk: 0,
+    notStarted: 0,
+    behind: 0,
   };
 
   for (const r of results) {
@@ -221,6 +227,8 @@ export function computeTargetSummary(results: TargetAchievementResult[]): Target
       case 'missed': summary.missed++; break;
       case 'on_track': summary.onTrack++; break;
       case 'at_risk': summary.atRisk++; break;
+      case 'not_started': summary.notStarted++; break;
+      case 'behind': summary.behind++; break;
     }
   }
 
@@ -394,6 +402,20 @@ export const TARGET_STATUS_CONFIG: Record<TargetStatus, {
     text: 'text-orange-700',
     dot: 'bg-orange-500',
     border: 'border-orange-200',
+  },
+  not_started: {
+    label: 'Not Started',
+    bg: 'bg-gray-50',
+    text: 'text-gray-600',
+    dot: 'bg-gray-400',
+    border: 'border-gray-200',
+  },
+  behind: {
+    label: 'Behind',
+    bg: 'bg-red-50',
+    text: 'text-red-700',
+    dot: 'bg-red-500',
+    border: 'border-red-200',
   },
 };
 
