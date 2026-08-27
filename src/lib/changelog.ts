@@ -33,6 +33,43 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.27b',
+    headline: 'Backdate Controls & Dashboard Milestones',
+    date: 'August 27, 2026',
+    features: [
+      {
+        emoji: '📅',
+        title: 'Back-Date Limit for Supervisors',
+        description: 'Supervisors can only select actual start/end dates within a configurable window (default 3 days). Dates older than the limit are blocked in the date picker and enforced server-side.',
+        roles: ['admin', 'supervisor'],
+      },
+      {
+        emoji: '✏️',
+        title: 'Admin Actual Date Edit',
+        description: 'Admins can now edit actual start and end dates directly from the activity table — click the pencil icon on any Act. Start or Act. End cell to open the edit modal.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '⚙️',
+        title: 'Configurable Back-Date Window',
+        description: 'Set how many days back supervisors can update entries (1–30 days) from the new Data Entry Settings section. Every change is audit-logged.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '🏗️',
+        title: 'Milestone Demarcation on Dashboard',
+        description: 'The dashboard heatmap now visually separates Milestone 1 (Pre-Tiling → 1st Coat Paint) and Milestone 2 (Post First Coat Paint → Lobby Flooring) with labeled header rows and a thick border divider.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📐',
+        title: 'Equal-Width Dashboard Tiles',
+        description: 'Fully Ready and Lobby Readiness tiles are now the same width for a cleaner, more balanced look.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.27',
     headline: 'Smarter Target Tracking & Bug Fixes',
     date: 'August 27, 2026',
