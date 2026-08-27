@@ -9,6 +9,7 @@ interface ActivityCardProps {
   bulkMode: boolean;
   isSelected: boolean;
   savingId?: string | null;
+  backdateCutoff?: string; // ISO date: activities with expected_end before this are locked
   onToggleSelect: (id: string) => void;
   onOpenDetail: (row: UploadedActivity) => void;
   onQuickAction: (row: UploadedActivity, action: 'start' | 'complete') => void;
@@ -19,6 +20,7 @@ function ActivityCard({
   bulkMode,
   isSelected,
   savingId,
+  backdateCutoff,
   onToggleSelect,
   onOpenDetail,
   onQuickAction,
@@ -30,9 +32,24 @@ function ActivityCard({
   const overdueDays = !isCompleted && row.expected_end && row.expected_end < TODAY
     ? daysOverdue(row.expected_end) : 0;
 
+  // Backdate lock: if expected_end is before the cutoff date, grey out the card
+  const isLocked = !isCompleted && !!backdateCutoff && !!row.expected_end && row.expected_end < backdateCutoff;
+
   return (
-    <div className={`bg-white rounded-xl border border-gray-200 p-4 transition-colors ${!bulkMode ? 'hover:bg-gray-50 cursor-pointer' : ''}`}>
-      <div className="flex items-start justify-between" onClick={() => !bulkMode && onOpenDetail(row)}>
+    <div className={`rounded-xl border p-4 transition-colors ${
+      isLocked
+        ? 'bg-gray-50 border-gray-200 opacity-60 cursor-not-allowed'
+        : `bg-white border-gray-200 ${!bulkMode ? 'hover:bg-gray-50 cursor-pointer' : ''}`
+    }`}>
+      {isLocked && (
+        <div className="flex items-center gap-1.5 mb-2 text-[11px] text-gray-400 font-medium">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+          </svg>
+          Update window expired
+        </div>
+      )}
+      <div className="flex items-start justify-between" onClick={() => !bulkMode && !isLocked && onOpenDetail(row)}>
         <div className="flex items-start gap-3 flex-1 min-w-0">
           {bulkMode && !isCompleted && (
             <input
@@ -64,7 +81,7 @@ function ActivityCard({
         </div>
       </div>
 
-      {!bulkMode && !isCompleted && (
+      {!bulkMode && !isCompleted && !isLocked && (
         <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
           {status === 'not_started' && (
             <button

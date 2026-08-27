@@ -77,3 +77,57 @@ export async function setManagementAccess(access: ManagementAccess): Promise<voi
 }
 
 export { DEFAULT_MANAGEMENT_ACCESS };
+
+// ---- Backdate Limit ----
+
+const DEFAULT_BACKDATE_DAYS = 3;
+
+export async function getBackdateLimit(): Promise<number> {
+  const stored = await getAppSetting<number>('backdate_limit_days');
+  return stored ?? DEFAULT_BACKDATE_DAYS;
+}
+
+export async function setBackdateLimit(days: number, changedBy: string): Promise<void> {
+  const oldValue = await getBackdateLimit();
+  await setAppSetting('backdate_limit_days', days);
+  await logSettingChange('backdate_limit_days', String(oldValue), String(days), changedBy);
+}
+
+// ---- Setting Audit Log ----
+
+/**
+ * Log a setting change to app_settings under the key `setting_audit_log`.
+ * Stores the last 50 changes as a JSON array — no extra table needed.
+ */
+export async function logSettingChange(
+  settingKey: string,
+  oldValue: string,
+  newValue: string,
+  changedBy: string,
+): Promise<void> {
+  const existing = await getAppSetting<SettingAuditEntry[]>('setting_audit_log') || [];
+  const entry: SettingAuditEntry = {
+    setting_key: settingKey,
+    old_value: oldValue,
+    new_value: newValue,
+    changed_by: changedBy,
+    changed_at: new Date().toISOString(),
+  };
+  // Keep the latest 50 entries
+  const updated = [entry, ...existing].slice(0, 50);
+  await setAppSetting('setting_audit_log', updated);
+}
+
+export interface SettingAuditEntry {
+  setting_key: string;
+  old_value: string;
+  new_value: string;
+  changed_by: string;
+  changed_at: string;
+}
+
+export async function getSettingAuditLog(settingKey?: string): Promise<SettingAuditEntry[]> {
+  const entries = await getAppSetting<SettingAuditEntry[]>('setting_audit_log') || [];
+  if (settingKey) return entries.filter(e => e.setting_key === settingKey);
+  return entries;
+}

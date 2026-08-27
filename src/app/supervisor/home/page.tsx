@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { UploadedActivity, ProjectData } from '@/lib/project-data-store';
 import { ManagedProject } from '@/lib/project-store';
 import { getProjectsFromSupabase, getSupervisorProjectData, getActiveReasons, getSupervisorAssignments, updateActivityWithAudit } from '@/lib/supabase-data';
+import { getBackdateLimit } from '@/repositories/settings-repo';
 import type { Reason } from '@/lib/supabase-data';
 import type { ActivityUpdate } from '@/types/database.types';
 import { useAuth } from '@/lib/auth-context';
@@ -57,6 +58,7 @@ export default function SupervisorHomePage() {
   const [refreshing, setRefreshing] = useState(false);
   const pullStartY = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const [backdateCutoff, setBackdateCutoff] = useState<string>('');
 
   // ---- Session cache helpers (stale-while-revalidate) ----
   const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
@@ -94,6 +96,12 @@ export default function SupervisorHomePage() {
       setLoading(false);
     });
     getActiveReasons().then(setReasons).catch(() => {});
+    // Compute backdate cutoff date
+    getBackdateLimit().then(days => {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      setBackdateCutoff(cutoff.toISOString().slice(0, 10));
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -840,6 +848,7 @@ export default function SupervisorHomePage() {
                           row={row}
                           bulkMode={bulkMode}
                           isSelected={selectedIds.has(row.id)}
+                          backdateCutoff={backdateCutoff}
                           onToggleSelect={toggleSelection}
                           onOpenDetail={openDetail}
                           onQuickAction={handleQuickAction}
@@ -966,6 +975,7 @@ export default function SupervisorHomePage() {
                       bulkMode={bulkMode}
                       isSelected={selectedIds.has(row.id)}
                       savingId={savingActionId}
+                      backdateCutoff={backdateCutoff}
                       onToggleSelect={toggleSelection}
                       onOpenDetail={openDetail}
                       onQuickAction={handleQuickAction}

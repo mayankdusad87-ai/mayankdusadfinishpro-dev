@@ -20,6 +20,12 @@ interface EditingCell {
   field: 'status' | 'vendor' | 'expected_start' | 'expected_end' | 'revised_start' | 'revised_end';
 }
 
+interface DateEditTarget {
+  row: ActivityRow;
+  actualStart: string;
+  actualEnd: string;
+}
+
 interface ActivityTableProps {
   projectId: string;
   filters: { floor?: string; flat?: string; stage?: string; stageGate?: string; vendor?: string; status?: string; search?: string };
@@ -56,6 +62,8 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   const [bulkRevEnd, setBulkRevEnd] = useState('');
   const [bulkSaving, setBulkSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [dateEditTarget, setDateEditTarget] = useState<DateEditTarget | null>(null);
+  const [dateEditSaving, setDateEditSaving] = useState(false);
 
   const activeFilters = useMemo(() => {
     const f: { floor?: string; flat?: string; stage?: string; stageGate?: string; vendor?: string; status?: string; search?: string } = { ...filters };
@@ -217,6 +225,31 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setBulkExpEnd('');
     setBulkRevStart('');
     setBulkRevEnd('');
+  }
+
+  async function handleDateEdit() {
+    if (!dateEditTarget) return;
+    const { row, actualStart, actualEnd } = dateEditTarget;
+    const updates: ActivityUpdate = {};
+    if (actualStart !== (row.actual_start || '')) updates.actual_start = actualStart || null;
+    if (actualEnd !== (row.actual_end || '')) updates.actual_end = actualEnd || null;
+    if (Object.keys(updates).length === 0) { setDateEditTarget(null); return; }
+
+    setDateEditSaving(true);
+    // Update each changed field
+    let hasError = false;
+    for (const [field, value] of Object.entries(updates)) {
+      const result = await updateActivityField(row.id, field, value as string);
+      if (result.error) { showToast(result.error, 'error'); hasError = true; break; }
+    }
+    if (!hasError) {
+      setTableRows(prev => prev.map(r =>
+        r.id === row.id ? { ...r, ...updates } : r
+      ));
+      showToast('Actual dates updated.', 'success');
+    }
+    setDateEditSaving(false);
+    setDateEditTarget(null);
   }
 
   async function exportExcel() {
@@ -426,8 +459,12 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                       <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">
                         <span className="flex items-center gap-1">Rev. End <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg></span>
                       </th>
-                      <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">Act. Start</th>
-                      <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">Act. End</th>
+                      <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">
+                        <span className="flex items-center gap-1">Act. Start <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg></span>
+                      </th>
+                      <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">
+                        <span className="flex items-center gap-1">Act. End <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg></span>
+                      </th>
                       <th className="text-left px-3 py-3 font-semibold text-gray-600 text-xs">
                         <span className="flex items-center gap-1">Status <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg></span>
                       </th>
@@ -483,8 +520,24 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                         <td className="px-3 py-2.5 whitespace-nowrap text-xs">
                           {renderEditableCell(row, 'revised_end', formatDate(row.revised_end), 'text-indigo-600')}
                         </td>
-                        <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap text-xs">{formatDate(row.actual_start) || '-'}</td>
-                        <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap text-xs">{formatDate(row.actual_end) || '-'}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                          <button
+                            onClick={() => setDateEditTarget({ row, actualStart: row.actual_start || '', actualEnd: row.actual_end || '' })}
+                            className="text-gray-500 cursor-pointer hover:bg-primary/5 rounded px-1 -mx-1 transition-colors text-left"
+                            title="Click to edit actual dates"
+                          >
+                            {formatDate(row.actual_start) || '-'}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                          <button
+                            onClick={() => setDateEditTarget({ row, actualStart: row.actual_start || '', actualEnd: row.actual_end || '' })}
+                            className="text-gray-500 cursor-pointer hover:bg-primary/5 rounded px-1 -mx-1 transition-colors text-left"
+                            title="Click to edit actual dates"
+                          >
+                            {formatDate(row.actual_end) || '-'}
+                          </button>
+                        </td>
                         <td className="px-3 py-2.5">
                           {renderEditableCell(row, 'status', '', '')}
                         </td>
@@ -559,6 +612,52 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                 className="px-5 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-dark disabled:opacity-50"
               >
                 {bulkSaving ? 'Updating...' : 'Reassign'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Actual Dates Modal */}
+      {dateEditTarget && (
+        <Modal open={!!dateEditTarget} onClose={() => setDateEditTarget(null)} title="Edit Actual Dates" maxWidth="max-w-md">
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-sm font-bold text-gray-900">{dateEditTarget.row.activity}</div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Floor {dateEditTarget.row.floor} &bull; Flat {dateEditTarget.row.flat_number} &bull; {dateEditTarget.row.stage}
+                {dateEditTarget.row.stage_gate ? ` → ${dateEditTarget.row.stage_gate}` : ''}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Actual Start</label>
+                <input
+                  type="date"
+                  value={dateEditTarget.actualStart}
+                  onChange={e => setDateEditTarget({ ...dateEditTarget, actualStart: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Actual End</label>
+                <input
+                  type="date"
+                  value={dateEditTarget.actualEnd}
+                  min={dateEditTarget.actualStart || undefined}
+                  onChange={e => setDateEditTarget({ ...dateEditTarget, actualEnd: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setDateEditTarget(null)} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={handleDateEdit}
+                disabled={dateEditSaving}
+                className="px-5 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-dark disabled:opacity-50"
+              >
+                {dateEditSaving ? 'Saving...' : 'Save Dates'}
               </button>
             </div>
           </div>

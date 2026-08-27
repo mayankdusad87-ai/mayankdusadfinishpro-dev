@@ -3,13 +3,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getReasons, createReason, updateReason, deleteReason, Reason } from '@/lib/supabase-data';
 import { getSupervisors, resetUserPassword } from '@/repositories/supervisor-repo';
+import { getBackdateLimit, setBackdateLimit } from '@/repositories/settings-repo';
 import { useDataLoader } from '@/hooks/use-data-loader';
 import { useProject } from '@/lib/project-context';
+import { useAuth } from '@/lib/auth-context';
 import TargetSetter from '@/components/admin/TargetSetter';
 import RccHandover from '@/components/admin/RccHandover';
 
 export default function SettingsPage() {
   const { currentProject } = useProject();
+  const { user } = useAuth();
   const { data: reasons, loading, refresh: loadReasons } = useDataLoader(() => getReasons(), [] as Reason[]);
   const [newLabel, setNewLabel] = useState('');
   const [error, setError] = useState('');
@@ -59,6 +62,41 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [resetMsg, setResetMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [resetting, setResetting] = useState(false);
+
+  // ---- Backdate limit state ----
+  const [backdateDays, setBackdateDays] = useState(3);
+  const [backdateInput, setBackdateInput] = useState('3');
+  const [backdateSaving, setBackdateSaving] = useState(false);
+  const [backdateMsg, setBackdateMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    getBackdateLimit().then(days => {
+      setBackdateDays(days);
+      setBackdateInput(String(days));
+    });
+  }, []);
+
+  async function handleSaveBackdateLimit() {
+    const days = parseInt(backdateInput, 10);
+    if (isNaN(days) || days < 1 || days > 30) {
+      setBackdateMsg({ type: 'error', text: 'Enter a value between 1 and 30 days.' });
+      return;
+    }
+    if (days === backdateDays) {
+      setBackdateMsg({ type: 'error', text: 'No change to save.' });
+      return;
+    }
+    setBackdateSaving(true);
+    setBackdateMsg(null);
+    try {
+      await setBackdateLimit(days, user?.id || '');
+      setBackdateDays(days);
+      setBackdateMsg({ type: 'success', text: `Back-date limit updated from ${backdateDays} to ${days} days.` });
+    } catch {
+      setBackdateMsg({ type: 'error', text: 'Failed to save. Please try again.' });
+    }
+    setBackdateSaving(false);
+  }
 
   // ---- Load supervisors + weights in parallel (single round-trip) ----
   const loadSupervisors = useCallback(async () => {
@@ -258,6 +296,55 @@ export default function SettingsPage() {
           <RccHandover projectId={currentProject.id} />
         </div>
       )}
+
+      {/* ---- Data Entry Settings ---- */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Data Entry Settings</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Control how far back supervisors can update activity entries. Admins are not restricted.
+          </p>
+        </div>
+
+        {backdateMsg && (
+          <div className={`mb-4 rounded-lg p-3 text-sm ${backdateMsg.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+            {backdateMsg.text}
+          </div>
+        )}
+
+        <div className="flex items-end gap-3">
+          <div className="flex-1 max-w-[200px]">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Back-date limit (days)
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={backdateInput}
+              onChange={e => { setBackdateInput(e.target.value); setBackdateMsg(null); }}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+          </div>
+          <button
+            onClick={handleSaveBackdateLimit}
+            disabled={backdateSaving}
+            className="px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {backdateSaving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+
+        <div className="mt-4 flex items-start gap-2 text-xs text-gray-500">
+          <svg className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>
+            Supervisors can only update activities within this window. Activities older than <strong>{backdateDays} days</strong> will
+            appear greyed out on their screen. Every change to this setting is logged with the admin who made it.
+          </span>
+        </div>
+      </div>
 
       {/* ---- Reset User Password ---- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
