@@ -28,6 +28,18 @@ function getStageColor(stage: string): string {
   return STAGE_COLORS[stage] || 'bg-gray-600';
 }
 
+const MILESTONE_1_STAGES = [
+  'pre-tiling', 'pre tiling',
+  'tiling',
+  'post tiling', 'post-tiling',
+  'pre paint activities', 'pre paint readiness',
+  '1st coat paint', 'first coat paint',
+];
+
+function isMilestone1(stage: string): boolean {
+  return MILESTONE_1_STAGES.includes(stage.toLowerCase());
+}
+
 function cellStyle(cell: RollupCell): string {
   if (cell.total === 0) return 'bg-gray-100 text-gray-400';
   switch (cell.label) {
@@ -65,6 +77,15 @@ function readinessText(r: string): string {
 function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
   if (data.stages.length === 0) return null;
 
+  // Split stages into milestones
+  const m1Stages = data.stages.filter(s => isMilestone1(s));
+  const m2Stages = data.stages.filter(s => !isMilestone1(s));
+  const m2Boundary = m2Stages.length > 0 ? m2Stages[0] : null;
+
+  // Extra left border on the first M2 stage column to visually separate milestones
+  const mBorder = (stage: string) =>
+    stage === m2Boundary ? ' border-l-[3px] border-l-gray-900' : '';
+
   return (
     <div className="space-y-5">
       {/* Title Bar */}
@@ -76,21 +97,25 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
 
       {/* Summary Cards */}
       <div className="flex flex-wrap items-center gap-3 md:gap-4 px-1">
-        <div className="hidden md:flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+        <div className="hidden md:flex items-center bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Floor Readiness</span>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg px-4 md:px-5 py-3 shadow-sm text-center min-w-[90px]">
-          <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsFirstCoatDone}</div>
-          <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">Fully Ready</div>
-          <div className="text-[10px] md:text-[11px] text-gray-400">Upto First Coat Paint</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg px-4 md:px-5 py-3 shadow-sm text-center min-w-[90px]">
-          <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsInProgress}</div>
-          <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">In Progress</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg px-4 md:px-5 py-3 shadow-sm text-center min-w-[90px]">
-          <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsLobbyDone}</div>
-          <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">Lobby Floor Readiness</div>
+
+        {/* Equal-width tiles */}
+        <div className="flex gap-3 md:gap-4 flex-1 max-w-xl">
+          <div className="flex-1 bg-white border border-gray-200 rounded-lg py-3 shadow-sm text-center">
+            <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsFirstCoatDone}</div>
+            <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">Fully Ready</div>
+            <div className="text-[10px] md:text-[11px] text-gray-400">Upto First Coat Paint</div>
+          </div>
+          <div className="flex-1 bg-white border border-gray-200 rounded-lg py-3 shadow-sm text-center">
+            <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsInProgress}</div>
+            <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">In Progress</div>
+          </div>
+          <div className="flex-1 bg-white border border-gray-200 rounded-lg py-3 shadow-sm text-center">
+            <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsLobbyDone}</div>
+            <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">Lobby Readiness</div>
+          </div>
         </div>
 
         {/* Legend */}
@@ -111,21 +136,41 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
-            {/* Stage Header */}
             <thead>
+              {/* Milestone Header Row */}
               <tr>
-                <th className="bg-gray-100 border border-gray-200 px-3 py-2 text-left text-gray-600 font-semibold min-w-[80px]" />
+                <th rowSpan={2} className="bg-gray-100 border border-gray-200 px-3 py-2 text-left text-gray-600 font-semibold min-w-[80px]" />
+                {m1Stages.length > 0 && (
+                  <th
+                    colSpan={m1Stages.length}
+                    className="bg-[#162032] text-white border border-gray-200 px-3 py-2 text-center font-bold text-sm tracking-wider"
+                  >
+                    MILESTONE 1
+                  </th>
+                )}
+                {m2Stages.length > 0 && (
+                  <th
+                    colSpan={m2Stages.length}
+                    className="bg-[#1e3a5f] text-white border border-gray-200 border-l-[3px] border-l-gray-900 px-3 py-2 text-center font-bold text-sm tracking-wider"
+                  >
+                    MILESTONE 2
+                  </th>
+                )}
+                <th rowSpan={2} className="bg-gray-700 text-white border border-gray-200 px-3 py-2 text-center font-semibold min-w-[100px]">
+                  Floor<br />Readiness
+                </th>
+              </tr>
+
+              {/* Stage Header Row */}
+              <tr>
                 {data.stages.map(stage => (
                   <th
                     key={stage}
-                    className={`${getStageColor(stage)} text-white border border-gray-200 px-3 py-2 text-center font-semibold min-w-[130px]`}
+                    className={`${getStageColor(stage)} text-white border border-gray-200 px-3 py-2 text-center font-semibold min-w-[130px]${mBorder(stage)}`}
                   >
                     {stage}
                   </th>
                 ))}
-                <th className="bg-gray-700 text-white border border-gray-200 px-3 py-2 text-center font-semibold min-w-[100px]">
-                  Floor Readiness
-                </th>
               </tr>
             </thead>
 
@@ -138,7 +183,7 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
                 {data.stages.map(stage => {
                   const cell = data.stageCompletionFloors[stage];
                   return (
-                    <td key={stage} className={`border border-gray-200 px-3 py-2 text-center ${cell ? cellStyle(cell) : 'bg-gray-100'}`}>
+                    <td key={stage} className={`border border-gray-200 px-3 py-2 text-center${mBorder(stage)} ${cell ? cellStyle(cell) : 'bg-gray-100'}`}>
                       {cell ? `${cell.completed}/${cell.total}` : '-'}
                     </td>
                   );
@@ -154,7 +199,7 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
                 {data.stages.map(stage => {
                   const cell = data.stageCompletionUnits[stage];
                   return (
-                    <td key={stage} className={`border border-gray-200 px-3 py-2 text-center ${cell ? cellStyle(cell) : 'bg-gray-100'}`}>
+                    <td key={stage} className={`border border-gray-200 px-3 py-2 text-center${mBorder(stage)} ${cell ? cellStyle(cell) : 'bg-gray-100'}`}>
                       {cell ? `${cell.completed}/${cell.total}` : '-'}
                     </td>
                   );
@@ -167,11 +212,31 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
                 <td colSpan={data.stages.length + 2} className="h-1 bg-gray-300" />
               </tr>
 
-              {/* Stage Header Row (repeated for clarity) */}
+              {/* Milestone + Stage Header Row (repeated for clarity) */}
+              <tr>
+                <td className="bg-gray-100 border border-gray-200 px-3 py-1 font-semibold text-gray-600" />
+                {m1Stages.length > 0 && (
+                  <td
+                    colSpan={m1Stages.length}
+                    className="bg-[#162032] text-white border border-gray-200 px-3 py-1 text-center font-bold text-[11px] tracking-wider"
+                  >
+                    MILESTONE 1
+                  </td>
+                )}
+                {m2Stages.length > 0 && (
+                  <td
+                    colSpan={m2Stages.length}
+                    className="bg-[#1e3a5f] text-white border border-gray-200 border-l-[3px] border-l-gray-900 px-3 py-1 text-center font-bold text-[11px] tracking-wider"
+                  >
+                    MILESTONE 2
+                  </td>
+                )}
+                <td className="bg-gray-700 border border-gray-200" />
+              </tr>
               <tr>
                 <td className="bg-gray-100 border border-gray-200 px-3 py-2 font-semibold text-gray-600">Floor</td>
                 {data.stages.map(stage => (
-                  <td key={stage} className={`${getStageColor(stage)} text-white border border-gray-200 px-3 py-2 text-center font-semibold`}>
+                  <td key={stage} className={`${getStageColor(stage)} text-white border border-gray-200 px-3 py-2 text-center font-semibold${mBorder(stage)}`}>
                     {stage}
                   </td>
                 ))}
@@ -189,7 +254,7 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
                   {data.stages.map(stage => {
                     const cell = row.stages[stage];
                     return (
-                      <td key={stage} className={`border border-gray-200 px-2 py-2.5 text-center ${cellStyle(cell)}`}>
+                      <td key={stage} className={`border border-gray-200 px-2 py-2.5 text-center${mBorder(stage)} ${cellStyle(cell)}`}>
                         {cellText(cell)}
                       </td>
                     );
