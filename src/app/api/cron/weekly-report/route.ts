@@ -19,7 +19,7 @@ const DASHBOARD_URL = 'https://finishpro-dev.vercel.app/login';
  * GET /api/cron/weekly-report
  *
  * Sends a weekly management report email for each active project.
- * One email per project → all active management users.
+ * One email per project → TO all active management users, CC all active admins.
  *
  * Content:
  *  - Executive summary (on track / at risk / behind)
@@ -66,6 +66,20 @@ export async function GET(req: NextRequest) {
 
     if (mgmtEmails.length === 0) {
       return NextResponse.json({ message: 'No active management users', sent: 0 });
+    }
+
+    // 1b. Fetch active admin users for CC
+    let adminEmails: string[] = [];
+    if (!testEmail) {
+      const { data: adminUsers } = await supabaseAdmin
+        .from('profiles')
+        .select('email')
+        .eq('role', 'admin')
+        .eq('is_active', true);
+
+      adminEmails = (adminUsers || [])
+        .map(u => u.email)
+        .filter((e): e is string => !!e);
     }
 
     // 2. Fetch all projects
@@ -138,9 +152,10 @@ export async function GET(req: NextRequest) {
         DASHBOARD_URL,
       );
 
-      // 3d. Send
+      // 3d. Send (TO management, CC admins)
       const sent = await sendEmail({
         to: mgmtEmails,
+        cc: adminEmails.length > 0 ? adminEmails : undefined,
         subject: `Finishing Pro Weekly — ${project.name} (${fmt(weekStart)} – ${fmt(weekEnd)})`,
         html,
       });

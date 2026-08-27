@@ -262,6 +262,25 @@ export default function SupervisorHomePage() {
     };
   }, [allActivities, activeFloor]);
 
+  // Selectable IDs for bulk mode — visible non-completed activities
+  const selectableIds = useMemo(() => {
+    const rows = activeView === 'floor' ? floorRows : allFloorRows;
+    return rows
+      .filter(r => normalizeStatus(r.status) !== 'completed')
+      .map(r => r.id);
+  }, [activeView, floorRows, allFloorRows]);
+
+  const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedIds.has(id));
+  const someSelected = selectableIds.some(id => selectedIds.has(id));
+
+  function handleSelectAll() {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableIds));
+    }
+  }
+
   function toggleSelection(id: string) {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -925,7 +944,24 @@ export default function SupervisorHomePage() {
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="text-xs text-gray-500 mb-2">{allFloorRows.length} activities across {allFloorGrouped.length} floors</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-gray-500">{allFloorRows.length} activities across {allFloorGrouped.length} floors</div>
+                  {bulkMode && selectableIds.length > 0 && (
+                    <button
+                      onClick={handleSelectAll}
+                      className="flex items-center gap-2 text-xs font-medium text-primary"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                        onChange={handleSelectAll}
+                        className="accent-[#C8922A] w-4 h-4"
+                      />
+                      {allSelected ? 'Deselect all' : `Select all (${selectableIds.length})`}
+                    </button>
+                  )}
+                </div>
                 {allFloorGrouped.map(group => (
                   <div key={group.floor}>
                     <div className="flex items-center gap-2 py-2">
@@ -1046,6 +1082,22 @@ export default function SupervisorHomePage() {
                   </button>
                 )}
               </>
+            )}
+
+            {/* Select All row — bulk mode */}
+            {bulkMode && floorRows.length > 0 && selectableIds.length > 0 && (
+              <div className="flex items-center gap-3 mb-3 px-1">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                  onChange={handleSelectAll}
+                  className="accent-[#C8922A] w-5 h-5"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  {allSelected ? 'Deselect all' : `Select all (${selectableIds.length})`}
+                </span>
+              </div>
             )}
 
             {/* Activity Cards */}
