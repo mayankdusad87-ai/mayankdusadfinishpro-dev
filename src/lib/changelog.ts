@@ -33,6 +33,31 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.27',
+    headline: 'Smarter Target Tracking & Bug Fixes',
+    date: 'August 27, 2026',
+    features: [
+      {
+        emoji: '🎯',
+        title: 'Honest Target Status',
+        description: 'Targets at 0% progress no longer show "On Track". New statuses: "Not Started" (gray) when work hasn\'t begun, escalating to "At Risk" and "Behind" as time passes. Velocity-based tracking kicks in once work starts.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '🔢',
+        title: 'Accurate In-Progress Unit Counts',
+        description: 'Floor-level drill-down in Operations now shows distinct flats (e.g. 7 units) instead of inflated activity-row counts (e.g. 21 units for 7 flats × 3 activities).',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📧',
+        title: 'Weekly Report on Tuesdays',
+        description: 'Management weekly email now arrives every Tuesday at 7 AM IST instead of Monday.',
+        roles: ['management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.26b',
     headline: 'Accurate Site Activity & Faster Re-upload',
     date: 'August 26, 2026',
