@@ -33,6 +33,25 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.27d',
+    headline: 'Audit Log Security & Delay Reasons',
+    date: 'August 27, 2026',
+    features: [
+      {
+        emoji: '🔒',
+        title: 'Secured API Endpoints',
+        description: 'Audit log and backdate settings API routes now require authenticated sessions — unauthenticated requests are rejected.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '⚠️',
+        title: 'Delay Reasons in Audit Log',
+        description: 'When a supervisor captures a delay reason, it now appears as an amber subtitle in the audit log under the status change. You can also search audit entries by delay reason text.',
+        roles: ['admin'],
+      },
+    ],
+  },
+  {
     version: '2026.08.27c',
     headline: 'Active Blockers & Extended Backdate',
     date: 'August 27, 2026',
