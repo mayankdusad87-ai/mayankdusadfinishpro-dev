@@ -188,8 +188,8 @@ export async function saveActivityDetail(input: SupervisorSaveInput): Promise<St
   const result = await updateActivityWithAudit(input.activityId, change.updates, {
     projectId: input.projectId,
     changedBy: input.userId,
-    oldStatus: change.statusChanged ? input.oldStatus : undefined,
-    newStatus: change.statusChanged ? change.resolvedStatus : undefined,
+    oldStatus: input.oldStatus,
+    newStatus: change.statusChanged ? change.resolvedStatus : input.oldStatus,
     floor: input.floor,
     flatNumber: input.flatNumber,
     stage: input.stage,
