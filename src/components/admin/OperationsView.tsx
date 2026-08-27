@@ -151,10 +151,13 @@ function groupInProgressByFloor(details: InProgressDetail[]): InProgressFloorGro
       stage: a.stage,
       units: [...a.units].sort((x, y) => x - y),
     }));
+    // Count distinct flats across all activities (not sum of per-activity counts)
+    const distinctFlats = new Set<number>();
+    for (const a of activities) for (const u of a.units) distinctFlats.add(u);
     groups.push({
       floor,
       activities,
-      totalUnits: activities.reduce((s, a) => s + a.units.length, 0),
+      totalUnits: distinctFlats.size,
     });
   }
 
