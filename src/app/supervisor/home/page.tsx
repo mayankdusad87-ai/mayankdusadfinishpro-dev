@@ -96,12 +96,16 @@ export default function SupervisorHomePage() {
       setLoading(false);
     });
     getActiveReasons().then(setReasons).catch(() => {});
-    // Compute backdate cutoff date
+    // Compute backdate cutoff date (fall back to 3 days if DB fetch fails)
     getBackdateLimit().then(days => {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - days);
       setBackdateCutoff(cutoff.toISOString().slice(0, 10));
-    }).catch(() => {});
+    }).catch(() => {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 3);
+      setBackdateCutoff(cutoff.toISOString().slice(0, 10));
+    });
   }, []);
 
   useEffect(() => {

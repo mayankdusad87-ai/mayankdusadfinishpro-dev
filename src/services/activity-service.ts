@@ -151,6 +151,7 @@ export interface SupervisorSaveInput {
   stage: string;
   stageGate: string;
   activityName: string;
+  backdateCutoff?: string; // ISO date — earliest allowed date
 }
 
 export async function saveActivityDetail(input: SupervisorSaveInput): Promise<StatusUpdateResult> {
@@ -166,6 +167,7 @@ export async function saveActivityDetail(input: SupervisorSaveInput): Promise<St
     remarks: input.remarks,
     photoCount: input.photoCount,
     today,
+    backdateCutoff: input.backdateCutoff,
   });
 
   if (validation) {

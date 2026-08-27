@@ -161,6 +161,7 @@ export default function ActivityDetailSheet({
       stage: activity.stage,
       stageGate: activity.stage_gate,
       activityName: activity.activity,
+      backdateCutoff: backdateCutoff || undefined,
     });
 
     if (result.error) {

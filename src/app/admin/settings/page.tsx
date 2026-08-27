@@ -340,8 +340,8 @@ export default function SettingsPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>
-            Supervisors can only update activities within this window. Activities older than <strong>{backdateDays} days</strong> will
-            appear greyed out on their screen. Every change to this setting is logged with the admin who made it.
+            Supervisors can only select actual start / end dates within the last <strong>{backdateDays} days</strong>.
+            Dates older than this limit will be blocked in the date picker. Every change to this setting is logged with the admin who made it.
           </span>
         </div>
       </div>

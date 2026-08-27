@@ -43,9 +43,21 @@ export function validateSupervisorSave(input: {
   remarks: string;
   photoCount: number;
   today: string;
+  backdateCutoff?: string; // ISO date — earliest allowed date for actual dates
 }): ValidationError | null {
   if (input.actualStart && input.actualStart > input.today) {
     return { field: 'actual_start', message: 'Actual start date cannot be a future date.' };
+  }
+  if (input.actualEnd && input.actualEnd > input.today) {
+    return { field: 'actual_end', message: 'Actual end date cannot be a future date.' };
+  }
+  if (input.backdateCutoff) {
+    if (input.actualStart && input.actualStart < input.backdateCutoff) {
+      return { field: 'actual_start', message: `Actual start date cannot be earlier than ${input.backdateCutoff}. Contact your admin to extend the back-date window.` };
+    }
+    if (input.actualEnd && input.actualEnd < input.backdateCutoff) {
+      return { field: 'actual_end', message: `Actual end date cannot be earlier than ${input.backdateCutoff}. Contact your admin to extend the back-date window.` };
+    }
   }
   if (input.actualEnd && input.actualStart && input.actualEnd < input.actualStart) {
     return { field: 'actual_end', message: 'Actual end date cannot be earlier than actual start date.' };

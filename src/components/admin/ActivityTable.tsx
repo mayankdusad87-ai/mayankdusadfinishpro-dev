@@ -635,6 +635,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                 <input
                   type="date"
                   value={dateEditTarget.actualStart}
+                  max={todayISO()}
                   onChange={e => setDateEditTarget({ ...dateEditTarget, actualStart: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
@@ -645,6 +646,7 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                   type="date"
                   value={dateEditTarget.actualEnd}
                   min={dateEditTarget.actualStart || undefined}
+                  max={todayISO()}
                   onChange={e => setDateEditTarget({ ...dateEditTarget, actualEnd: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
