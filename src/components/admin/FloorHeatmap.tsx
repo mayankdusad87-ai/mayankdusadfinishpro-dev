@@ -80,12 +80,17 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Floor Readiness</span>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg px-4 md:px-5 py-3 shadow-sm text-center min-w-[90px]">
-          <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsFullyReady}</div>
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsFirstCoatDone}</div>
           <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">Fully Ready</div>
+          <div className="text-[10px] md:text-[11px] text-gray-400">Upto First Coat Paint</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg px-4 md:px-5 py-3 shadow-sm text-center min-w-[90px]">
           <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsInProgress}</div>
           <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">In Progress</div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg px-4 md:px-5 py-3 shadow-sm text-center min-w-[90px]">
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsLobbyDone}</div>
+          <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">Lobby Floor Readiness</div>
         </div>
 
         {/* Legend */}

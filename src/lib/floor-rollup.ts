@@ -21,6 +21,27 @@ export interface HeatmapData {
   stageCompletionUnits: Record<string, RollupCell>;
   floorsFullyReady: number;
   floorsInProgress: number;
+  floorsFirstCoatDone: number;
+  floorsLobbyDone: number;
+}
+
+const FIRST_COAT_ALIASES = ['1st coat paint', 'first coat paint'];
+const LOBBY_ALIASES = ['lobby flooring'];
+
+function isFirstCoatStage(stage: string): boolean {
+  return FIRST_COAT_ALIASES.includes(stage.toLowerCase());
+}
+
+function isLobbyStage(stage: string): boolean {
+  return LOBBY_ALIASES.includes(stage.toLowerCase());
+}
+
+/** Check if a floor has a given stage completed */
+function floorStageDone(row: FloorRow, matchFn: (s: string) => boolean): boolean {
+  for (const stage of Object.keys(row.stages)) {
+    if (matchFn(stage) && row.stages[stage].label === 'completed') return true;
+  }
+  return false;
 }
 
 function isCompleted(s: string): boolean {
@@ -46,7 +67,7 @@ function rollup(completed: number, yetToStart: number, total: number): RollupCel
 export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
   const applicable = activities.filter(a => isApplicable(a.status));
   if (applicable.length === 0) {
-    return { stages: [], floors: [], stageCompletionFloors: {}, stageCompletionUnits: {}, floorsFullyReady: 0, floorsInProgress: 0 };
+    return { stages: [], floors: [], stageCompletionFloors: {}, stageCompletionUnits: {}, floorsFullyReady: 0, floorsInProgress: 0, floorsFirstCoatDone: 0, floorsLobbyDone: 0 };
   }
 
   const stagesSet = new Set<string>();
@@ -158,6 +179,8 @@ export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
 
   const floorsFullyReady = floorRows.filter(r => r.readiness === 'completed').length;
   const floorsInProgress = floorRows.filter(r => r.readiness === 'running').length;
+  const floorsFirstCoatDone = floorRows.filter(r => floorStageDone(r, isFirstCoatStage)).length;
+  const floorsLobbyDone = floorRows.filter(r => floorStageDone(r, isLobbyStage)).length;
 
   return {
     stages,
@@ -166,6 +189,8 @@ export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
     stageCompletionUnits,
     floorsFullyReady,
     floorsInProgress,
+    floorsFirstCoatDone,
+    floorsLobbyDone,
   };
 }
 
@@ -193,7 +218,7 @@ function sortStages(stages: string[]): string[] {
 
 export function computeHeatmapFromRollup(rollupData: SubstageRollup[], stagesList: string[]): HeatmapData {
   if (rollupData.length === 0) {
-    return { stages: [], floors: [], stageCompletionFloors: {}, stageCompletionUnits: {}, floorsFullyReady: 0, floorsInProgress: 0 };
+    return { stages: [], floors: [], stageCompletionFloors: {}, stageCompletionUnits: {}, floorsFullyReady: 0, floorsInProgress: 0, floorsFirstCoatDone: 0, floorsLobbyDone: 0 };
   }
 
   const rawStages = stagesList.length > 0 ? stagesList : [...new Set(rollupData.map(r => r.stage))];
@@ -292,6 +317,8 @@ export function computeHeatmapFromRollup(rollupData: SubstageRollup[], stagesLis
 
   const floorsFullyReady = floorRows.filter(r => r.readiness === 'completed').length;
   const floorsInProgress = floorRows.filter(r => r.readiness === 'running').length;
+  const floorsFirstCoatDone = floorRows.filter(r => floorStageDone(r, isFirstCoatStage)).length;
+  const floorsLobbyDone = floorRows.filter(r => floorStageDone(r, isLobbyStage)).length;
 
-  return { stages, floors: floorRows, stageCompletionFloors, stageCompletionUnits, floorsFullyReady, floorsInProgress };
+  return { stages, floors: floorRows, stageCompletionFloors, stageCompletionUnits, floorsFullyReady, floorsInProgress, floorsFirstCoatDone, floorsLobbyDone };
 }

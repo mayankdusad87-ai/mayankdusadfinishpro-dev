@@ -91,7 +91,7 @@ export default function DashboardPage() {
 
   // Compute heatmap from rollup data
   const heatmapData: HeatmapData = useMemo(() => {
-    if (!dashData) return { stages: [], floors: [], stageCompletionFloors: {}, stageCompletionUnits: {}, floorsFullyReady: 0, floorsInProgress: 0 };
+    if (!dashData) return { stages: [], floors: [], stageCompletionFloors: {}, stageCompletionUnits: {}, floorsFullyReady: 0, floorsInProgress: 0, floorsFirstCoatDone: 0, floorsLobbyDone: 0 };
     return computeHeatmapFromRollup(dashData.heatmap, dashData.stages);
   }, [dashData]);
 
