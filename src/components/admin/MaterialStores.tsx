@@ -25,41 +25,49 @@ function MaterialStores({ stores, onUnmark, showActions = false, compact = false
   const activeStores = stores.filter(s => s.unmarkedAt === null);
   const clearedStores = stores.filter(s => s.unmarkedAt !== null);
 
-  // Compact pill format for management view
+  // Compact colored-pill format for management view
   if (compact) {
+    // Color-code pills based on notes/purpose
+    const pillColor = (notes: string | null | undefined) => {
+      const n = (notes || '').toLowerCase();
+      if (n.includes('show flat') || n.includes('showflat') || n.includes('display'))
+        return { bg: 'bg-emerald-50', border: 'border-emerald-200', unit: 'text-emerald-800', type: 'text-emerald-600' };
+      if (n.includes('labour') || n.includes('labor') || n.includes('camp'))
+        return { bg: 'bg-amber-50', border: 'border-amber-200', unit: 'text-amber-800', type: 'text-amber-600' };
+      if (n.includes('godown') || n.includes('storage') || n.includes('store'))
+        return { bg: 'bg-blue-50', border: 'border-blue-200', unit: 'text-blue-800', type: 'text-blue-600' };
+      // Default
+      return { bg: 'bg-gray-50', border: 'border-gray-200', unit: 'text-gray-800', type: 'text-gray-500' };
+    };
+
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
-              <svg className="w-5 h-5 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
-              </svg>
-            </div>
-            <h3 className="text-base md:text-lg font-bold text-gray-900">Material Stores</h3>
-          </div>
-          {activeStores.length > 0 && (
-            <span className="text-sm font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full tabular-nums">
-              {activeStores.length} active
-            </span>
-          )}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-3.5 py-3 border-b border-gray-200">
+          <h4 className="text-sm font-bold text-gray-900">Material Stores</h4>
+          <span className="text-xs text-gray-500">{activeStores.length} active location{activeStores.length !== 1 ? 's' : ''}</span>
         </div>
         {activeStores.length === 0 ? (
-          <p className="text-sm text-gray-500">No units currently marked as stores</p>
+          <p className="text-sm text-gray-500 px-3.5 py-4">No units currently marked as stores</p>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {activeStores.map(store => (
-              <span
-                key={store.id}
-                className="inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-full px-3 py-1.5 text-xs font-semibold text-amber-800"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                F{store.floor}-{store.flatNumber}
-                {store.notes && (
-                  <span className="text-amber-600 font-normal">({store.notes})</span>
-                )}
-              </span>
-            ))}
+          <div className="px-3.5 py-3 max-h-[200px] overflow-y-auto">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {activeStores.map(store => {
+                const c = pillColor(store.notes);
+                return (
+                  <div
+                    key={store.id}
+                    className={`flex flex-col items-center py-2 px-1.5 rounded-lg border ${c.bg} ${c.border}`}
+                  >
+                    <span className={`text-xs font-bold tabular-nums ${c.unit}`}>
+                      F{store.floor}-{store.flatNumber}
+                    </span>
+                    {store.notes && (
+                      <span className={`text-[10px] font-medium mt-0.5 ${c.type}`}>{store.notes}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

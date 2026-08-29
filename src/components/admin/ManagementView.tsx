@@ -251,6 +251,32 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
   const [expandedPulseStage, setExpandedPulseStage] = useState<string | null>(null);
   const [weeklyDrillOpen, setWeeklyDrillOpen] = useState(false);
 
+  // Pending work analysis: per-stage floor stats and bottleneck detection
+  const pendingWorkAnalysis = useMemo(() => {
+    const stages = pendingWork.map(stageGroup => {
+      const totalFloors = stageGroup.subStages[0]?.totalFloors ?? 0;
+      const uniquePendingFloors = new Set(
+        stageGroup.subStages.flatMap(sub => sub.pendingFloors.map(pf => pf.floor))
+      );
+      const floorsCompleted = totalFloors - uniquePendingFloors.size;
+      const pendingCount = uniquePendingFloors.size;
+      const pendingPct = totalFloors > 0 ? Math.round((pendingCount / totalFloors) * 100) : 0;
+      return { stage: stageGroup.stage, totalFloors, floorsCompleted, pendingCount, pendingPct, subStageCount: stageGroup.subStages.length };
+    });
+
+    let bottleneckIdx = -1;
+    let maxDrop = 0;
+    for (let i = 1; i < stages.length; i++) {
+      const drop = stages[i - 1].floorsCompleted - stages[i].floorsCompleted;
+      if (drop > maxDrop) {
+        maxDrop = drop;
+        bottleneckIdx = i;
+      }
+    }
+
+    return { stages, bottleneckIdx, maxDrop, totalFloors: stages[0]?.totalFloors ?? 0 };
+  }, [pendingWork]);
+
   // Pipeline analysis: drop-offs between stages and bottleneck detection
   const pipelineAnalysis = useMemo(() => {
     const dropOffs: { from: string; to: string; drop: number }[] = [];
@@ -484,7 +510,7 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
 
       {/* ---- SECTION 3: FIX THIS (hidden for now — re-enable when logic is refined) ---- */}
 
-      {/* ---- SECTION 4: SITE PULSE ---- */}
+      {/* ---- SECTION 4: SITE PULSE (2-column: Pending Work | Blockers + Stores) ---- */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-4 md:px-6 py-3.5 bg-gradient-to-r from-[#162032] to-[#1e2d45]">
           <h3 className="text-sm md:text-base font-bold text-white">Site Pulse</h3>
@@ -572,159 +598,183 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
             )}
           </div>
 
-          {/* Pending work section */}
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending work</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
+          {/* ---- 2-column grid: Pending Work (left) | Blockers + Stores (right) ---- */}
+          <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-5">
 
-          {pendingWork.length === 0 ? (
-            <div className="text-center py-8">
-              <svg className="w-10 h-10 text-emerald-300 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-              </svg>
-              <div className="text-sm font-semibold text-gray-700">All clear</div>
-              <div className="text-xs text-gray-500 mt-0.5">Every sub-stage is completed across all floors</div>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-200">
-              {pendingWork.map((stageGroup) => {
-                const isExpanded = expandedPulseStage === stageGroup.stage;
-                // Floor-level progress: a floor is "done" for the stage only if it's NOT pending in ANY sub-stage
-                const totalFloors = stageGroup.subStages[0]?.totalFloors ?? 0;
-                const uniquePendingFloors = new Set(
-                  stageGroup.subStages.flatMap(sub => sub.pendingFloors.map(pf => pf.floor))
-                );
-                const floorsCompleted = totalFloors - uniquePendingFloors.size;
-                const stagePct = totalFloors > 0 ? Math.round((floorsCompleted / totalFloors) * 100) : 0;
+            {/* LEFT: Pending Work by Stage */}
+            <div>
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="text-sm font-bold text-gray-900">Pending Work by Stage</span>
+                <span className="text-xs text-gray-500 tabular-nums">{pendingWorkAnalysis.totalFloors} total floors</span>
+                <span className="ml-auto text-[10px] font-semibold text-gray-400 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded">Completed hidden</span>
+              </div>
+              <div className="text-[11px] text-gray-400 mb-2">Tap stage to expand sub-stages</div>
 
-                return (
-                  <div key={stageGroup.stage}>
-                    {/* Collapsed / expanded header */}
-                    <button
-                      onClick={() => setExpandedPulseStage(prev => prev === stageGroup.stage ? null : stageGroup.stage)}
-                      className={`w-full px-4 py-3 transition-colors cursor-pointer ${
-                        isExpanded ? 'bg-[#162032]' : 'bg-white hover:bg-gray-50'
-                      }`}
-                    >
-                      {/* Row 1: chevron + stage name + sub-stage badge */}
-                      <div className="flex items-center gap-2.5">
-                        <svg
-                          className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
-                            isExpanded ? 'rotate-90 text-[#C8922A]' : 'text-gray-500'
+              {pendingWork.length === 0 ? (
+                <div className="text-center py-8 border border-gray-200 rounded-xl">
+                  <svg className="w-10 h-10 text-emerald-300 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                  <div className="text-sm font-semibold text-gray-700">All clear</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Every sub-stage is completed across all floors</div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-200">
+                  {pendingWork.map((stageGroup, stageIdx) => {
+                    const isExpanded = expandedPulseStage === stageGroup.stage;
+                    const analysis = pendingWorkAnalysis.stages[stageIdx];
+                    const isBottleneck = stageIdx === pendingWorkAnalysis.bottleneckIdx && pendingWorkAnalysis.maxDrop > 0;
+                    const prevStageName = stageIdx > 0 ? pendingWork[stageIdx - 1].stage : '';
+
+                    return (
+                      <div key={stageGroup.stage}>
+                        {/* Collapsed / expanded header */}
+                        <button
+                          onClick={() => setExpandedPulseStage(prev => prev === stageGroup.stage ? null : stageGroup.stage)}
+                          className={`w-full px-4 py-3 transition-colors cursor-pointer text-left ${
+                            isExpanded
+                              ? 'bg-[#162032]'
+                              : isBottleneck
+                                ? 'bg-amber-50 border-l-[3px] border-l-amber-400 hover:bg-amber-100/60'
+                                : 'bg-white hover:bg-gray-50'
                           }`}
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                        </svg>
-                        <span className={`text-sm font-semibold ${isExpanded ? 'text-white' : 'text-gray-800'}`}>
-                          {stageGroup.stage}
-                        </span>
-                        <span className={`ml-auto text-xs flex-shrink-0 tabular-nums ${isExpanded ? 'text-gray-400' : 'text-gray-500'}`}>
-                          {stageGroup.subStages.length} sub-stage{stageGroup.subStages.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      {/* Row 2: progress bar + floor count */}
-                      <div className="flex items-center gap-2.5 mt-2 pl-6">
-                        <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isExpanded ? 'bg-white/15' : 'bg-gray-100'}`}>
-                          <div
-                            className={`h-1.5 rounded-full transition-all duration-500 ${isExpanded ? 'bg-[#C8922A]' : 'bg-blue-500'}`}
-                            style={{ width: `${stagePct}%` }}
-                          />
-                        </div>
-                        <span className={`text-xs tabular-nums flex-shrink-0 font-medium ${
-                          isExpanded ? 'text-gray-300' : 'text-gray-500'
-                        }`}>
-                          {floorsCompleted}/{totalFloors} floors
-                        </span>
-                      </div>
-                    </button>
-
-                    {/* Expanded: sub-stage detail rows */}
-                    <div
-                      className="grid transition-[grid-template-rows] duration-200 ease-out"
-                      style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
-                    >
-                      <div className={`overflow-hidden ${isExpanded ? 'bg-gray-50/80' : ''}`}>
-                        {/* Legend row */}
-                        <div className="flex items-center gap-4 px-4 py-2 border-b border-gray-100">
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-blue-500" />
-                            <span className="text-xs text-gray-500">In progress</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-gray-300" />
-                            <span className="text-xs text-gray-500">Yet to start</span>
-                          </div>
-                        </div>
-
-                        {stageGroup.subStages.map((sub, idx) => {
-                          const pct = sub.totalFloors > 0 ? Math.round((sub.completedFloors / sub.totalFloors) * 100) : 0;
-                          return (
-                            <div
-                              key={sub.subStage}
-                              className={`flex items-start md:items-center gap-3 px-4 py-3 ${
-                                idx < stageGroup.subStages.length - 1 ? 'border-b border-gray-100' : ''
+                          {/* Row 1: chevron + stage name + bottleneck badge + sub-stage count + pending/total */}
+                          <div className="flex items-center gap-2">
+                            <svg
+                              className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
+                                isExpanded ? 'rotate-90 text-[#C8922A]' : 'text-gray-400'
                               }`}
+                              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
                             >
-                              {/* Sub-stage name */}
-                              <div className="w-[120px] md:w-[160px] flex-shrink-0">
-                                <div className="text-sm font-medium text-gray-800 leading-tight">{sub.subStage}</div>
-                              </div>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                            </svg>
+                            <span className={`text-sm font-semibold ${isExpanded ? 'text-white' : 'text-gray-800'}`}>
+                              {stageGroup.stage}
+                            </span>
+                            {isBottleneck && !isExpanded && (
+                              <span className="text-[9px] font-extrabold tracking-wide text-amber-800 bg-amber-200 px-1.5 py-0.5 rounded">BOTTLENECK</span>
+                            )}
+                            <div className="ml-auto flex items-center gap-3">
+                              <span className={`text-[11px] flex-shrink-0 ${isExpanded ? 'text-gray-400' : 'text-gray-500'}`}>
+                                {stageGroup.subStages.length} sub-stage{stageGroup.subStages.length !== 1 ? 's' : ''}
+                              </span>
+                              <span className={`text-xs font-bold flex-shrink-0 tabular-nums ${isExpanded ? 'text-gray-300' : 'text-gray-800'}`}>
+                                <span className={
+                                  isExpanded ? 'text-amber-400'
+                                    : isBottleneck ? 'text-amber-600'
+                                      : analysis && analysis.pendingCount > 0 ? 'text-red-500' : 'text-gray-800'
+                                }>
+                                  {analysis?.pendingCount ?? 0}
+                                </span>
+                                /{analysis?.totalFloors ?? 0} floors
+                              </span>
+                            </div>
+                          </div>
+                          {/* Row 2: progress bar showing pending % */}
+                          <div className="flex items-center gap-2 mt-2 pl-6">
+                            <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isExpanded ? 'bg-white/15' : 'bg-gray-100'}`}>
+                              <div
+                                className={`h-1.5 rounded-full transition-all duration-500 ${
+                                  isExpanded ? 'bg-[#C8922A]' : isBottleneck ? 'bg-amber-400' : 'bg-blue-500'
+                                }`}
+                                style={{ width: `${analysis?.pendingPct ?? 0}%` }}
+                              />
+                            </div>
+                            <span className={`text-[11px] tabular-nums flex-shrink-0 font-semibold ${
+                              isExpanded ? 'text-gray-400' : 'text-gray-400'
+                            }`}>
+                              {analysis?.pendingPct ?? 0}%
+                            </span>
+                          </div>
+                          {/* Bottleneck message */}
+                          {isBottleneck && !isExpanded && (
+                            <div className="flex items-center gap-1.5 mt-1.5 pl-6 text-[11px] text-amber-700 font-medium">
+                              <span>▲</span> {pendingWorkAnalysis.maxDrop} floors dropped from {prevStageName} — largest gap in pipeline
+                            </div>
+                          )}
+                        </button>
 
-                              {/* Progress bar + count + floor chips */}
-                              <div className="flex-1 min-w-0 space-y-1.5">
-                                <div className="flex items-center gap-2">
-                                  <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-1.5 rounded-full bg-blue-500 transition-all duration-500"
-                                      style={{ width: `${pct}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-xs text-gray-500 tabular-nums flex-shrink-0">
-                                    {sub.completedFloors}/{sub.totalFloors}
-                                  </span>
-                                </div>
-                                <div className="flex gap-1 flex-wrap">
-                                  {sub.pendingFloors.map(pf => (
-                                    <span
-                                      key={pf.floor}
-                                      className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded ${
-                                        pf.status === 'in_progress'
-                                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                          : 'bg-gray-100 text-gray-500 border border-gray-200'
-                                      }`}
-                                    >
-                                      F{pf.floor}
-                                    </span>
-                                  ))}
-                                </div>
+                        {/* Expanded: sub-stage detail rows */}
+                        <div
+                          className="grid transition-[grid-template-rows] duration-200 ease-out"
+                          style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+                        >
+                          <div className={`overflow-hidden ${isExpanded ? 'bg-gray-50/80' : ''}`}>
+                            {/* Legend row */}
+                            <div className="flex items-center gap-4 px-4 py-2 border-b border-gray-100">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                <span className="text-xs text-gray-500">In progress</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-gray-300" />
+                                <span className="text-xs text-gray-500">Yet to start</span>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
 
-          {/* Footer note */}
-          {pendingWork.length > 0 && (
-            <div className="text-xs text-gray-500 mt-2.5">
-              Tap a stage to see sub-stage detail. Completed sub-stages are hidden.
+                            {stageGroup.subStages.map((sub, idx) => {
+                              const pct = sub.totalFloors > 0 ? Math.round((sub.completedFloors / sub.totalFloors) * 100) : 0;
+                              return (
+                                <div
+                                  key={sub.subStage}
+                                  className={`flex items-start md:items-center gap-3 px-4 py-3 ${
+                                    idx < stageGroup.subStages.length - 1 ? 'border-b border-gray-100' : ''
+                                  }`}
+                                >
+                                  {/* Sub-stage name */}
+                                  <div className="w-[120px] md:w-[160px] flex-shrink-0">
+                                    <div className="text-sm font-medium text-gray-800 leading-tight">{sub.subStage}</div>
+                                  </div>
+
+                                  {/* Progress bar + count + floor chips */}
+                                  <div className="flex-1 min-w-0 space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-1.5 rounded-full bg-blue-500 transition-all duration-500"
+                                          style={{ width: `${pct}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-xs text-gray-500 tabular-nums flex-shrink-0">
+                                        {sub.completedFloors}/{sub.totalFloors}
+                                      </span>
+                                    </div>
+                                    <div className="flex gap-1 flex-wrap">
+                                      {sub.pendingFloors.map(pf => (
+                                        <span
+                                          key={pf.floor}
+                                          className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded ${
+                                            pf.status === 'in_progress'
+                                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                              : 'bg-gray-100 text-gray-500 border border-gray-200'
+                                          }`}
+                                        >
+                                          F{pf.floor}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
+
+            {/* RIGHT: Active Blockers + Material Stores */}
+            <div className="flex flex-col gap-4">
+              <ActiveBlockers data={activeBlockers} />
+              <MaterialStores stores={stores} compact />
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* ---- SECTION 5: ACTIVE BLOCKERS ---- */}
-      <ActiveBlockers data={activeBlockers} />
-
-      {/* ---- SECTION 6: MATERIAL STORES (compact pills) ---- */}
-      <MaterialStores stores={stores} compact />
     </div>
   );
 }
