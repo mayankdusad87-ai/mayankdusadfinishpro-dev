@@ -33,6 +33,19 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.29a',
+    headline: 'Pipeline Redesign',
+    date: 'August 29, 2026',
+    features: [
+      {
+        emoji: '📊',
+        title: 'Redesigned Flat Completion Pipeline',
+        description: 'Pipeline now uses unified blue progress bars with drop-off indicators between stages. Bottleneck stage (largest sequential drop) is auto-detected and highlighted with an amber badge.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.27e',
     headline: 'Supervisor UX & Weekly Report',
     date: 'August 27, 2026',
