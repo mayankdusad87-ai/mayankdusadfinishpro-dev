@@ -198,10 +198,10 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
               />
             ))}
           </div>
-          {/* Legend toggle — desktop only */}
+          {/* Legend toggle */}
           <button
             onClick={() => setShowLegend(p => !p)}
-            className="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
             title="What do these statuses mean?"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -212,10 +212,10 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
         </div>
       </div>
 
-      {/* ---- Status legend (desktop only, collapsible) ---- */}
+      {/* ---- Status legend (collapsible) ---- */}
       {showLegend && (
-        <div className="hidden md:block px-5 py-3 bg-gray-50 border-b border-gray-100">
-          <div className="grid grid-cols-4 gap-x-6 gap-y-2">
+        <div className="px-5 py-3 bg-gray-50 border-b border-gray-100">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2">
             {([
               { status: 'on_track' as TargetStatus, desc: 'Current pace will finish before deadline' },
               { status: 'at_risk' as TargetStatus, desc: 'Work started but pace too slow to finish on time' },
