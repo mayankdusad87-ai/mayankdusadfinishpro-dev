@@ -258,20 +258,22 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
     return { totalFlats: 0, completedFlats: 0, lastCompletionDate: null, delayReasons: [], statusBreakdown: { notStarted: 0, inProgress: 0, completed: 0, onHold: 0 } };
   }
 
-  // Group by flat key — track per-flat activity statuses
+  // Group by flat key — track per-flat activity statuses + reasons
   const flatMap = new Map<string, {
     total: number;
     completed: number;
     inProgress: number;
     onHold: number;
     latestEnd: string | null;
+    reasons: Map<string, number>; // reason → count of incomplete activities with this reason
+    noReasonCount: number;        // incomplete activities with no reason
   }>();
 
   for (const row of rows) {
     const key = `${row.floor}-${row.flat_number}`;
     let entry = flatMap.get(key);
     if (!entry) {
-      entry = { total: 0, completed: 0, inProgress: 0, onHold: 0, latestEnd: null };
+      entry = { total: 0, completed: 0, inProgress: 0, onHold: 0, latestEnd: null, reasons: new Map(), noReasonCount: 0 };
       flatMap.set(key, entry);
     }
 
@@ -285,10 +287,19 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
           entry.latestEnd = row.actual_end;
         }
       }
-    } else if (s === 'in_progress') {
-      entry.inProgress++;
-    } else if (s === 'on_hold') {
-      entry.onHold++;
+    } else {
+      if (s === 'in_progress') {
+        entry.inProgress++;
+      } else if (s === 'on_hold') {
+        entry.onHold++;
+      }
+      // Track delay reason for incomplete activities
+      const reason = row.delay_reason?.trim();
+      if (reason) {
+        entry.reasons.set(reason, (entry.reasons.get(reason) || 0) + 1);
+      } else {
+        entry.noReasonCount++;
+      }
     }
   }
 
@@ -323,23 +334,37 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
     }
   }
 
-  // Top delay reasons (from incomplete activities)
-  const reasonCounts = new Map<string, number>();
-  for (const row of rows) {
-    if (
-      row.delay_reason &&
-      row.delay_reason.trim() !== '' &&
-      row.status !== 'completed' &&
-      row.status !== 'completed_delayed'
-    ) {
-      const r = row.delay_reason.trim();
-      reasonCounts.set(r, (reasonCounts.get(r) || 0) + 1);
+  // Top delay reasons — flat level (each incomplete flat counted once under its dominant reason)
+  const NO_REASON = 'No reason captured';
+  const flatReasonCounts = new Map<string, number>();
+
+  for (const entry of flatMap.values()) {
+    // Skip completed flats
+    if (entry.completed === entry.total) continue;
+
+    if (entry.reasons.size === 0) {
+      // No reasons on any incomplete activity → "No reason captured"
+      flatReasonCounts.set(NO_REASON, (flatReasonCounts.get(NO_REASON) || 0) + 1);
+    } else {
+      // Pick dominant reason: most frequent across this flat's incomplete activities
+      // Tie-break: prefer an explicit reason over no-reason
+      let dominant = '';
+      let maxCount = 0;
+      for (const [r, c] of entry.reasons) {
+        if (c > maxCount) { dominant = r; maxCount = c; }
+      }
+      flatReasonCounts.set(dominant, (flatReasonCounts.get(dominant) || 0) + 1);
     }
   }
 
-  const delayReasons = [...reasonCounts.entries()]
+  const delayReasons = [...flatReasonCounts.entries()]
     .map(([reason, count]) => ({ reason, count }))
-    .sort((a, b) => b.count - a.count)
+    .sort((a, b) => {
+      // "No reason captured" always last
+      if (a.reason === NO_REASON && b.reason !== NO_REASON) return 1;
+      if (b.reason === NO_REASON && a.reason !== NO_REASON) return -1;
+      return b.count - a.count;
+    })
     .slice(0, 3);
 
   return { totalFlats, completedFlats, lastCompletionDate, delayReasons, statusBreakdown };

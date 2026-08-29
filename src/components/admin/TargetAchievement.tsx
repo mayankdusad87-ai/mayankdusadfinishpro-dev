@@ -266,7 +266,7 @@ function formatStatusBreakdown(sb: StatusBreakdown): string {
 function getWhyMessage(t: TargetAchievementResult): string | null {
   // Show "why" for not_started, behind, at_risk, missed
   if (t.status !== 'missed' && t.status !== 'at_risk' && t.status !== 'not_started' && t.status !== 'behind') return null;
-  if (t.delayReasons.length > 0) return null; // delay reasons table will show instead
+  // Show "why" even when delay reasons exist — they complement each other
 
   const sb = t.statusBreakdown;
 
@@ -403,13 +403,13 @@ function TargetCard({ target: t }: { target: TargetAchievementResult }) {
         )}
 
         {/* Delay reasons table (for missed/at_risk/delayed) */}
-        {t.delayReasons.length > 0 && (t.status === 'missed' || t.status === 'at_risk' || t.status === 'delayed' || t.status === 'behind') && (
+        {t.delayReasons.length > 0 && t.status !== 'achieved' && t.status !== 'on_track' && (
           <div className="mt-2.5 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-gray-100/80">
                   <th className="text-left px-3 py-1.5 font-semibold text-gray-500">Delay Reason</th>
-                  <th className="text-right px-3 py-1.5 font-semibold text-gray-500 w-16">Count</th>
+                  <th className="text-right px-3 py-1.5 font-semibold text-gray-500 w-16">Flats</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
