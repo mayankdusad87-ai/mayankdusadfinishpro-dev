@@ -251,6 +251,25 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
   const [expandedPulseStage, setExpandedPulseStage] = useState<string | null>(null);
   const [weeklyDrillOpen, setWeeklyDrillOpen] = useState(false);
 
+  // Pipeline analysis: drop-offs between stages and bottleneck detection
+  const pipelineAnalysis = useMemo(() => {
+    const dropOffs: { from: string; to: string; drop: number }[] = [];
+    let bottleneckIdx = -1;
+    let maxDrop = 0;
+    const totalFlats = pipeline.length > 0 ? pipeline[0].totalFlats : 0;
+
+    for (let i = 1; i < pipeline.length; i++) {
+      const drop = pipeline[i - 1].completedFlats - pipeline[i].completedFlats;
+      dropOffs.push({ from: pipeline[i - 1].stage, to: pipeline[i].stage, drop: Math.max(0, drop) });
+      if (drop > maxDrop) {
+        maxDrop = drop;
+        bottleneckIdx = i;
+      }
+    }
+
+    return { dropOffs, bottleneckIdx, maxDrop, totalFlats };
+  }, [pipeline]);
+
   // --- Fix This: fetch targets for linkage (hidden for now) ---
   // const [targetResults, setTargetResults] = useState<TargetAchievementResult[]>([]);
   /* useEffect(() => {
@@ -278,48 +297,76 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
 
       {/* ---- SECTION 1: PIPELINE FUNNEL ---- */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {/* Header with navy gradient */}
+        {/* Header */}
         <div className="px-4 md:px-6 py-3.5 bg-gradient-to-r from-[#162032] to-[#1e2d45] flex items-center justify-between">
           <div>
             <h3 className="text-sm md:text-base font-bold text-white">Flat Completion Pipeline</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Click a stage to see floor-level breakdown</p>
+            <p className="text-xs text-gray-400 mt-0.5">{pipelineAnalysis.totalFlats} total flats &bull; Click stage for floor breakdown</p>
           </div>
-          <span className="text-xs text-gray-500 hidden md:inline">{projectName}</span>
         </div>
 
         <div className="p-4 md:p-6">
-          {/* Desktop: horizontal funnel */}
+          {/* Desktop: horizontal cards with drop-off indicators */}
           <div className="hidden md:block">
-            <div className="flex gap-3">
+            <div className="flex items-stretch gap-0">
               {pipeline.map((s, i) => {
                 const w = s.totalFlats > 0 ? (s.completedFlats / s.totalFlats) * 100 : 0;
                 const isActive = selectedStage === s.stage;
+                const isBottleneck = i === pipelineAnalysis.bottleneckIdx && pipelineAnalysis.maxDrop > 0;
+                const dropOff = i > 0 ? pipelineAnalysis.dropOffs[i - 1] : null;
                 return (
-                  <div key={s.stage} className="flex-1 relative">
-                    {i < pipeline.length - 1 && (
-                      <div className="absolute -right-2 top-1/2 -translate-y-1/2 z-10">
-                        <svg width="12" height="16" viewBox="0 0 12 16" fill="none">
-                          <path d="M2 1L10 8L2 15" stroke="#C8922A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
-                        </svg>
+                  <div key={s.stage} className="flex items-stretch flex-1 min-w-0">
+                    {/* Drop-off connector between stages */}
+                    {dropOff !== null && (
+                      <div className="flex flex-col items-center justify-center w-10 shrink-0">
+                        <div className={`w-px h-4 ${dropOff.drop >= 16 ? 'bg-red-300' : dropOff.drop >= 6 ? 'bg-amber-300' : 'bg-gray-200'}`} />
+                        {dropOff.drop > 0 ? (
+                          <div className={`px-1 py-0.5 rounded text-center whitespace-nowrap ${
+                            dropOff.drop >= 16 ? 'bg-red-50' : dropOff.drop >= 6 ? 'bg-amber-50' : 'bg-gray-50'
+                          }`}>
+                            <div className={`text-[10px] font-bold tabular-nums leading-tight ${
+                              dropOff.drop >= 16 ? 'text-red-600' : dropOff.drop >= 6 ? 'text-amber-600' : 'text-gray-400'
+                            }`}>
+                              ↓{dropOff.drop}
+                            </div>
+                            {dropOff.drop >= 16 && (
+                              <div className="text-[8px] font-bold text-red-500 uppercase tracking-wide leading-tight">bottleneck</div>
+                            )}
+                          </div>
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0">
+                            <path d="M3 6H9M9 6L6 3M9 6L6 9" stroke="#D1D5DB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                        <div className={`w-px h-4 ${dropOff.drop >= 16 ? 'bg-red-300' : dropOff.drop >= 6 ? 'bg-amber-300' : 'bg-gray-200'}`} />
                       </div>
                     )}
+                    {/* Stage card */}
                     <button
                       onClick={() => setSelectedStage(isActive ? null : s.stage)}
-                      className={`w-full rounded-xl p-4 border text-center transition-all cursor-pointer ${
+                      className={`w-full rounded-xl p-4 text-center transition-all cursor-pointer border-2 ${
                         isActive
                           ? 'border-[#C8922A] ring-2 ring-[#C8922A]/20 bg-[#C8922A]/5'
-                          : 'border-gray-100 bg-gray-50/80 hover:border-gray-300 hover:shadow-md hover:bg-white'
+                          : isBottleneck
+                            ? 'border-amber-400 bg-amber-50/50 hover:shadow-md'
+                            : 'border-gray-100 bg-gray-50/80 hover:border-gray-300 hover:shadow-md hover:bg-white'
                       }`}
                     >
+                      {isBottleneck && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 mb-2">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126Z" />
+                          </svg>
+                          BOTTLENECK
+                        </span>
+                      )}
                       <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 truncate">{s.stage}</div>
                       <div className="text-2xl font-bold text-gray-900 tabular-nums">{s.completedFlats}</div>
                       <div className="text-xs text-gray-500 tabular-nums">/ {s.totalFlats} flats</div>
                       <div className="w-full h-2.5 bg-gray-200 rounded-full mt-3 overflow-hidden">
-                        <div className="h-2.5 rounded-full transition-all duration-500" style={{ width: `${w}%`, backgroundColor: barColor(w) }} />
+                        <div className="h-2.5 rounded-full transition-all duration-500" style={{ width: `${w}%`, backgroundColor: '#3b82f6' }} />
                       </div>
-                      <div className={`inline-flex items-center mt-2 px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${pctBadgeBg(w)}`}>
-                        {s.pct}%
-                      </div>
+                      <div className="mt-2 text-xs font-bold tabular-nums text-blue-600">{s.pct}%</div>
                     </button>
                   </div>
                 );
@@ -327,55 +374,93 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
             </div>
           </div>
 
-          {/* Mobile: vertical list with inline drill-down */}
-          <div className="md:hidden space-y-3">
+          {/* Mobile: vertical pipeline with drop-off indicators */}
+          <div className="md:hidden space-y-0">
             {pipeline.map((s, i) => {
               const w = s.totalFlats > 0 ? (s.completedFlats / s.totalFlats) * 100 : 0;
-              const bc = barColor(w);
               const isActive = selectedStage === s.stage;
+              const isBottleneck = i === pipelineAnalysis.bottleneckIdx && pipelineAnalysis.maxDrop > 0;
+              const dropOff = i > 0 ? pipelineAnalysis.dropOffs[i - 1] : null;
+
               return (
                 <div key={s.stage}>
+                  {/* Drop-off indicator between stages */}
+                  {dropOff && dropOff.drop > 0 && (
+                    <div className="flex items-center gap-2 py-1.5 pl-4">
+                      <svg className={`w-3 h-3 shrink-0 ${dropOff.drop >= 16 ? 'text-red-500' : dropOff.drop >= 6 ? 'text-amber-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3" />
+                      </svg>
+                      <span className={`text-xs tabular-nums ${
+                        dropOff.drop >= 16 ? 'font-bold text-red-600' : dropOff.drop >= 6 ? 'font-semibold text-amber-600' : 'text-gray-400'
+                      }`}>
+                        Drop-off: {dropOff.drop} flats from previous stage
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Stage card */}
                   <button
                     onClick={() => setSelectedStage(isActive ? null : s.stage)}
-                    className={`w-full text-left rounded-xl p-3 transition-all cursor-pointer border ${
+                    className={`w-full text-left rounded-xl p-3.5 transition-all cursor-pointer border-2 ${
                       isActive
-                        ? 'ring-2 ring-[#C8922A]/20 bg-[#C8922A]/5 border-[#C8922A]'
-                        : 'bg-gray-50/80 border-gray-100 hover:border-gray-300'
+                        ? 'border-[#C8922A] ring-2 ring-[#C8922A]/20 bg-[#C8922A]/5'
+                        : isBottleneck
+                          ? 'border-amber-400 bg-amber-50/60'
+                          : 'bg-white border-gray-100 hover:border-gray-300'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-[#162032] flex items-center justify-center text-[10px] font-bold text-white">{i + 1}</span>
-                        <span className="text-sm font-semibold text-gray-800">{s.stage}</span>
+                    {/* Top row: stage name + flats count */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2.5">
+                        {isBottleneck && (
+                          <span className="text-lg">🔶</span>
+                        )}
+                        <span className={`text-sm font-bold ${isBottleneck ? 'text-gray-900' : 'text-gray-800'}`}>{s.stage}</span>
+                        {isBottleneck && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wide">Bottleneck</span>
+                        )}
                       </div>
                       <div className="text-sm tabular-nums">
-                        <span className="font-bold text-gray-900">{s.completedFlats}</span>
-                        <span className="text-gray-500"> / {s.totalFlats}</span>
+                        <span className="font-bold text-gray-900">{s.completedFlats} flats</span>
+                        <span className="text-gray-400"> / {s.totalFlats}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-3 rounded-full transition-all duration-500" style={{ width: `${w}%`, backgroundColor: bc }} />
+
+                    {/* Progress bar with percentage inside */}
+                    <div className="relative w-full h-6 bg-gray-100 rounded-lg overflow-hidden">
+                      <div
+                        className="h-6 rounded-lg transition-all duration-500 flex items-center"
+                        style={{ width: `${Math.max(w, 8)}%`, backgroundColor: '#3b82f6' }}
+                      >
+                        {w >= 15 && (
+                          <span className="text-xs font-bold text-white ml-2.5 tabular-nums">{s.pct}%</span>
+                        )}
                       </div>
-                      <span className={`text-xs font-bold tabular-nums w-12 text-right px-1.5 py-0.5 rounded-full ${pctBadgeBg(w)}`}>{s.pct}%</span>
+                      {w < 15 && (
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500 tabular-nums">{s.pct}%</span>
+                      )}
                     </div>
+
+                    {/* Bottleneck subtitle */}
+                    {isBottleneck && (
+                      <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-amber-700">
+                        <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126Z" />
+                        </svg>
+                        Largest drop-off: {pipelineAnalysis.maxDrop} flats stuck here
+                      </div>
+                    )}
                   </button>
-                  {/* Inline drill-down on mobile — appears right below the tapped stage */}
+
+                  {/* Inline drill-down on mobile */}
                   {isActive && stageFloorBreakdowns[s.stage] && (
-                    <div className="mt-2">
+                    <div className="mt-2 mb-1">
                       <DrilldownPanel
                         stage={s.stage}
                         breakdowns={stageFloorBreakdowns[s.stage]}
                         onClose={() => setSelectedStage(null)}
                         handoverMap={handoverMap}
                       />
-                    </div>
-                  )}
-                  {i < pipeline.length - 1 && !isActive && (
-                    <div className="flex justify-center py-1">
-                      <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
-                        <path d="M8 2V10M8 10L4 6M8 10L12 6" stroke="#C8922A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
-                      </svg>
                     </div>
                   )}
                 </div>
