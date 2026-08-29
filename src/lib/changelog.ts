@@ -33,6 +33,25 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.29d',
+    headline: 'Supervisor UX Fixes',
+    date: 'August 29, 2026',
+    features: [
+      {
+        emoji: '📅',
+        title: 'Date Format Fix',
+        description: 'Backdate cutoff hint now shows in dd-mm-yyyy format instead of raw ISO dates.',
+        roles: ['supervisor'],
+      },
+      {
+        emoji: '🔔',
+        title: 'Delay Reason Banner Fix',
+        description: 'The "need delay reason" banner now counts all overdue activities without a reason, matching exactly what you see in the Overdue view.',
+        roles: ['supervisor'],
+      },
+    ],
+  },
+  {
     version: '2026.08.29c',
     headline: 'Site Pulse Redesign',
     date: 'August 29, 2026',
