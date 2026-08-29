@@ -33,6 +33,25 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.29b',
+    headline: 'Weekly Report Redesign & Target Legend',
+    date: 'August 29, 2026',
+    features: [
+      {
+        emoji: '📧',
+        title: 'Executive Weekly Report',
+        description: 'Weekly email redesigned as an executive brief: verdict banner, compact target rows with status badges, "what needs attention" narrative, and pipeline table showing flats completed and pending floors per stage.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '❓',
+        title: 'Target Status Legend',
+        description: 'Target Achievement section now includes a collapsible legend explaining all 7 status indicators (on track, at risk, behind, not started, missed, achieved, delayed).',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.29a',
     headline: 'Pipeline Redesign',
     date: 'August 29, 2026',
