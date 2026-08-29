@@ -599,7 +599,7 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
           </div>
 
           {/* ---- 2-column grid: Pending Work (left) | Blockers + Stores (right) ---- */}
-          <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] md:items-start gap-5">
 
             {/* LEFT: Pending Work by Stage */}
             <div>

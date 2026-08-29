@@ -99,16 +99,19 @@ function ActiveBlockers({ data }: Props) {
         </div>
       </div>
 
-      {/* Overdue — Not Started */}
-      <BlockerSection title="Overdue — Not Started" colorClass="red" groups={delayed} />
+      {/* Scrollable blocker content */}
+      <div className="max-h-[420px] overflow-y-auto">
+        {/* Overdue — Not Started */}
+        <BlockerSection title="Overdue — Not Started" colorClass="red" groups={delayed} />
 
-      {/* Separator */}
-      {delayed.length > 0 && onHold.length > 0 && (
-        <div className="border-t border-gray-100 mx-3.5" />
-      )}
+        {/* Separator */}
+        {delayed.length > 0 && onHold.length > 0 && (
+          <div className="border-t border-gray-100 mx-3.5" />
+        )}
 
-      {/* On Hold */}
-      <BlockerSection title="On Hold" colorClass="amber" groups={onHold} />
+        {/* On Hold */}
+        <BlockerSection title="On Hold" colorClass="amber" groups={onHold} />
+      </div>
     </div>
   );
 }
