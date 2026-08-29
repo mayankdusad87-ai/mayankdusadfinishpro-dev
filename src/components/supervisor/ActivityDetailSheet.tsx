@@ -317,7 +317,7 @@ export default function ActivityDetailSheet({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
                 {backdateCutoff && (
-                  <p className="text-[10px] text-gray-400 mt-0.5">Earliest: {backdateCutoff}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Earliest: {backdateCutoff.split('-').reverse().join('-')}</p>
                 )}
               </div>
               <div>
@@ -331,7 +331,7 @@ export default function ActivityDetailSheet({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 />
                 {backdateCutoff && (
-                  <p className="text-[10px] text-gray-400 mt-0.5">Earliest: {backdateCutoff}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Earliest: {backdateCutoff.split('-').reverse().join('-')}</p>
                 )}
               </div>
             </div>
