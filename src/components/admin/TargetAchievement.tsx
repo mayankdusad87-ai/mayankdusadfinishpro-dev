@@ -104,6 +104,7 @@ function ProgressRing({ pct, status, size = 64 }: { pct: number; status: TargetS
 export default function TargetAchievement({ projectId, projectName }: Props) {
   const [data, setData] = useState<AchievementData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showLegend, setShowLegend] = useState(false);
   const loadedForProject = useRef<string | null>(null);
 
   const loadAchievements = useCallback(async (skipCache = false) => {
@@ -185,18 +186,59 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
           </div>
         </div>
 
-        {/* Status dots summary */}
-        <div className="flex items-center gap-1.5">
-          {targets.map(t => (
-            <span
-              key={t.id}
-              className="w-2.5 h-2.5 rounded-full ring-1 ring-white/20"
-              style={{ backgroundColor: DOT_COLORS[t.status] }}
-              title={`${t.stage}: ${TARGET_STATUS_CONFIG[t.status].label}`}
-            />
-          ))}
+        {/* Status dots summary + legend toggle */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            {targets.map(t => (
+              <span
+                key={t.id}
+                className="w-2.5 h-2.5 rounded-full ring-1 ring-white/20"
+                style={{ backgroundColor: DOT_COLORS[t.status] }}
+                title={`${t.stage}: ${TARGET_STATUS_CONFIG[t.status].label}`}
+              />
+            ))}
+          </div>
+          {/* Legend toggle — desktop only */}
+          <button
+            onClick={() => setShowLegend(p => !p)}
+            className="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wider text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            title="What do these statuses mean?"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M12 18.75h.007v.008H12v-.008Z" />
+            </svg>
+            Legend
+          </button>
         </div>
       </div>
+
+      {/* ---- Status legend (desktop only, collapsible) ---- */}
+      {showLegend && (
+        <div className="hidden md:block px-5 py-3 bg-gray-50 border-b border-gray-100">
+          <div className="grid grid-cols-4 gap-x-6 gap-y-2">
+            {([
+              { status: 'on_track' as TargetStatus, desc: 'Current pace will finish before deadline' },
+              { status: 'at_risk' as TargetStatus, desc: 'Work started but pace too slow to finish on time' },
+              { status: 'behind' as TargetStatus, desc: 'No progress made with >30% of time elapsed' },
+              { status: 'not_started' as TargetStatus, desc: 'Work hasn\'t begun yet (early in timeline)' },
+              { status: 'missed' as TargetStatus, desc: 'Deadline passed, work incomplete' },
+              { status: 'achieved' as TargetStatus, desc: 'All flats completed on or before target date' },
+              { status: 'delayed' as TargetStatus, desc: 'All flats completed but after the target date' },
+            ]).map(item => {
+              const cfg = TARGET_STATUS_CONFIG[item.status];
+              return (
+                <div key={item.status} className="flex items-start gap-2">
+                  <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+                  <div>
+                    <span className={`text-xs font-bold ${cfg.text}`}>{cfg.label}</span>
+                    <p className="text-[11px] text-gray-500 leading-tight mt-0.5">{item.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ---- Target cards (vertical stack) ---- */}
       <div className="divide-y divide-gray-100">
