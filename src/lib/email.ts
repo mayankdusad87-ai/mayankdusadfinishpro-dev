@@ -212,7 +212,7 @@ export function inactivityEscalationEmailHtml(
   `;
 }
 
-// ---- Weekly Management Report ----
+// ---- Weekly Management Report (V3 — executive brief) ----
 
 export interface WeeklyTargetRow {
   stage: string;
@@ -225,95 +225,181 @@ export interface WeeklyTargetRow {
   status: 'achieved' | 'delayed' | 'missed' | 'on_track' | 'at_risk' | 'not_started' | 'behind';
 }
 
+export interface WeeklyPipelineStage {
+  stage: string;
+  completedFlats: number;
+  totalFlats: number;
+  pct: number;
+  pendingFloors: number[];       // floor numbers with incomplete work
+  isBottleneck: boolean;
+}
+
 export interface WeeklyBlocker {
   reason: string;
   activityCount: number;
   floorCount: number;
 }
 
-const PACE_BADGE: Record<string, { label: string; bg: string; color: string; barColor: string }> = {
-  achieved: { label: 'ACHIEVED', bg: '#dcfce7', color: '#166534', barColor: '#22c55e' },
-  on_track: { label: 'ON TRACK', bg: '#dcfce7', color: '#166534', barColor: '#22c55e' },
-  at_risk: { label: 'AT RISK', bg: '#fef3c7', color: '#92400e', barColor: '#f59e0b' },
-  delayed: { label: 'DELAYED', bg: '#fef3c7', color: '#92400e', barColor: '#f59e0b' },
-  missed: { label: 'BEHIND', bg: '#fee2e2', color: '#991b1b', barColor: '#ef4444' },
-  not_started: { label: 'NOT STARTED', bg: '#f3f4f6', color: '#4b5563', barColor: '#9ca3af' },
-  behind: { label: 'BEHIND', bg: '#fee2e2', color: '#991b1b', barColor: '#ef4444' },
+const TARGET_BADGE: Record<string, { label: string; bg: string; color: string; borderColor: string; bgCard: string; timingColor: string }> = {
+  achieved:    { label: 'ACHIEVED',    bg: '#dcfce7', color: '#166534', borderColor: '#bbf7d0', bgCard: '#f0fdf4', timingColor: '#166534' },
+  on_track:    { label: 'ON TRACK',    bg: '#dcfce7', color: '#166534', borderColor: '#bbf7d0', bgCard: '#f0fdf4', timingColor: '#166534' },
+  at_risk:     { label: 'AT RISK',     bg: '#fef3c7', color: '#92400e', borderColor: '#fed7aa', bgCard: '#fffbf5', timingColor: '#92400e' },
+  delayed:     { label: 'DELAYED',     bg: '#fef3c7', color: '#92400e', borderColor: '#fed7aa', bgCard: '#fffbf5', timingColor: '#92400e' },
+  missed:      { label: 'MISSED',      bg: '#fee2e2', color: '#991b1b', borderColor: '#fecaca', bgCard: '#fff5f5', timingColor: '#991b1b' },
+  not_started: { label: 'NOT STARTED', bg: '#f3f4f6', color: '#4b5563', borderColor: '#e5e7eb', bgCard: '#f9fafb', timingColor: '#6b7280' },
+  behind:      { label: 'BEHIND',      bg: '#fee2e2', color: '#991b1b', borderColor: '#fecaca', bgCard: '#fff5f5', timingColor: '#991b1b' },
 };
 
 function floorRangeLabel(from: number, to: number): string {
-  return from === to ? `Floor ${from}` : `Floors ${from}–${to}`;
+  return from === to ? `Fl ${from}` : `Fl ${from}–${to}`;
+}
+
+/** Compress [1,2,3,5,6,8] → "1–3, 5–6, 8" */
+function compressFloors(floors: number[]): string {
+  if (floors.length === 0) return '—';
+  const sorted = [...floors].sort((a, b) => a - b);
+  const ranges: string[] = [];
+  let start = sorted[0], end = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === end + 1) { end = sorted[i]; }
+    else {
+      ranges.push(start === end ? `${start}` : `${start}–${end}`);
+      start = end = sorted[i];
+    }
+  }
+  ranges.push(start === end ? `${start}` : `${start}–${end}`);
+  return 'Fl ' + ranges.join(', ');
+}
+
+/** Build timing text like the dashboard: "22d left · no progress" */
+function targetTimingText(t: WeeklyTargetRow): string {
+  const d = Math.abs(t.daysRemaining);
+  const ds = d === 1 ? 'day' : 'days';
+  if (t.status === 'achieved') return 'Completed on time';
+  if (t.status === 'delayed') return `${d} ${ds} late`;
+  if (t.status === 'missed') return `${d}d overdue`;
+  if (t.status === 'behind') return `${d}d left · no progress`;
+  if (t.status === 'not_started') return `${d}d left · not started`;
+  if (t.status === 'at_risk') return t.completedFlats === 0 ? `${d}d left · not started` : `${d}d left · pace slow`;
+  if (t.status === 'on_track') return `${d}d remaining`;
+  return '';
 }
 
 export function weeklyReportEmailHtml(
   projectName: string,
   weekRange: string,
   targets: WeeklyTargetRow[],
+  pipeline: WeeklyPipelineStage[],
   blockers: WeeklyBlocker[],
   dashboardUrl: string,
 ): string {
-  // Executive summary
-  const onTrackCount = targets.filter(t => t.status === 'achieved' || t.status === 'on_track').length;
+  // ---- Verdict ----
   const behindTargets = targets.filter(t => t.status === 'missed' || t.status === 'behind');
-  const atRiskTargets = targets.filter(t => t.status === 'at_risk' || t.status === 'delayed');
-  const notStartedTargets = targets.filter(t => t.status === 'not_started');
+  const atRiskTargets = targets.filter(t => t.status === 'at_risk' || t.status === 'delayed' || t.status === 'not_started');
+  const bottleneck = pipeline.find(s => s.isBottleneck);
+  const totalAffectedFloors = new Set(blockers.flatMap(b => Array.from({ length: b.floorCount }, (_, i) => i))).size;
+  const totalBlockerFloors = blockers.reduce((sum, b) => sum + b.floorCount, 0);
 
-  let summaryText: string;
-  if (targets.length === 0) {
-    summaryText = 'No monthly targets have been set for this project yet.';
-  } else if (behindTargets.length > 0) {
-    const worstStage = behindTargets[0].stage;
-    summaryText = `<strong style="color: #162032;">${onTrackCount} of ${targets.length}</strong> targets are on track this month. <span style="color: #991b1b; font-weight: 600;">${worstStage}</span> is significantly behind pace and needs attention.`;
+  let verdictTitle: string;
+  let verdictDesc: string;
+  let verdictBg: string;
+  let verdictBorder: string;
+  let verdictColor: string;
+  let verdictIcon: string;
+
+  if (behindTargets.length > 0 || blockers.length > 0) {
+    verdictTitle = 'Project needs attention';
+    const parts: string[] = [];
+    if (behindTargets.length > 0) parts.push(`${behindTargets.length} target${behindTargets.length > 1 ? 's' : ''} behind pace`);
+    if (bottleneck) parts.push(`${bottleneck.stage} is a bottleneck`);
+    if (blockers.length > 0) parts.push(`${totalBlockerFloors} floor${totalBlockerFloors !== 1 ? 's' : ''} blocked`);
+    verdictDesc = parts.join('. ') + '.';
+    verdictBg = '#fef2f2'; verdictBorder = '#fecaca'; verdictColor = '#991b1b'; verdictIcon = '⚠';
   } else if (atRiskTargets.length > 0) {
-    summaryText = `<strong style="color: #162032;">${onTrackCount} of ${targets.length}</strong> targets are on track. <span style="color: #92400e; font-weight: 600;">${atRiskTargets[0].stage}</span> is at risk and may need a push.`;
+    verdictTitle = 'Some targets at risk';
+    verdictDesc = `${atRiskTargets.length} target${atRiskTargets.length > 1 ? 's need' : ' needs'} a push to stay on track.`;
+    verdictBg = '#fffbeb'; verdictBorder = '#fde68a'; verdictColor = '#92400e'; verdictIcon = '⚠';
   } else {
-    summaryText = `All <strong style="color: #162032;">${targets.length}</strong> targets are on track this month. Great progress!`;
+    verdictTitle = 'Project on track';
+    verdictDesc = targets.length > 0
+      ? `All ${targets.length} targets are on pace. No blockers.`
+      : 'No active blockers. Pipeline progressing normally.';
+    verdictBg = '#f0fdf4'; verdictBorder = '#bbf7d0'; verdictColor = '#166534'; verdictIcon = '✓';
   }
 
-  // Target cards
-  const targetCards = targets.map(t => {
-    const badge = PACE_BADGE[t.status] || PACE_BADGE.on_track;
-    const isBehind = t.status === 'missed' || t.status === 'behind';
-    const cardBorder = isBehind ? '#fecaca' : '#e2e8f0';
-    const cardBg = isBehind ? '#fff5f5' : '#ffffff';
-    const trackBg = isBehind ? '#fecaca' : '#e2e8f0';
-    const pctWidth = Math.max(t.progressPct, 2);
-
+  // ---- Target rows (compact one-line each) ----
+  const targetRows = targets.map(t => {
+    const badge = TARGET_BADGE[t.status] || TARGET_BADGE.on_track;
+    const timing = targetTimingText(t);
     return `
-      <div style="border: 1px solid ${cardBorder}; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; background: ${cardBg};">
-        <table style="width: 100%;"><tr>
-          <td style="font-size: 14px; font-weight: 600; color: #1e293b;">${t.stage}</td>
-          <td style="text-align: right;"><span style="background: ${badge.bg}; color: ${badge.color}; padding: 2px 10px; border-radius: 10px; font-weight: 600; font-size: 11px; letter-spacing: 0.3px;">${badge.label}</span></td>
-        </tr></table>
-        <table style="width: 100%; margin-top: 8px;"><tr>
-          <td style="font-size: 12px; color: #64748b;">${t.completedFlats} of ${t.totalFlats} flats</td>
-          <td style="text-align: right; font-size: 12px; color: #64748b;">${t.progressPct}%</td>
-        </tr></table>
-        <div style="height: 6px; background: ${trackBg}; border-radius: 3px; margin-top: 6px;">
-          <div style="width: ${pctWidth}%; height: 6px; background: ${badge.barColor}; border-radius: 3px;"></div>
-        </div>
-        <div style="font-size: 11px; color: #94a3b8; margin-top: 6px;">${t.daysRemaining >= 0 ? `${t.daysRemaining} days remaining` : `${Math.abs(t.daysRemaining)} days overdue`} · ${floorRangeLabel(t.floorFrom, t.floorTo)}</div>
-      </div>`;
+      <table style="width: 100%; margin-bottom: 6px;"><tr>
+        <td style="background: ${badge.bgCard}; border: 1px solid ${badge.borderColor}; border-radius: 6px; padding: 10px 14px;">
+          <table style="width: 100%;"><tr>
+            <td style="font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap;">${t.stage}</td>
+            <td style="font-size: 12px; color: #64748b; text-align: center; padding: 0 8px; white-space: nowrap;">${floorRangeLabel(t.floorFrom, t.floorTo)} · ${t.completedFlats}/${t.totalFlats} flats</td>
+            <td style="font-size: 11px; font-weight: 600; color: ${badge.timingColor}; text-align: right; white-space: nowrap;">${timing}</td>
+            <td style="text-align: right; padding-left: 8px; white-space: nowrap;">
+              <span style="background: ${badge.bg}; color: ${badge.color}; padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 10px; letter-spacing: 0.3px;">${badge.label}</span>
+            </td>
+          </tr></table>
+        </td>
+      </tr></table>`;
   }).join('');
 
-  // Blocker rows
-  const blockerRows = blockers.length > 0
-    ? blockers.map((b, i) => {
-        const severity = i === 0 ? '#ef4444' : '#f59e0b';
-        const borderBottom = i < blockers.length - 1 ? 'border-bottom: 1px solid #f1f5f9;' : '';
-        return `
-          <tr>
-            <td style="width: 16px; padding: 12px 0 12px 12px; vertical-align: middle;">
-              <div style="width: 4px; height: 28px; background: ${severity}; border-radius: 2px;"></div>
-            </td>
-            <td style="padding: 12px 16px 12px 12px; ${borderBottom}">
-              <div style="font-size: 13px; font-weight: 600; color: #1e293b;">${b.reason}</div>
-              <div style="font-size: 11px; color: #94a3b8; margin-top: 1px;">Affecting ${b.activityCount} activit${b.activityCount === 1 ? 'y' : 'ies'} across ${b.floorCount} floor${b.floorCount !== 1 ? 's' : ''}</div>
-            </td>
-          </tr>`;
-      }).join('')
-    : '<tr><td style="padding: 16px; text-align: center; font-size: 13px; color: #94a3b8;">No active blockers — all clear!</td></tr>';
+  // ---- Pipeline + pending floors table ----
+  const totalFlats = pipeline.length > 0 ? pipeline[0].totalFlats : 0;
+  const pipelineRows = pipeline.map((s, i) => {
+    const isLast = i === pipeline.length - 1;
+    const bb = isLast ? '' : 'border-bottom: 1px solid #f1f5f9;';
+    const rowBg = s.isBottleneck ? 'background: #fffbeb;' : '';
+    const nameColor = s.isBottleneck ? 'color: #92400e;' : 'color: #1e293b;';
+    const flatsColor = s.isBottleneck ? 'color: #92400e; font-weight: 600;' : 'color: #475569;';
+    const floorsColor = s.isBottleneck ? 'color: #92400e; font-weight: 600;' : 'color: #64748b;';
+    const bnIcon = s.isBottleneck ? ' <span style="font-size: 9px; vertical-align: middle;">⚠</span>' : '';
+    const floorsText = s.pendingFloors.length > 0
+      ? `${compressFloors(s.pendingFloors)} <span style="color: ${s.isBottleneck ? '#b45309' : '#94a3b8'};">(${s.pendingFloors.length})</span>`
+      : '<span style="color: #22c55e;">✓ All done</span>';
 
+    return `
+      <tr style="${rowBg}">
+        <td style="padding: 9px 12px; font-size: 12px; font-weight: 600; ${nameColor} ${bb}">${s.stage}${bnIcon}</td>
+        <td style="padding: 9px 12px; font-size: 12px; text-align: center; ${bb} font-variant-numeric: tabular-nums; ${flatsColor}"><strong>${s.completedFlats}</strong>/${s.totalFlats}</td>
+        <td style="padding: 9px 12px; font-size: 11px; text-align: right; ${bb} ${floorsColor}">${floorsText}</td>
+      </tr>`;
+  }).join('');
+
+  // ---- What needs attention (narrative) ----
+  const attentionItems: string[] = [];
+
+  if (bottleneck) {
+    const prevIdx = pipeline.indexOf(bottleneck) - 1;
+    const prevStage = prevIdx >= 0 ? pipeline[prevIdx] : null;
+    const drop = prevStage ? prevStage.completedFlats - bottleneck.completedFlats : 0;
+    if (drop > 0 && prevStage) {
+      attentionItems.push(`
+        <tr>
+          <td style="width: 4px; background: #f59e0b; border-radius: 3px 0 0 3px;"></td>
+          <td style="background: #fffbeb; padding: 10px 14px; border-radius: 0 6px 6px 0;">
+            <div style="font-size: 13px; font-weight: 600; color: #1e293b;">${bottleneck.stage} is the bottleneck</div>
+            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">${drop} flats dropped between ${prevStage.stage} → ${bottleneck.stage}. Only ${bottleneck.pct}% complete vs ${prevStage.pct}% at ${prevStage.stage}.</div>
+          </td>
+        </tr>`);
+    }
+  }
+
+  if (blockers.length > 0) {
+    const topReasons = blockers.slice(0, 3).map(b => `${b.reason} (${b.floorCount} floor${b.floorCount !== 1 ? 's' : ''})`).join(', ');
+    attentionItems.push(`
+      <tr>
+        <td style="width: 4px; background: #ef4444; border-radius: 3px 0 0 3px;"></td>
+        <td style="background: #fef2f2; padding: 10px 14px; border-radius: 0 6px 6px 0;">
+          <div style="font-size: 13px; font-weight: 600; color: #1e293b;">${totalBlockerFloors} floor${totalBlockerFloors !== 1 ? 's have' : ' has'} unresolved blockers</div>
+          <div style="font-size: 12px; color: #64748b; margin-top: 2px;">Top reasons: ${topReasons}.</div>
+        </td>
+      </tr>`);
+  }
+
+  // ---- Assemble ----
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #162032; padding: 24px 28px 20px; border-radius: 8px 8px 0 0;">
@@ -326,27 +412,52 @@ export function weeklyReportEmailHtml(
         <div style="font-size: 13px; color: #94a3b8; margin-top: 6px;">${weekRange}</div>
       </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 28px; border-radius: 0 0 8px 8px;">
-        <div style="background: #f8fafc; border-radius: 8px; padding: 14px 18px; margin-bottom: 28px; border-left: 3px solid #C8922A;">
-          <p style="margin: 0; font-size: 14px; color: #334155; line-height: 1.5;">${summaryText}</p>
+
+        <div style="background: ${verdictBg}; border: 1px solid ${verdictBorder}; border-radius: 8px; padding: 16px 18px; margin-bottom: 24px;">
+          <table style="width: 100%;"><tr>
+            <td style="width: 36px; vertical-align: top;">
+              <div style="width: 32px; height: 32px; background: ${verdictBorder}; border-radius: 50%; text-align: center; line-height: 32px; font-size: 16px;">${verdictIcon}</div>
+            </td>
+            <td style="padding-left: 12px;">
+              <div style="font-size: 15px; font-weight: 700; color: ${verdictColor}; line-height: 1.3;">${verdictTitle}</div>
+              <div style="font-size: 13px; color: #64748b; margin-top: 4px; line-height: 1.5;">${verdictDesc}</div>
+            </td>
+          </tr></table>
         </div>
+
         ${targets.length > 0 ? `
-        <div style="margin-bottom: 28px;">
-          <div style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 14px;">Monthly target pace</div>
-          ${targetCards}
-        </div>` : ''}
         <div style="margin-bottom: 24px;">
-          <div style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 14px;">Current blockers</div>
-          <table style="width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; border-collapse: collapse;">
-            ${blockerRows}
+          <div style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px;">Targets · ${targets.filter(t => t.status === 'achieved' || t.status === 'delayed').length} of ${targets.length} achieved</div>
+          ${targetRows}
+        </div>` : ''}
+
+        ${attentionItems.length > 0 ? `
+        <div style="margin-bottom: 24px;">
+          <div style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px;">What needs attention</div>
+          <table style="width: 100%; border-collapse: separate; border-spacing: 0 6px;">
+            ${attentionItems.join('')}
+          </table>
+        </div>` : ''}
+
+        <div style="margin-bottom: 24px;">
+          <div style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px;">Pipeline · ${totalFlats} total flats</div>
+          <table style="width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; border-collapse: separate; border-spacing: 0; overflow: hidden;">
+            <tr style="background: #f8fafc;">
+              <td style="padding: 7px 12px; font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">Stage</td>
+              <td style="padding: 7px 12px; font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; text-align: center; width: 70px;">Flats</td>
+              <td style="padding: 7px 12px; font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; text-align: right;">Floors Pending</td>
+            </tr>
+            ${pipelineRows}
           </table>
         </div>
+
         <div style="text-align: center; margin: 28px 0 8px;">
           <a href="${dashboardUrl}" style="display: inline-block; background: #162032; color: #C8922A; text-decoration: none; padding: 11px 32px; border-radius: 6px; font-weight: 600; font-size: 13px; letter-spacing: 0.3px;">View full dashboard &rarr;</a>
         </div>
         <div style="border-top: 1px solid #e2e8f0; margin-top: 24px; padding-top: 16px;">
           <p style="margin: 0; font-size: 11px; color: #94a3b8; text-align: center; line-height: 1.6;">
             Automated weekly report · Finishing Pro<br>
-            Sent every Monday to active management users
+            Sent every Tuesday to management users · Admins in CC
           </p>
         </div>
       </div>

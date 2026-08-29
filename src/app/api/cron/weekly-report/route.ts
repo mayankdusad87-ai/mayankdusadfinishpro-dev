@@ -4,6 +4,7 @@ import {
   sendEmail,
   weeklyReportEmailHtml,
   type WeeklyTargetRow,
+  type WeeklyPipelineStage,
   type WeeklyBlocker,
 } from '@/lib/email';
 import {
@@ -14,6 +15,14 @@ import {
 } from '@/lib/target-engine';
 
 const DASHBOARD_URL = 'https://finishpro-dev.vercel.app/login';
+
+const PIPELINE_STAGES = [
+  'Pre-Tiling',
+  'Tiling',
+  'Post Tiling',
+  'Pre Paint Activities',
+  '1st coat paint',
+];
 
 /**
  * GET /api/cron/weekly-report
@@ -103,7 +112,7 @@ export async function GET(req: NextRequest) {
     const weekRange = `Week of ${fmt(weekStart)} – ${fmt(weekEnd)} ${weekEnd.getFullYear()}`;
 
     let totalSent = 0;
-    const results: { project: string; sent: boolean; targets: number; blockers: number }[] = [];
+    const results: { project: string; sent: boolean; targets: number; pipelineStages: number; blockers: number }[] = [];
 
     // 3. For each project, build and send the report
     for (const project of projects) {
@@ -140,19 +149,23 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // 3b. Fetch current blockers (delay reasons from non-completed activities)
+      // 3b. Fetch pipeline data (per-stage flat completion + pending floors)
+      const pipeline = await fetchPipelineData(project.id);
+
+      // 3c. Fetch current blockers (delay reasons from non-completed activities)
       const blockers = await fetchBlockers(project.id);
 
-      // 3c. Build email
+      // 3d. Build email
       const html = weeklyReportEmailHtml(
         project.name,
         weekRange,
         targetRows,
+        pipeline,
         blockers,
         DASHBOARD_URL,
       );
 
-      // 3d. Send (TO management, CC admins)
+      // 3e. Send (TO management, CC admins)
       const sent = await sendEmail({
         to: mgmtEmails,
         cc: adminEmails.length > 0 ? adminEmails : undefined,
@@ -166,11 +179,12 @@ export async function GET(req: NextRequest) {
         project: project.name,
         sent,
         targets: targetRows.length,
+        pipelineStages: pipeline.length,
         blockers: blockers.length,
       });
 
       console.log(
-        `[cron/weekly-report] ${project.name}: ${targetRows.length} targets, ${blockers.length} blockers, sent=${sent}`,
+        `[cron/weekly-report] ${project.name}: ${targetRows.length} targets, ${pipeline.length} pipeline stages, ${blockers.length} blockers, sent=${sent}`,
       );
     }
 
@@ -265,4 +279,91 @@ async function fetchBlockers(projectId: string): Promise<WeeklyBlocker[]> {
     }))
     .sort((a, b) => b.activityCount - a.activityCount)
     .slice(0, 5);
+}
+
+/**
+ * Fetch pipeline data: per-stage flat completion counts and pending floors.
+ *
+ * A flat is "completed" for a stage when ALL its activities for that stage
+ * are completed or completed_delayed (matching floor-rollup.ts logic).
+ * A floor is "pending" when at least one flat on that floor is not completed.
+ */
+async function fetchPipelineData(projectId: string): Promise<WeeklyPipelineStage[]> {
+  const stages: WeeklyPipelineStage[] = [];
+  let maxDrop = 0;
+  let bottleneckIdx = -1;
+
+  for (let si = 0; si < PIPELINE_STAGES.length; si++) {
+    const stage = PIPELINE_STAGES[si];
+
+    // Fetch all non-NA activities for this stage
+    const PAGE = 1000;
+    const all: { floor: number; flat_number: number; status: string | null }[] = [];
+    let from = 0;
+
+    while (true) {
+      const { data, error } = await supabaseAdmin
+        .from('activities')
+        .select('floor, flat_number, status')
+        .eq('project_id', projectId)
+        .eq('stage', stage)
+        .neq('status', 'not_applicable')
+        .range(from, from + PAGE - 1);
+
+      if (error || !data || data.length === 0) break;
+      all.push(...data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+
+    // Group by flat (floor:flat_number) — a flat is completed when ALL activities are done
+    const flatMap = new Map<string, { floor: number; allCompleted: boolean }>();
+    for (const row of all) {
+      const key = `${row.floor}:${row.flat_number}`;
+      const entry = flatMap.get(key) || { floor: row.floor, allCompleted: true };
+      if (row.status !== 'completed' && row.status !== 'completed_delayed') {
+        entry.allCompleted = false;
+      }
+      flatMap.set(key, entry);
+    }
+
+    const totalFlats = flatMap.size;
+    let completedFlats = 0;
+    const pendingFloorSet = new Set<number>();
+
+    for (const [, info] of flatMap) {
+      if (info.allCompleted) {
+        completedFlats++;
+      } else {
+        pendingFloorSet.add(info.floor);
+      }
+    }
+
+    const pct = totalFlats > 0 ? Math.round((completedFlats / totalFlats) * 100) : 0;
+
+    stages.push({
+      stage,
+      completedFlats,
+      totalFlats,
+      pct,
+      pendingFloors: [...pendingFloorSet].sort((a, b) => a - b),
+      isBottleneck: false, // set below
+    });
+
+    // Detect bottleneck: largest sequential drop-off
+    if (si > 0) {
+      const drop = stages[si - 1].completedFlats - completedFlats;
+      if (drop > maxDrop) {
+        maxDrop = drop;
+        bottleneckIdx = si;
+      }
+    }
+  }
+
+  // Mark bottleneck stage
+  if (bottleneckIdx >= 0 && maxDrop > 0) {
+    stages[bottleneckIdx].isBottleneck = true;
+  }
+
+  return stages;
 }
