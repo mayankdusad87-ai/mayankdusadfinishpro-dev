@@ -33,6 +33,25 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.29e',
+    headline: 'Target Achievement Insights',
+    date: 'August 29, 2026',
+    features: [
+      {
+        emoji: '🔍',
+        title: 'Delay Reasons on Targets',
+        description: 'Target Achievement now shows why targets are behind — top 3 delay reasons with flat counts, so management can see what\'s blocking progress at a glance.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📱',
+        title: 'Legend on Mobile',
+        description: 'The status legend (what each color badge means) is now accessible on mobile too, not just desktop.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.29d',
     headline: 'Supervisor UX Fixes',
     date: 'August 29, 2026',
