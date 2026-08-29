@@ -33,6 +33,31 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.29c',
+    headline: 'Site Pulse Redesign',
+    date: 'August 29, 2026',
+    features: [
+      {
+        emoji: '📋',
+        title: 'Redesigned Site Pulse Layout',
+        description: 'Site Pulse now uses a 2-column layout: Pending Work by Stage on the left (showing pending/total floors, bottleneck detection, expandable sub-stages with floor status chips) and Active Blockers + Material Stores on the right.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '🚧',
+        title: 'Compact Active Blockers',
+        description: 'Blockers redesigned as compact cards with a total badge, OVERDUE and ON HOLD sections, and expandable stage/floor detail.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📦',
+        title: 'Color-Coded Material Stores',
+        description: 'Store pills are now color-coded by type: green for Show Flat, yellow for Labour Camp, blue for Storage.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.29b',
     headline: 'Weekly Report Redesign & Target Legend',
     date: 'August 29, 2026',
