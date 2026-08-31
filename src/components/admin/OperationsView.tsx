@@ -63,6 +63,23 @@ interface VelocityData {
   lastWeekRange: string;
 }
 
+// ---- WIP Aging types ----
+
+interface WipItem {
+  floor: number;
+  flatNumber: number;
+  stage: string;
+  activity: string;
+  daysInWip: number;
+  severity: 'critical' | 'warning' | 'normal'; // 10+, 7-9, <7
+}
+
+interface WipStageGroup {
+  stage: string;
+  items: WipItem[];
+  maxDays: number;
+}
+
 // ---- Helpers (actual_start / actual_end based) ----
 
 /** Local YYYY-MM-DD (avoids UTC shift that .toISOString() causes in IST) */
@@ -332,6 +349,71 @@ function computeVelocity(rows: InsightRow[]): VelocityData {
     thisWeekRange: formatWeekRange(thisMonday, thisSunday),
     lastWeekRange: formatWeekRange(lastMonday, lastSunday),
   };
+}
+
+// ---- WIP Aging computation ----
+
+function computeWipAging(rows: InsightRow[]): WipStageGroup[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Filter to in-progress activities with an actual_start
+  const wipRows = rows.filter(r => {
+    const s = r.status;
+    return (s === 'in_progress' || s === 'in_progress_delayed') && r.actual_start;
+  });
+
+  // Group by stage, then collect per-flat the worst (longest) activity
+  // We show flat-level: for each flat in a stage, pick the activity with the most days
+  const stageMap = new Map<string, Map<string, WipItem>>();
+
+  for (const r of wipRows) {
+    const startDate = new Date(r.actual_start);
+    startDate.setHours(0, 0, 0, 0);
+    const daysInWip = Math.max(0, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+    const severity: WipItem['severity'] = daysInWip >= 10 ? 'critical' : daysInWip >= 7 ? 'warning' : 'normal';
+
+    if (!stageMap.has(r.stage)) stageMap.set(r.stage, new Map());
+    const flatMap = stageMap.get(r.stage)!;
+    const flatKey = `${r.floor}-${r.flat_number}`;
+
+    const existing = flatMap.get(flatKey);
+    // Keep the activity with the most days stuck (worst case per flat)
+    if (!existing || daysInWip > existing.daysInWip) {
+      flatMap.set(flatKey, {
+        floor: r.floor,
+        flatNumber: r.flat_number,
+        stage: r.stage,
+        activity: r.activity,
+        daysInWip,
+        severity,
+      });
+    }
+  }
+
+  // Build stage groups, ordered by VELOCITY_STAGES
+  const groups: WipStageGroup[] = [];
+  for (const stage of VELOCITY_STAGES) {
+    const flatMap = stageMap.get(stage);
+    if (!flatMap || flatMap.size === 0) continue;
+    const items = [...flatMap.values()].sort((a, b) => b.daysInWip - a.daysInWip);
+    groups.push({
+      stage,
+      items,
+      maxDays: items[0].daysInWip,
+    });
+  }
+
+  // Also include stages not in VELOCITY_STAGES (if any)
+  for (const [stage, flatMap] of stageMap) {
+    if ((VELOCITY_STAGES as readonly string[]).includes(stage)) continue;
+    if (flatMap.size === 0) continue;
+    const items = [...flatMap.values()].sort((a, b) => b.daysInWip - a.daysInWip);
+    groups.push({ stage, items, maxDays: items[0].daysInWip });
+  }
+
+  return groups;
 }
 
 // ---- Sub-components ----
@@ -724,6 +806,13 @@ function OperationsView({ data, supervisors, reversals, activityRows }: Props) {
   // Completion Velocity
   const velocity = useMemo(() => computeVelocity(activityRows), [activityRows]);
   const [expandedVelocityStage, setExpandedVelocityStage] = useState<string | null>(null);
+
+  // WIP Aging
+  const wipGroups = useMemo(() => computeWipAging(activityRows), [activityRows]);
+  const wipTotalFlats = wipGroups.reduce((s, g) => s + g.items.length, 0);
+  const wipCriticalCount = wipGroups.reduce((s, g) => s + g.items.filter(i => i.severity === 'critical').length, 0);
+  const wipWarningCount = wipGroups.reduce((s, g) => s + g.items.filter(i => i.severity === 'warning').length, 0);
+  const [expandedWipStage, setExpandedWipStage] = useState<string | null>(null);
 
   function toggleTile(tile: ExpandedTile) {
     setExpandedTile(prev => prev === tile ? null : tile);
@@ -1156,6 +1245,129 @@ function OperationsView({ data, supervisors, reversals, activityRows }: Props) {
             );
           })()}
         </div>
+      </div>
+
+      {/* ---- WIP AGING (Stuck Work) ---- */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 md:px-6 md:pt-6 md:pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base md:text-lg font-bold text-gray-900">WIP Aging</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Flats stuck in-progress — sorted by days waiting</p>
+            </div>
+          </div>
+          {/* Summary badges */}
+          <div className="flex items-center gap-1.5">
+            {wipCriticalCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600 tabular-nums">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                {wipCriticalCount} critical
+              </span>
+            )}
+            {wipWarningCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 tabular-nums">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                {wipWarningCount} warning
+              </span>
+            )}
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 tabular-nums">
+              {wipTotalFlats} flats
+            </span>
+          </div>
+        </div>
+
+        {wipGroups.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">No flats currently in progress</p>
+        ) : (
+          <>
+            {/* Table header */}
+            <div className="grid grid-cols-[1fr_70px_90px] md:grid-cols-[1fr_80px_100px] px-4 md:px-6 py-2 bg-gray-50 border-b border-gray-100">
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Stage / Flat</span>
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Days</span>
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Status</span>
+            </div>
+
+            {wipGroups.map(group => {
+              const isExpanded = expandedWipStage === group.stage;
+              const criticalInStage = group.items.filter(i => i.severity === 'critical').length;
+              const displayItems = isExpanded ? group.items : group.items.slice(0, 3);
+              return (
+                <div key={group.stage}>
+                  {/* Stage header row */}
+                  <button
+                    className={`w-full grid grid-cols-[1fr_70px_90px] md:grid-cols-[1fr_80px_100px] px-4 md:px-6 py-2.5 items-center border-b border-gray-50 transition-colors text-left ${isExpanded ? 'bg-gray-50' : 'hover:bg-gray-50/60'}`}
+                    onClick={() => setExpandedWipStage(isExpanded ? null : group.stage)}
+                  >
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-900">
+                      <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                      </svg>
+                      {group.stage}
+                      <span className="text-[10px] font-medium text-gray-400 ml-1">({group.items.length} flat{group.items.length !== 1 ? 's' : ''})</span>
+                    </span>
+                    <span className="text-sm font-bold text-gray-900 tabular-nums text-right">{group.maxDays}d</span>
+                    <span className="text-right">
+                      {criticalInStage > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          {criticalInStage} critical
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-50 text-gray-400">
+                          OK
+                        </span>
+                      )}
+                    </span>
+                  </button>
+
+                  {/* Flat detail rows */}
+                  {isExpanded && (
+                    <div className="bg-gray-50 border-b border-gray-100">
+                      {displayItems.map((item, idx) => (
+                        <div key={`${item.floor}-${item.flatNumber}-${idx}`} className="grid grid-cols-[1fr_70px_90px] md:grid-cols-[1fr_80px_100px] px-4 md:px-6 py-2 pl-10 md:pl-14 items-center border-b border-gray-50/50">
+                          <div className="min-w-0">
+                            <span className="text-[12px] font-semibold text-gray-700 tabular-nums">
+                              Fl {item.floor} — {item.flatNumber}
+                            </span>
+                            <span className="text-[10px] text-gray-400 ml-1.5 truncate">{item.activity}</span>
+                          </div>
+                          <span className={`text-[13px] font-bold tabular-nums text-right ${item.severity === 'critical' ? 'text-red-600' : item.severity === 'warning' ? 'text-amber-600' : 'text-gray-600'}`}>
+                            {item.daysInWip}d
+                          </span>
+                          <span className="text-right">
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              item.severity === 'critical' ? 'bg-red-50 text-red-600' :
+                              item.severity === 'warning' ? 'bg-amber-50 text-amber-600' :
+                              'bg-gray-50 text-gray-500'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                item.severity === 'critical' ? 'bg-red-500' :
+                                item.severity === 'warning' ? 'bg-amber-500' :
+                                'bg-gray-400'
+                              }`} />
+                              {item.severity === 'critical' ? '10+ days' : item.severity === 'warning' ? '7–9 days' : `< 7 days`}
+                            </span>
+                          </span>
+                        </div>
+                      ))}
+                      {!isExpanded && group.items.length > 3 && (
+                        <p className="text-[10px] text-gray-400 text-center py-1.5">
+                          + {group.items.length - 3} more flat{group.items.length - 3 > 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
     </div>
   );

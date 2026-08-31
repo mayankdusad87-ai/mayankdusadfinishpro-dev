@@ -34,13 +34,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '2026.08.31a',
-    headline: 'Completion Velocity',
+    headline: 'Operations Intelligence',
     date: 'August 31, 2026',
     features: [
       {
         emoji: '📈',
         title: 'Completion Velocity',
         description: 'New Completion Velocity section in Operations view — see how many flats completed per stage this week vs last week, with expandable floor and flat breakdowns. Replaces the Delay Root Cause chart.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '⚠️',
+        title: 'WIP Aging (Stuck Work)',
+        description: 'See which flats have been stuck in-progress the longest, grouped by stage. Critical (10+ days) and warning (7–9 days) flags help you spot bottlenecks instantly.',
         roles: ['admin', 'management'],
       },
     ],
