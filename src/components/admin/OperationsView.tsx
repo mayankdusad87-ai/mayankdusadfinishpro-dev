@@ -32,7 +32,7 @@ interface InProgressFloorGroup {
 type TimeRange = 'today' | 'week' | 'month';
 type ExpandedTile = 'started' | 'completed' | 'inProgress' | null;
 
-// ---- Completion Velocity types ----
+// ---- WIP Aging types ----
 
 const VELOCITY_STAGES = [
   'Pre-Tiling',
@@ -42,29 +42,6 @@ const VELOCITY_STAGES = [
   '1st coat paint',
 ] as const;
 
-interface VelocityFloorDetail {
-  floor: number;
-  flats: number[];
-}
-
-interface VelocityStageRow {
-  stage: string;
-  thisWeek: number;
-  lastWeek: number;
-  thisWeekFloors: VelocityFloorDetail[];
-  lastWeekFloors: VelocityFloorDetail[];
-}
-
-interface VelocityData {
-  stages: VelocityStageRow[];
-  thisWeekTotal: number;
-  lastWeekTotal: number;
-  thisWeekRange: string;  // e.g. "25 – 31 Aug"
-  lastWeekRange: string;
-}
-
-// ---- WIP Aging types ----
-
 interface WipItem {
   floor: number;
   flatNumber: number;
@@ -72,6 +49,7 @@ interface WipItem {
   activity: string;
   daysInWip: number;
   severity: 'critical' | 'warning' | 'normal'; // 10+, 7-9, <7
+  delayReason: string; // empty if none captured
 }
 
 interface WipStageGroup {
@@ -257,100 +235,6 @@ function formatStatus(status: string): string {
   return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-// ---- Completion Velocity computation ----
-
-/** Format a date range like "25 – 31 Aug" */
-function formatWeekRange(monday: Date, sunday: Date): string {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const d1 = monday.getDate();
-  const d2 = sunday.getDate();
-  const m1 = months[monday.getMonth()];
-  const m2 = months[sunday.getMonth()];
-  if (m1 === m2) return `${d1} – ${d2} ${m1}`;
-  return `${d1} ${m1} – ${d2} ${m2}`;
-}
-
-function computeVelocity(rows: InsightRow[]): VelocityData {
-  const now = new Date();
-
-  // This week: Monday to Sunday
-  const thisMonday = new Date(now);
-  const day = thisMonday.getDay();
-  thisMonday.setDate(thisMonday.getDate() - day + (day === 0 ? -6 : 1));
-  thisMonday.setHours(0, 0, 0, 0);
-  const thisSunday = new Date(thisMonday);
-  thisSunday.setDate(thisSunday.getDate() + 6);
-
-  // Last week
-  const lastMonday = new Date(thisMonday);
-  lastMonday.setDate(lastMonday.getDate() - 7);
-  const lastSunday = new Date(lastMonday);
-  lastSunday.setDate(lastSunday.getDate() + 6);
-
-  const thisStart = localDateStr(thisMonday);
-  const thisEnd = localDateStr(thisSunday);
-  const lastStart = localDateStr(lastMonday);
-  const lastEnd = localDateStr(lastSunday);
-
-  // Only completed activities (completed or completed_delayed)
-  const completed = rows.filter(r => {
-    const s = r.status;
-    return (s === 'completed' || s === 'completed_delayed') && r.actual_end;
-  });
-
-  const stages: VelocityStageRow[] = VELOCITY_STAGES.map(stage => {
-    const stageRows = completed.filter(r => r.stage === stage);
-
-    // This week: distinct flats with actual_end in [thisStart, thisEnd]
-    const thisWeekRows = stageRows.filter(r => {
-      const d = r.actual_end.slice(0, 10);
-      return d >= thisStart && d <= thisEnd;
-    });
-    // Last week
-    const lastWeekRows = stageRows.filter(r => {
-      const d = r.actual_end.slice(0, 10);
-      return d >= lastStart && d <= lastEnd;
-    });
-
-    // Group by floor → distinct flat numbers
-    function groupByFloor(filtered: InsightRow[]): VelocityFloorDetail[] {
-      const floorMap = new Map<number, Set<number>>();
-      for (const r of filtered) {
-        if (!floorMap.has(r.floor)) floorMap.set(r.floor, new Set());
-        floorMap.get(r.floor)!.add(r.flat_number);
-      }
-      return [...floorMap.entries()]
-        .map(([floor, flats]) => ({ floor, flats: [...flats].sort((a, b) => a - b) }))
-        .sort((a, b) => a.floor - b.floor);
-    }
-
-    const thisWeekFloors = groupByFloor(thisWeekRows);
-    const lastWeekFloors = groupByFloor(lastWeekRows);
-
-    // Count distinct flats (not activities)
-    const thisWeekFlats = new Set<string>();
-    for (const r of thisWeekRows) thisWeekFlats.add(`${r.floor}-${r.flat_number}`);
-    const lastWeekFlats = new Set<string>();
-    for (const r of lastWeekRows) lastWeekFlats.add(`${r.floor}-${r.flat_number}`);
-
-    return {
-      stage,
-      thisWeek: thisWeekFlats.size,
-      lastWeek: lastWeekFlats.size,
-      thisWeekFloors,
-      lastWeekFloors,
-    };
-  });
-
-  return {
-    stages,
-    thisWeekTotal: stages.reduce((s, r) => s + r.thisWeek, 0),
-    lastWeekTotal: stages.reduce((s, r) => s + r.lastWeek, 0),
-    thisWeekRange: formatWeekRange(thisMonday, thisSunday),
-    lastWeekRange: formatWeekRange(lastMonday, lastSunday),
-  };
-}
-
 // ---- WIP Aging computation ----
 
 function computeWipAging(rows: InsightRow[]): WipStageGroup[] {
@@ -388,6 +272,7 @@ function computeWipAging(rows: InsightRow[]): WipStageGroup[] {
         activity: r.activity,
         daysInWip,
         severity,
+        delayReason: r.delay_reason || '',
       });
     }
   }
@@ -804,9 +689,6 @@ function OperationsView({ data, supervisors, reversals, activityRows }: Props) {
   const inProgressSubtitle = buildInProgressSubtitle(kpi.inProgressDetails);
 
   // Completion Velocity
-  const velocity = useMemo(() => computeVelocity(activityRows), [activityRows]);
-  const [expandedVelocityStage, setExpandedVelocityStage] = useState<string | null>(null);
-
   // WIP Aging
   const wipGroups = useMemo(() => computeWipAging(activityRows), [activityRows]);
   const wipTotalFlats = wipGroups.reduce((s, g) => s + g.items.length, 0);
@@ -922,6 +804,137 @@ function OperationsView({ data, supervisors, reversals, activityRows }: Props) {
         ...
       </div>
       */}
+
+      {/* ---- WIP AGING (Stuck Work) ---- */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 md:px-6 md:pt-6 md:pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base md:text-lg font-bold text-gray-900">WIP Aging</h3>
+              <p className="text-xs text-gray-400 mt-0.5">Flats stuck in-progress — sorted by days waiting</p>
+            </div>
+          </div>
+          {/* Summary badges */}
+          <div className="flex items-center gap-1.5">
+            {wipCriticalCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600 tabular-nums">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                {wipCriticalCount} critical
+              </span>
+            )}
+            {wipWarningCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 tabular-nums">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                {wipWarningCount} warning
+              </span>
+            )}
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 tabular-nums">
+              {wipTotalFlats} flats
+            </span>
+          </div>
+        </div>
+
+        {wipGroups.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">No flats currently in progress</p>
+        ) : (
+          <>
+            {/* Table header */}
+            <div className="grid grid-cols-[1fr_70px_90px] md:grid-cols-[1fr_80px_100px] px-4 md:px-6 py-2 bg-gray-50 border-b border-gray-100">
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Stage / Flat</span>
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Days</span>
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Status</span>
+            </div>
+
+            {wipGroups.map(group => {
+              const isExpanded = expandedWipStage === group.stage;
+              const criticalInStage = group.items.filter(i => i.severity === 'critical').length;
+              return (
+                <div key={group.stage}>
+                  {/* Stage header row */}
+                  <button
+                    className={`w-full grid grid-cols-[1fr_70px_90px] md:grid-cols-[1fr_80px_100px] px-4 md:px-6 py-2.5 items-center border-b border-gray-50 transition-colors text-left ${isExpanded ? 'bg-gray-50' : 'hover:bg-gray-50/60'}`}
+                    onClick={() => setExpandedWipStage(isExpanded ? null : group.stage)}
+                  >
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-900">
+                      <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                      </svg>
+                      {group.stage}
+                      <span className="text-[10px] font-medium text-gray-400 ml-1">({group.items.length} flat{group.items.length !== 1 ? 's' : ''})</span>
+                    </span>
+                    <span className="text-sm font-bold text-gray-900 tabular-nums text-right">{group.maxDays}d</span>
+                    <span className="text-right">
+                      {criticalInStage > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          {criticalInStage} critical
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-50 text-gray-400">
+                          OK
+                        </span>
+                      )}
+                    </span>
+                  </button>
+
+                  {/* Flat detail rows */}
+                  {isExpanded && (
+                    <div className="bg-gray-50 border-b border-gray-100">
+                      {group.items.map((item, idx) => (
+                        <div key={`${item.floor}-${item.flatNumber}-${idx}`} className="px-4 md:px-6 py-2 pl-10 md:pl-14 border-b border-gray-50/50">
+                          <div className="grid grid-cols-[1fr_70px_90px] md:grid-cols-[1fr_80px_100px] items-center">
+                            <div className="min-w-0">
+                              <span className="text-[12px] font-semibold text-gray-700 tabular-nums">
+                                Fl {item.floor} — {item.flatNumber}
+                              </span>
+                              <span className="text-[10px] text-gray-400 ml-1.5 truncate">{item.activity}</span>
+                            </div>
+                            <span className={`text-[13px] font-bold tabular-nums text-right ${item.severity === 'critical' ? 'text-red-600' : item.severity === 'warning' ? 'text-amber-600' : 'text-gray-600'}`}>
+                              {item.daysInWip}d
+                            </span>
+                            <span className="text-right">
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                item.severity === 'critical' ? 'bg-red-50 text-red-600' :
+                                item.severity === 'warning' ? 'bg-amber-50 text-amber-600' :
+                                'bg-gray-50 text-gray-500'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  item.severity === 'critical' ? 'bg-red-500' :
+                                  item.severity === 'warning' ? 'bg-amber-500' :
+                                  'bg-gray-400'
+                                }`} />
+                                {item.severity === 'critical' ? '10+ days' : item.severity === 'warning' ? '7–9 days' : `< 7 days`}
+                              </span>
+                            </span>
+                          </div>
+                          {item.delayReason ? (
+                            <div className="mt-1 flex items-center gap-1 ml-0.5">
+                              <svg className="w-3 h-3 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                              </svg>
+                              <span className="text-[11px] text-amber-700 font-medium truncate">{item.delayReason}</span>
+                            </div>
+                          ) : (
+                            <div className="mt-1 ml-0.5">
+                              <span className="text-[10px] text-gray-400 italic">No reason captured</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
 
       {/* ---- SUPERVISOR PULSE ---- */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
@@ -1091,284 +1104,6 @@ function OperationsView({ data, supervisors, reversals, activityRows }: Props) {
         )}
       </div>
 
-      {/* ---- COMPLETION VELOCITY ---- */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center gap-2.5 p-4 md:px-6 md:pt-6 md:pb-4 border-b border-gray-100">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C8922A] to-[#a07520] flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-base md:text-lg font-bold text-gray-900">Completion Velocity</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Flats completed per stage — weekly comparison</p>
-          </div>
-        </div>
-
-        {/* Summary strip */}
-        <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
-          <div className="px-4 py-3 md:px-5">
-            <div className="text-xl font-extrabold text-gray-900 tabular-nums">{velocity.thisWeekTotal}</div>
-            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mt-0.5">This Week</div>
-            <div className="text-[11px] text-gray-500 tabular-nums">{velocity.thisWeekRange}</div>
-          </div>
-          <div className="px-4 py-3 md:px-5 text-center">
-            {(() => {
-              const diff = velocity.thisWeekTotal - velocity.lastWeekTotal;
-              const pct = velocity.lastWeekTotal > 0
-                ? Math.round(Math.abs(diff) / velocity.lastWeekTotal * 100)
-                : velocity.thisWeekTotal > 0 ? 100 : 0;
-              return (
-                <>
-                  <div className={`text-xl font-extrabold tabular-nums ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                    {diff > 0 ? '+' : ''}{diff}
-                  </div>
-                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mt-0.5">vs Last Week</div>
-                  {diff !== 0 && (
-                    <div className={`text-[11px] tabular-nums ${diff > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                      {diff > 0 ? '↑' : '↓'} {pct}% {diff > 0 ? 'faster' : 'slower'}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-          </div>
-          <div className="px-4 py-3 md:px-5 text-right">
-            <div className="text-xl font-extrabold text-gray-400 tabular-nums">{velocity.lastWeekTotal}</div>
-            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mt-0.5">Last Week</div>
-            <div className="text-[11px] text-gray-500 tabular-nums">{velocity.lastWeekRange}</div>
-          </div>
-        </div>
-
-        {/* Table header */}
-        <div className="grid grid-cols-[1fr_60px_60px_44px] md:grid-cols-[1fr_80px_80px_50px] px-4 md:px-6 py-2 bg-gray-50 border-b border-gray-100">
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Stage</span>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">This Wk</span>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Last Wk</span>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Trend</span>
-        </div>
-
-        {/* Stage rows */}
-        {velocity.stages.map(row => {
-          const diff = row.thisWeek - row.lastWeek;
-          const isExpanded = expandedVelocityStage === row.stage;
-          const stalled = row.thisWeek === 0 && row.lastWeek > 0;
-          return (
-            <div key={row.stage}>
-              <button
-                className={`w-full grid grid-cols-[1fr_60px_60px_44px] md:grid-cols-[1fr_80px_80px_50px] px-4 md:px-6 py-2.5 items-center border-b border-gray-50 transition-colors text-left ${isExpanded ? 'bg-gray-50' : 'hover:bg-gray-50/60'}`}
-                onClick={() => setExpandedVelocityStage(isExpanded ? null : row.stage)}
-              >
-                <span className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-900">
-                  <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                  </svg>
-                  {row.stage}
-                </span>
-                <span className="text-sm font-bold text-gray-900 tabular-nums text-right">{row.thisWeek}</span>
-                <span className="text-sm font-semibold text-gray-400 tabular-nums text-right">{row.lastWeek}</span>
-                <span className={`text-xs font-bold tabular-nums text-right flex items-center justify-end gap-0.5 ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-gray-300'}`}>
-                  {diff > 0 && (
-                    <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clipRule="evenodd" /></svg>
-                  )}
-                  {diff < 0 && (
-                    <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clipRule="evenodd" /></svg>
-                  )}
-                  {diff !== 0 ? (diff > 0 ? `+${diff}` : `${diff}`) : '—'}
-                </span>
-              </button>
-
-              {/* Expanded floor detail */}
-              {isExpanded && (
-                <div className="bg-gray-50 border-b border-gray-100 px-4 md:px-6 py-3 pl-10 md:pl-14">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <h5 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">This Week</h5>
-                      {row.thisWeekFloors.length === 0 ? (
-                        <p className="text-[11px] text-gray-400 italic">No completions</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {row.thisWeekFloors.map(f => (
-                            <span key={f.floor} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-600 tabular-nums">
-                              Fl {f.floor} — {f.flats.join(', ')}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <h5 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Last Week</h5>
-                      {row.lastWeekFloors.length === 0 ? (
-                        <p className="text-[11px] text-gray-400 italic">No completions</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {row.lastWeekFloors.map(f => (
-                            <span key={f.floor} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-500 tabular-nums">
-                              Fl {f.floor} — {f.flats.join(', ')}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {/* Stalled alert */}
-                  {stalled && (
-                    <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-red-50 text-red-600">
-                      <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
-                      <span className="text-[11px] font-semibold">Zero completions this week — was active last week</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Total row */}
-        <div className="grid grid-cols-[1fr_60px_60px_44px] md:grid-cols-[1fr_80px_80px_50px] px-4 md:px-6 py-2.5 bg-gray-50 items-center">
-          <span className="text-[13px] font-bold text-gray-900 pl-5">Total</span>
-          <span className="text-[15px] font-bold text-gray-900 tabular-nums text-right">{velocity.thisWeekTotal}</span>
-          <span className="text-[15px] font-semibold text-gray-400 tabular-nums text-right">{velocity.lastWeekTotal}</span>
-          {(() => {
-            const diff = velocity.thisWeekTotal - velocity.lastWeekTotal;
-            return (
-              <span className={`text-xs font-extrabold tabular-nums text-right flex items-center justify-end gap-0.5 ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-gray-300'}`}>
-                {diff > 0 && (
-                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clipRule="evenodd" /></svg>
-                )}
-                {diff < 0 && (
-                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clipRule="evenodd" /></svg>
-                )}
-                {diff !== 0 ? (diff > 0 ? `+${diff}` : `${diff}`) : '—'}
-              </span>
-            );
-          })()}
-        </div>
-      </div>
-
-      {/* ---- WIP AGING (Stuck Work) ---- */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 md:px-6 md:pt-6 md:pb-4 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center shrink-0">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-base md:text-lg font-bold text-gray-900">WIP Aging</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Flats stuck in-progress — sorted by days waiting</p>
-            </div>
-          </div>
-          {/* Summary badges */}
-          <div className="flex items-center gap-1.5">
-            {wipCriticalCount > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600 tabular-nums">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                {wipCriticalCount} critical
-              </span>
-            )}
-            {wipWarningCount > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 tabular-nums">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                {wipWarningCount} warning
-              </span>
-            )}
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-500 tabular-nums">
-              {wipTotalFlats} flats
-            </span>
-          </div>
-        </div>
-
-        {wipGroups.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No flats currently in progress</p>
-        ) : (
-          <>
-            {/* Table header */}
-            <div className="grid grid-cols-[1fr_70px_90px] md:grid-cols-[1fr_80px_100px] px-4 md:px-6 py-2 bg-gray-50 border-b border-gray-100">
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Stage / Flat</span>
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Days</span>
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Status</span>
-            </div>
-
-            {wipGroups.map(group => {
-              const isExpanded = expandedWipStage === group.stage;
-              const criticalInStage = group.items.filter(i => i.severity === 'critical').length;
-              const displayItems = isExpanded ? group.items : group.items.slice(0, 3);
-              return (
-                <div key={group.stage}>
-                  {/* Stage header row */}
-                  <button
-                    className={`w-full grid grid-cols-[1fr_70px_90px] md:grid-cols-[1fr_80px_100px] px-4 md:px-6 py-2.5 items-center border-b border-gray-50 transition-colors text-left ${isExpanded ? 'bg-gray-50' : 'hover:bg-gray-50/60'}`}
-                    onClick={() => setExpandedWipStage(isExpanded ? null : group.stage)}
-                  >
-                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-900">
-                      <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                      </svg>
-                      {group.stage}
-                      <span className="text-[10px] font-medium text-gray-400 ml-1">({group.items.length} flat{group.items.length !== 1 ? 's' : ''})</span>
-                    </span>
-                    <span className="text-sm font-bold text-gray-900 tabular-nums text-right">{group.maxDays}d</span>
-                    <span className="text-right">
-                      {criticalInStage > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-600">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                          {criticalInStage} critical
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-50 text-gray-400">
-                          OK
-                        </span>
-                      )}
-                    </span>
-                  </button>
-
-                  {/* Flat detail rows */}
-                  {isExpanded && (
-                    <div className="bg-gray-50 border-b border-gray-100">
-                      {displayItems.map((item, idx) => (
-                        <div key={`${item.floor}-${item.flatNumber}-${idx}`} className="grid grid-cols-[1fr_70px_90px] md:grid-cols-[1fr_80px_100px] px-4 md:px-6 py-2 pl-10 md:pl-14 items-center border-b border-gray-50/50">
-                          <div className="min-w-0">
-                            <span className="text-[12px] font-semibold text-gray-700 tabular-nums">
-                              Fl {item.floor} — {item.flatNumber}
-                            </span>
-                            <span className="text-[10px] text-gray-400 ml-1.5 truncate">{item.activity}</span>
-                          </div>
-                          <span className={`text-[13px] font-bold tabular-nums text-right ${item.severity === 'critical' ? 'text-red-600' : item.severity === 'warning' ? 'text-amber-600' : 'text-gray-600'}`}>
-                            {item.daysInWip}d
-                          </span>
-                          <span className="text-right">
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              item.severity === 'critical' ? 'bg-red-50 text-red-600' :
-                              item.severity === 'warning' ? 'bg-amber-50 text-amber-600' :
-                              'bg-gray-50 text-gray-500'
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${
-                                item.severity === 'critical' ? 'bg-red-500' :
-                                item.severity === 'warning' ? 'bg-amber-500' :
-                                'bg-gray-400'
-                              }`} />
-                              {item.severity === 'critical' ? '10+ days' : item.severity === 'warning' ? '7–9 days' : `< 7 days`}
-                            </span>
-                          </span>
-                        </div>
-                      ))}
-                      {!isExpanded && group.items.length > 3 && (
-                        <p className="text-[10px] text-gray-400 text-center py-1.5">
-                          + {group.items.length - 3} more flat{group.items.length - 3 > 1 ? 's' : ''}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </>
-        )}
-      </div>
     </div>
   );
 }
