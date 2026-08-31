@@ -36,6 +36,7 @@ export default function ActivityDetailSheet({
   const [detailPhotos, setDetailPhotos] = useState<ActivityPhoto[]>([]);
   const [pendingPhotos, setPendingPhotos] = useState<{ file: Blob; preview: string; fileName: string }[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [photoError, setPhotoError] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
@@ -103,6 +104,8 @@ export default function ActivityDetailSheet({
   }
 
   async function saveDetail() {
+    if (saving) return; // prevent double-tap
+    setSaving(true);
     setDetailError('');
     setPhotoError('');
 
@@ -127,11 +130,13 @@ export default function ActivityDetailSheet({
           if (uploadResult.error) {
             setPhotoError(uploadResult.error);
             setPhotoUploading(false);
+            setSaving(false);
             return;
           }
         } catch {
           setPhotoError('Failed to upload photo. Please try again.');
           setPhotoUploading(false);
+          setSaving(false);
           return;
         }
       }
@@ -166,6 +171,7 @@ export default function ActivityDetailSheet({
 
     if (result.error) {
       setDetailError(result.error);
+      setSaving(false);
       return;
     }
 
@@ -425,15 +431,20 @@ export default function ActivityDetailSheet({
         <div className="sticky bottom-0 bg-white border-t border-gray-200 px-5 py-3">
           <button
             onClick={saveDetail}
-            disabled={photoUploading}
+            disabled={photoUploading || saving}
             className={`w-full py-3 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 ${
-              photoUploading ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark'
+              photoUploading || saving ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark'
             }`}
           >
             {photoUploading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Uploading photos...
+              </>
+            ) : saving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
               </>
             ) : (
               `Save Changes${pendingPhotos.length > 0 ? ` (${pendingPhotos.length} photo${pendingPhotos.length > 1 ? 's' : ''})` : ''}`
