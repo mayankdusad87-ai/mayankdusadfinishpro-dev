@@ -699,51 +699,12 @@ function OperationsView({ data, supervisors, reversals, activityRows }: Props) {
         )}
       </div>
 
-      {/* ---- NEEDS YOUR ATTENTION ---- */}
+      {/* ---- NEEDS YOUR ATTENTION — disabled, not being used ---- */}
+      {/*
       <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
-        <div className="mb-4 md:mb-5">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-base md:text-lg font-bold text-gray-900">Needs Your Attention</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Priority items that require action today</p>
-            </div>
-          </div>
-        </div>
-
-        {actionItems.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-2">
-              <svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-              </svg>
-            </div>
-            <p className="text-sm text-gray-500">All clear — no urgent actions today</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {actionItems.map((item, i) => (
-              <div
-                key={i}
-                className={`flex items-start gap-3 p-3 md:p-3.5 rounded-lg border border-l-4 border-gray-100 ${severityBorder(item.severity)} bg-gray-50/50`}
-              >
-                <div className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${severityDot(item.severity)}`} />
-                <div className="hidden md:block mt-0.5">
-                  {severityIcon(item.type)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-gray-900 leading-snug">{item.text}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{item.meta}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        ...
       </div>
+      */}
 
       {/* ---- SUPERVISOR PULSE ---- */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
