@@ -116,7 +116,19 @@ export async function GET(req: NextRequest) {
 
     // 3. For each project, build and send the report
     for (const project of projects) {
-      // 3a. Fetch targets
+      // 3a. Check if project has any activity data — skip empty projects
+      const { count: activityCount } = await supabaseAdmin
+        .from('activities')
+        .select('id', { count: 'exact', head: true })
+        .eq('project_id', project.id);
+
+      if (!activityCount || activityCount === 0) {
+        console.log(`[cron/weekly-report] ${project.name}: no activities, skipping`);
+        results.push({ project: project.name, sent: false, targets: 0, pipelineStages: 0, blockers: 0 });
+        continue;
+      }
+
+      // 3b. Fetch targets
       const { data: rawTargets } = await supabaseAdmin
         .from('project_milestones')
         .select('*')

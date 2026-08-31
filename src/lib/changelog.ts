@@ -33,6 +33,19 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.31b',
+    headline: 'Weekly Email Improvements',
+    date: 'August 31, 2026',
+    features: [
+      {
+        emoji: '📧',
+        title: 'Cleaner Weekly Report Email',
+        description: 'Redesigned weekly management email with larger fonts, stacked target cards for mobile readability, and better spacing. Empty projects (no activity data) are now skipped — no more misleading "on track" emails.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.31a',
     headline: 'WIP Aging',
     date: 'August 31, 2026',

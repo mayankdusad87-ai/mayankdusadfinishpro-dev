@@ -327,21 +327,22 @@ export function weeklyReportEmailHtml(
     verdictBg = '#f0fdf4'; verdictBorder = '#bbf7d0'; verdictColor = '#166534'; verdictIcon = '✓';
   }
 
-  // ---- Target rows (compact one-line each) ----
+  // ---- Target rows (stacked two-line cards — readable on mobile) ----
   const targetRows = targets.map(t => {
     const badge = TARGET_BADGE[t.status] || TARGET_BADGE.on_track;
     const timing = targetTimingText(t);
     return `
-      <table style="width: 100%; margin-bottom: 6px;"><tr>
-        <td style="background: ${badge.bgCard}; border: 1px solid ${badge.borderColor}; border-radius: 6px; padding: 10px 14px;">
+      <table style="width: 100%; margin-bottom: 8px;"><tr>
+        <td style="background: ${badge.bgCard}; border: 1px solid ${badge.borderColor}; border-radius: 8px; padding: 14px 16px;">
           <table style="width: 100%;"><tr>
-            <td style="font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap;">${t.stage}</td>
-            <td style="font-size: 12px; color: #64748b; text-align: center; padding: 0 8px; white-space: nowrap;">${floorRangeLabel(t.floorFrom, t.floorTo)} · ${t.completedFlats}/${t.totalFlats} flats</td>
-            <td style="font-size: 11px; font-weight: 600; color: ${badge.timingColor}; text-align: right; white-space: nowrap;">${timing}</td>
-            <td style="text-align: right; padding-left: 8px; white-space: nowrap;">
-              <span style="background: ${badge.bg}; color: ${badge.color}; padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 10px; letter-spacing: 0.3px;">${badge.label}</span>
+            <td style="font-size: 15px; font-weight: 700; color: #1e293b;">${t.stage}</td>
+            <td style="text-align: right;">
+              <span style="background: ${badge.bg}; color: ${badge.color}; padding: 3px 10px; border-radius: 10px; font-weight: 700; font-size: 11px; letter-spacing: 0.3px;">${badge.label}</span>
             </td>
           </tr></table>
+          <div style="margin-top: 6px; font-size: 13px; color: #64748b; line-height: 1.5;">
+            ${floorRangeLabel(t.floorFrom, t.floorTo)} · <strong style="color: #475569;">${t.completedFlats}/${t.totalFlats}</strong> flats · <span style="color: ${badge.timingColor}; font-weight: 600;">${timing}</span>
+          </div>
         </td>
       </tr></table>`;
   }).join('');
@@ -355,16 +356,16 @@ export function weeklyReportEmailHtml(
     const nameColor = s.isBottleneck ? 'color: #92400e;' : 'color: #1e293b;';
     const flatsColor = s.isBottleneck ? 'color: #92400e; font-weight: 600;' : 'color: #475569;';
     const floorsColor = s.isBottleneck ? 'color: #92400e; font-weight: 600;' : 'color: #64748b;';
-    const bnIcon = s.isBottleneck ? ' <span style="font-size: 9px; vertical-align: middle;">⚠</span>' : '';
+    const bnIcon = s.isBottleneck ? ' <span style="font-size: 10px; vertical-align: middle;">⚠</span>' : '';
     const floorsText = s.pendingFloors.length > 0
       ? `${compressFloors(s.pendingFloors)} <span style="color: ${s.isBottleneck ? '#b45309' : '#94a3b8'};">(${s.pendingFloors.length})</span>`
       : '<span style="color: #22c55e;">✓ All done</span>';
 
     return `
       <tr style="${rowBg}">
-        <td style="padding: 9px 12px; font-size: 12px; font-weight: 600; ${nameColor} ${bb}">${s.stage}${bnIcon}</td>
-        <td style="padding: 9px 12px; font-size: 12px; text-align: center; ${bb} font-variant-numeric: tabular-nums; ${flatsColor}"><strong>${s.completedFlats}</strong>/${s.totalFlats}</td>
-        <td style="padding: 9px 12px; font-size: 11px; text-align: right; ${bb} ${floorsColor}">${floorsText}</td>
+        <td style="padding: 12px 14px; font-size: 14px; font-weight: 600; ${nameColor} ${bb}">${s.stage}${bnIcon}</td>
+        <td style="padding: 12px 14px; font-size: 14px; text-align: center; ${bb} font-variant-numeric: tabular-nums; ${flatsColor}"><strong>${s.completedFlats}</strong>/${s.totalFlats}</td>
+        <td style="padding: 12px 14px; font-size: 13px; text-align: right; ${bb} ${floorsColor}">${floorsText}</td>
       </tr>`;
   }).join('');
 
@@ -378,10 +379,10 @@ export function weeklyReportEmailHtml(
     if (drop > 0 && prevStage) {
       attentionItems.push(`
         <tr>
-          <td style="width: 4px; background: #f59e0b; border-radius: 3px 0 0 3px;"></td>
-          <td style="background: #fffbeb; padding: 10px 14px; border-radius: 0 6px 6px 0;">
-            <div style="font-size: 13px; font-weight: 600; color: #1e293b;">${bottleneck.stage} is the bottleneck</div>
-            <div style="font-size: 12px; color: #64748b; margin-top: 2px;">${drop} flats dropped between ${prevStage.stage} → ${bottleneck.stage}. Only ${bottleneck.pct}% complete vs ${prevStage.pct}% at ${prevStage.stage}.</div>
+          <td style="width: 5px; background: #f59e0b; border-radius: 4px 0 0 4px;"></td>
+          <td style="background: #fffbeb; padding: 14px 16px; border-radius: 0 8px 8px 0;">
+            <div style="font-size: 15px; font-weight: 700; color: #1e293b;">${bottleneck.stage} is the bottleneck</div>
+            <div style="font-size: 13px; color: #64748b; margin-top: 4px; line-height: 1.5;">${drop} flats dropped between ${prevStage.stage} → ${bottleneck.stage}. Only ${bottleneck.pct}% complete vs ${prevStage.pct}% at ${prevStage.stage}.</div>
           </td>
         </tr>`);
     }
@@ -391,71 +392,71 @@ export function weeklyReportEmailHtml(
     const topReasons = blockers.slice(0, 3).map(b => `${b.reason} (${b.floorCount} floor${b.floorCount !== 1 ? 's' : ''})`).join(', ');
     attentionItems.push(`
       <tr>
-        <td style="width: 4px; background: #ef4444; border-radius: 3px 0 0 3px;"></td>
-        <td style="background: #fef2f2; padding: 10px 14px; border-radius: 0 6px 6px 0;">
-          <div style="font-size: 13px; font-weight: 600; color: #1e293b;">${totalBlockerFloors} floor${totalBlockerFloors !== 1 ? 's have' : ' has'} unresolved blockers</div>
-          <div style="font-size: 12px; color: #64748b; margin-top: 2px;">Top reasons: ${topReasons}.</div>
+        <td style="width: 5px; background: #ef4444; border-radius: 4px 0 0 4px;"></td>
+        <td style="background: #fef2f2; padding: 14px 16px; border-radius: 0 8px 8px 0;">
+          <div style="font-size: 15px; font-weight: 700; color: #1e293b;">${totalBlockerFloors} floor${totalBlockerFloors !== 1 ? 's have' : ' has'} unresolved blockers</div>
+          <div style="font-size: 13px; color: #64748b; margin-top: 4px; line-height: 1.5;">Top reasons: ${topReasons}.</div>
         </td>
       </tr>`);
   }
 
   // ---- Assemble ----
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: #162032; padding: 24px 28px 20px; border-radius: 8px 8px 0 0;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 640px; margin: 0 auto; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+      <div style="background: #162032; padding: 28px 28px 24px; border-radius: 8px 8px 0 0;">
         <table style="width: 100%;"><tr>
-          <td style="font-size: 14px; font-weight: 600; color: #C8922A; letter-spacing: 1.5px; text-transform: uppercase;">Finishing Pro</td>
-          <td style="text-align: right; font-size: 11px; color: #64748b; letter-spacing: 0.5px;">WEEKLY REPORT</td>
+          <td style="font-size: 15px; font-weight: 600; color: #C8922A; letter-spacing: 1.5px; text-transform: uppercase;">Finishing Pro</td>
+          <td style="text-align: right; font-size: 12px; color: #64748b; letter-spacing: 0.5px;">WEEKLY REPORT</td>
         </tr></table>
-        <div style="height: 1px; background: linear-gradient(to right, #C8922A, transparent); margin: 14px 0 16px;"></div>
-        <div style="font-size: 24px; font-weight: 600; color: #ffffff; letter-spacing: -0.3px;">${projectName}</div>
-        <div style="font-size: 13px; color: #94a3b8; margin-top: 6px;">${weekRange}</div>
+        <div style="height: 1px; background: linear-gradient(to right, #C8922A, transparent); margin: 16px 0 18px;"></div>
+        <div style="font-size: 26px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px;">${projectName}</div>
+        <div style="font-size: 14px; color: #94a3b8; margin-top: 6px;">${weekRange}</div>
       </div>
-      <div style="border: 1px solid #e5e7eb; border-top: none; padding: 28px; border-radius: 0 0 8px 8px;">
+      <div style="border: 1px solid #e5e7eb; border-top: none; padding: 28px; border-radius: 0 0 8px 8px; background: #ffffff;">
 
-        <div style="background: ${verdictBg}; border: 1px solid ${verdictBorder}; border-radius: 8px; padding: 16px 18px; margin-bottom: 24px;">
+        <div style="background: ${verdictBg}; border: 1px solid ${verdictBorder}; border-radius: 10px; padding: 18px 20px; margin-bottom: 28px;">
           <table style="width: 100%;"><tr>
-            <td style="width: 36px; vertical-align: top;">
-              <div style="width: 32px; height: 32px; background: ${verdictBorder}; border-radius: 50%; text-align: center; line-height: 32px; font-size: 16px;">${verdictIcon}</div>
+            <td style="width: 40px; vertical-align: top;">
+              <div style="width: 36px; height: 36px; background: ${verdictBorder}; border-radius: 50%; text-align: center; line-height: 36px; font-size: 18px;">${verdictIcon}</div>
             </td>
-            <td style="padding-left: 12px;">
-              <div style="font-size: 15px; font-weight: 700; color: ${verdictColor}; line-height: 1.3;">${verdictTitle}</div>
-              <div style="font-size: 13px; color: #64748b; margin-top: 4px; line-height: 1.5;">${verdictDesc}</div>
+            <td style="padding-left: 14px;">
+              <div style="font-size: 17px; font-weight: 700; color: ${verdictColor}; line-height: 1.3;">${verdictTitle}</div>
+              <div style="font-size: 14px; color: #64748b; margin-top: 5px; line-height: 1.5;">${verdictDesc}</div>
             </td>
           </tr></table>
         </div>
 
         ${targets.length > 0 ? `
-        <div style="margin-bottom: 24px;">
-          <div style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px;">Targets · ${targets.filter(t => t.status === 'achieved' || t.status === 'delayed').length} of ${targets.length} achieved</div>
+        <div style="margin-bottom: 28px;">
+          <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 12px;">Targets · ${targets.filter(t => t.status === 'achieved' || t.status === 'delayed').length} of ${targets.length} achieved</div>
           ${targetRows}
         </div>` : ''}
 
         ${attentionItems.length > 0 ? `
-        <div style="margin-bottom: 24px;">
-          <div style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px;">What needs attention</div>
-          <table style="width: 100%; border-collapse: separate; border-spacing: 0 6px;">
+        <div style="margin-bottom: 28px;">
+          <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 12px;">What needs attention</div>
+          <table style="width: 100%; border-collapse: separate; border-spacing: 0 8px;">
             ${attentionItems.join('')}
           </table>
         </div>` : ''}
 
-        <div style="margin-bottom: 24px;">
-          <div style="font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 10px;">Pipeline · ${totalFlats} total flats</div>
+        <div style="margin-bottom: 28px;">
+          <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 12px;">Pipeline · ${totalFlats} total flats</div>
           <table style="width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; border-collapse: separate; border-spacing: 0; overflow: hidden;">
             <tr style="background: #f8fafc;">
-              <td style="padding: 7px 12px; font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">Stage</td>
-              <td style="padding: 7px 12px; font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; text-align: center; width: 70px;">Flats</td>
-              <td style="padding: 7px 12px; font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; text-align: right;">Floors Pending</td>
+              <td style="padding: 10px 14px; font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0;">Stage</td>
+              <td style="padding: 10px 14px; font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; text-align: center; width: 80px;">Flats</td>
+              <td style="padding: 10px 14px; font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; text-align: right;">Floors Pending</td>
             </tr>
             ${pipelineRows}
           </table>
         </div>
 
-        <div style="text-align: center; margin: 28px 0 8px;">
-          <a href="${dashboardUrl}" style="display: inline-block; background: #162032; color: #C8922A; text-decoration: none; padding: 11px 32px; border-radius: 6px; font-weight: 600; font-size: 13px; letter-spacing: 0.3px;">View full dashboard &rarr;</a>
+        <div style="text-align: center; margin: 32px 0 8px;">
+          <a href="${dashboardUrl}" style="display: inline-block; background: #162032; color: #C8922A; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-weight: 700; font-size: 15px; letter-spacing: 0.3px;">View full dashboard &rarr;</a>
         </div>
-        <div style="border-top: 1px solid #e2e8f0; margin-top: 24px; padding-top: 16px;">
-          <p style="margin: 0; font-size: 11px; color: #94a3b8; text-align: center; line-height: 1.6;">
+        <div style="border-top: 1px solid #e2e8f0; margin-top: 28px; padding-top: 16px;">
+          <p style="margin: 0; font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.6;">
             Automated weekly report · Finishing Pro<br>
             Sent every Tuesday to management users · Admins in CC
           </p>
