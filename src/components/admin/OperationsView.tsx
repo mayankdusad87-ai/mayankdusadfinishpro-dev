@@ -32,6 +32,37 @@ interface InProgressFloorGroup {
 type TimeRange = 'today' | 'week' | 'month';
 type ExpandedTile = 'started' | 'completed' | 'inProgress' | null;
 
+// ---- Completion Velocity types ----
+
+const VELOCITY_STAGES = [
+  'Pre-Tiling',
+  'Tiling',
+  'Post Tiling',
+  'Pre Paint Activities',
+  '1st coat paint',
+] as const;
+
+interface VelocityFloorDetail {
+  floor: number;
+  flats: number[];
+}
+
+interface VelocityStageRow {
+  stage: string;
+  thisWeek: number;
+  lastWeek: number;
+  thisWeekFloors: VelocityFloorDetail[];
+  lastWeekFloors: VelocityFloorDetail[];
+}
+
+interface VelocityData {
+  stages: VelocityStageRow[];
+  thisWeekTotal: number;
+  lastWeekTotal: number;
+  thisWeekRange: string;  // e.g. "25 – 31 Aug"
+  lastWeekRange: string;
+}
+
 // ---- Helpers (actual_start / actual_end based) ----
 
 /** Local YYYY-MM-DD (avoids UTC shift that .toISOString() causes in IST) */
@@ -207,6 +238,100 @@ function buildInProgressSubtitle(details: InProgressDetail[]): string {
 
 function formatStatus(status: string): string {
   return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ---- Completion Velocity computation ----
+
+/** Format a date range like "25 – 31 Aug" */
+function formatWeekRange(monday: Date, sunday: Date): string {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const d1 = monday.getDate();
+  const d2 = sunday.getDate();
+  const m1 = months[monday.getMonth()];
+  const m2 = months[sunday.getMonth()];
+  if (m1 === m2) return `${d1} – ${d2} ${m1}`;
+  return `${d1} ${m1} – ${d2} ${m2}`;
+}
+
+function computeVelocity(rows: InsightRow[]): VelocityData {
+  const now = new Date();
+
+  // This week: Monday to Sunday
+  const thisMonday = new Date(now);
+  const day = thisMonday.getDay();
+  thisMonday.setDate(thisMonday.getDate() - day + (day === 0 ? -6 : 1));
+  thisMonday.setHours(0, 0, 0, 0);
+  const thisSunday = new Date(thisMonday);
+  thisSunday.setDate(thisSunday.getDate() + 6);
+
+  // Last week
+  const lastMonday = new Date(thisMonday);
+  lastMonday.setDate(lastMonday.getDate() - 7);
+  const lastSunday = new Date(lastMonday);
+  lastSunday.setDate(lastSunday.getDate() + 6);
+
+  const thisStart = localDateStr(thisMonday);
+  const thisEnd = localDateStr(thisSunday);
+  const lastStart = localDateStr(lastMonday);
+  const lastEnd = localDateStr(lastSunday);
+
+  // Only completed activities (completed or completed_delayed)
+  const completed = rows.filter(r => {
+    const s = r.status;
+    return (s === 'completed' || s === 'completed_delayed') && r.actual_end;
+  });
+
+  const stages: VelocityStageRow[] = VELOCITY_STAGES.map(stage => {
+    const stageRows = completed.filter(r => r.stage === stage);
+
+    // This week: distinct flats with actual_end in [thisStart, thisEnd]
+    const thisWeekRows = stageRows.filter(r => {
+      const d = r.actual_end.slice(0, 10);
+      return d >= thisStart && d <= thisEnd;
+    });
+    // Last week
+    const lastWeekRows = stageRows.filter(r => {
+      const d = r.actual_end.slice(0, 10);
+      return d >= lastStart && d <= lastEnd;
+    });
+
+    // Group by floor → distinct flat numbers
+    function groupByFloor(filtered: InsightRow[]): VelocityFloorDetail[] {
+      const floorMap = new Map<number, Set<number>>();
+      for (const r of filtered) {
+        if (!floorMap.has(r.floor)) floorMap.set(r.floor, new Set());
+        floorMap.get(r.floor)!.add(r.flat_number);
+      }
+      return [...floorMap.entries()]
+        .map(([floor, flats]) => ({ floor, flats: [...flats].sort((a, b) => a - b) }))
+        .sort((a, b) => a.floor - b.floor);
+    }
+
+    const thisWeekFloors = groupByFloor(thisWeekRows);
+    const lastWeekFloors = groupByFloor(lastWeekRows);
+
+    // Count distinct flats (not activities)
+    const thisWeekFlats = new Set<string>();
+    for (const r of thisWeekRows) thisWeekFlats.add(`${r.floor}-${r.flat_number}`);
+    const lastWeekFlats = new Set<string>();
+    for (const r of lastWeekRows) lastWeekFlats.add(`${r.floor}-${r.flat_number}`);
+
+    return {
+      stage,
+      thisWeek: thisWeekFlats.size,
+      lastWeek: lastWeekFlats.size,
+      thisWeekFloors,
+      lastWeekFloors,
+    };
+  });
+
+  return {
+    stages,
+    thisWeekTotal: stages.reduce((s, r) => s + r.thisWeek, 0),
+    lastWeekTotal: stages.reduce((s, r) => s + r.lastWeek, 0),
+    thisWeekRange: formatWeekRange(thisMonday, thisSunday),
+    lastWeekRange: formatWeekRange(lastMonday, lastSunday),
+  };
 }
 
 // ---- Sub-components ----
@@ -557,8 +682,7 @@ interface Props {
 }
 
 function OperationsView({ data, supervisors, reversals, activityRows }: Props) {
-  const { delayReasons, actionItems, kpi } = data;
-  const maxReasonCount = delayReasons.length > 0 ? delayReasons[0].count : 1;
+  const { actionItems, kpi } = data;
 
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
   const [expandedTile, setExpandedTile] = useState<ExpandedTile>(null);
@@ -596,6 +720,10 @@ function OperationsView({ data, supervisors, reversals, activityRows }: Props) {
   const startedSubtitle = buildSubtitle(startedToday);
   const completedSubtitle = buildSubtitle(completedToday);
   const inProgressSubtitle = buildInProgressSubtitle(kpi.inProgressDetails);
+
+  // Completion Velocity
+  const velocity = useMemo(() => computeVelocity(activityRows), [activityRows]);
+  const [expandedVelocityStage, setExpandedVelocityStage] = useState<string | null>(null);
 
   function toggleTile(tile: ExpandedTile) {
     setExpandedTile(prev => prev === tile ? null : tile);
@@ -874,51 +1002,160 @@ function OperationsView({ data, supervisors, reversals, activityRows }: Props) {
         )}
       </div>
 
-      {/* ---- DELAY ROOT CAUSE ---- */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
-        <div className="mb-4 md:mb-5">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C8922A] to-[#a07520] flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-base md:text-lg font-bold text-gray-900">Delay Root Cause</h3>
-              <p className="text-xs text-gray-400 mt-0.5">Most common reasons for activity delays</p>
-            </div>
+      {/* ---- COMPLETION VELOCITY ---- */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center gap-2.5 p-4 md:px-6 md:pt-6 md:pb-4 border-b border-gray-100">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C8922A] to-[#a07520] flex items-center justify-center shrink-0">
+            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-base md:text-lg font-bold text-gray-900">Completion Velocity</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Flats completed per stage — weekly comparison</p>
           </div>
         </div>
 
-        {delayReasons.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No delay reasons recorded</p>
-        ) : (
-          <div className="space-y-3">
-            {delayReasons.slice(0, 8).map((d, i) => {
-              const barWidth = (d.count / maxReasonCount) * 100;
+        {/* Summary strip */}
+        <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
+          <div className="px-4 py-3 md:px-5">
+            <div className="text-xl font-extrabold text-gray-900 tabular-nums">{velocity.thisWeekTotal}</div>
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mt-0.5">This Week</div>
+            <div className="text-[11px] text-gray-500 tabular-nums">{velocity.thisWeekRange}</div>
+          </div>
+          <div className="px-4 py-3 md:px-5 text-center">
+            {(() => {
+              const diff = velocity.thisWeekTotal - velocity.lastWeekTotal;
+              const pct = velocity.lastWeekTotal > 0
+                ? Math.round(Math.abs(diff) / velocity.lastWeekTotal * 100)
+                : velocity.thisWeekTotal > 0 ? 100 : 0;
               return (
-                <div key={d.reason} className="group">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-gray-800 font-medium truncate max-w-[60%]">{d.reason}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-gray-500 tabular-nums">{d.count}</span>
-                      <span className="text-[10px] text-gray-400 tabular-nums w-8 text-right">{d.pct}%</span>
+                <>
+                  <div className={`text-xl font-extrabold tabular-nums ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {diff > 0 ? '+' : ''}{diff}
+                  </div>
+                  <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mt-0.5">vs Last Week</div>
+                  {diff !== 0 && (
+                    <div className={`text-[11px] tabular-nums ${diff > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {diff > 0 ? '↑' : '↓'} {pct}% {diff > 0 ? 'faster' : 'slower'}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+          <div className="px-4 py-3 md:px-5 text-right">
+            <div className="text-xl font-extrabold text-gray-400 tabular-nums">{velocity.lastWeekTotal}</div>
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mt-0.5">Last Week</div>
+            <div className="text-[11px] text-gray-500 tabular-nums">{velocity.lastWeekRange}</div>
+          </div>
+        </div>
+
+        {/* Table header */}
+        <div className="grid grid-cols-[1fr_60px_60px_44px] md:grid-cols-[1fr_80px_80px_50px] px-4 md:px-6 py-2 bg-gray-50 border-b border-gray-100">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Stage</span>
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">This Wk</span>
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Last Wk</span>
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide text-right">Trend</span>
+        </div>
+
+        {/* Stage rows */}
+        {velocity.stages.map(row => {
+          const diff = row.thisWeek - row.lastWeek;
+          const isExpanded = expandedVelocityStage === row.stage;
+          const stalled = row.thisWeek === 0 && row.lastWeek > 0;
+          return (
+            <div key={row.stage}>
+              <button
+                className={`w-full grid grid-cols-[1fr_60px_60px_44px] md:grid-cols-[1fr_80px_80px_50px] px-4 md:px-6 py-2.5 items-center border-b border-gray-50 transition-colors text-left ${isExpanded ? 'bg-gray-50' : 'hover:bg-gray-50/60'}`}
+                onClick={() => setExpandedVelocityStage(isExpanded ? null : row.stage)}
+              >
+                <span className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-900">
+                  <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                  </svg>
+                  {row.stage}
+                </span>
+                <span className="text-sm font-bold text-gray-900 tabular-nums text-right">{row.thisWeek}</span>
+                <span className="text-sm font-semibold text-gray-400 tabular-nums text-right">{row.lastWeek}</span>
+                <span className={`text-xs font-bold tabular-nums text-right flex items-center justify-end gap-0.5 ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-gray-300'}`}>
+                  {diff > 0 && (
+                    <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clipRule="evenodd" /></svg>
+                  )}
+                  {diff < 0 && (
+                    <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clipRule="evenodd" /></svg>
+                  )}
+                  {diff !== 0 ? (diff > 0 ? `+${diff}` : `${diff}`) : '—'}
+                </span>
+              </button>
+
+              {/* Expanded floor detail */}
+              {isExpanded && (
+                <div className="bg-gray-50 border-b border-gray-100 px-4 md:px-6 py-3 pl-10 md:pl-14">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <h5 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">This Week</h5>
+                      {row.thisWeekFloors.length === 0 ? (
+                        <p className="text-[11px] text-gray-400 italic">No completions</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {row.thisWeekFloors.map(f => (
+                            <span key={f.floor} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-600 tabular-nums">
+                              Fl {f.floor} — {f.flats.join(', ')}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h5 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Last Week</h5>
+                      {row.lastWeekFloors.length === 0 ? (
+                        <p className="text-[11px] text-gray-400 italic">No completions</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {row.lastWeekFloors.map(f => (
+                            <span key={f.floor} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-500 tabular-nums">
+                              Fl {f.floor} — {f.flats.join(', ')}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="h-3 bg-gray-50 rounded-full overflow-hidden">
-                    <div
-                      className="h-3 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${barWidth}%`,
-                        backgroundColor: i === 0 ? '#EF4444' : i === 1 ? '#F97316' : i === 2 ? '#F59E0B' : '#94A3B8',
-                      }}
-                    />
-                  </div>
+                  {/* Stalled alert */}
+                  {stalled && (
+                    <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-red-50 text-red-600">
+                      <svg className="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
+                      <span className="text-[11px] font-semibold">Zero completions this week — was active last week</span>
+                    </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })}
+
+        {/* Total row */}
+        <div className="grid grid-cols-[1fr_60px_60px_44px] md:grid-cols-[1fr_80px_80px_50px] px-4 md:px-6 py-2.5 bg-gray-50 items-center">
+          <span className="text-[13px] font-bold text-gray-900 pl-5">Total</span>
+          <span className="text-[15px] font-bold text-gray-900 tabular-nums text-right">{velocity.thisWeekTotal}</span>
+          <span className="text-[15px] font-semibold text-gray-400 tabular-nums text-right">{velocity.lastWeekTotal}</span>
+          {(() => {
+            const diff = velocity.thisWeekTotal - velocity.lastWeekTotal;
+            return (
+              <span className={`text-xs font-extrabold tabular-nums text-right flex items-center justify-end gap-0.5 ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-gray-300'}`}>
+                {diff > 0 && (
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clipRule="evenodd" /></svg>
+                )}
+                {diff < 0 && (
+                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75v10.638l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clipRule="evenodd" /></svg>
+                )}
+                {diff !== 0 ? (diff > 0 ? `+${diff}` : `${diff}`) : '—'}
+              </span>
+            );
+          })()}
+        </div>
       </div>
     </div>
   );

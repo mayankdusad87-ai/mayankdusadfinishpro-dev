@@ -33,6 +33,19 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.08.31a',
+    headline: 'Completion Velocity',
+    date: 'August 31, 2026',
+    features: [
+      {
+        emoji: '📈',
+        title: 'Completion Velocity',
+        description: 'New Completion Velocity section in Operations view — see how many flats completed per stage this week vs last week, with expandable floor and flat breakdowns. Replaces the Delay Root Cause chart.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.08.29e',
     headline: 'Target Achievement Insights',
     date: 'August 29, 2026',
