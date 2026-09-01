@@ -143,7 +143,7 @@ export function computeSupervisorUpdate(input: {
     actual_start: actualStart || null,
     actual_end: actualEnd || null,
     delay_reason: isReversalToNotStarted ? null : (reasonValue || null),
-    remarks: isReversalToNotStarted ? '' : (input.delayReasonIsOther ? input.remarks.trim() : ''),
+    remarks: isReversalToNotStarted ? '' : (input.remarks?.trim() || ''),
   };
 
   return {
