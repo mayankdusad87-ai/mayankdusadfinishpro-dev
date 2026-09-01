@@ -33,6 +33,19 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.09.01b',
+    headline: 'Activity Tiles in Pipeline',
+    date: 'September 1, 2026',
+    features: [
+      {
+        emoji: '📊',
+        title: 'Activity Completion Tiles',
+        description: 'Click any pipeline stage to see a horizontal row of activity tiles — each shows the activity name, completed/total count, and a color-coded progress bar. Instantly see which activities are lagging within a stage.',
+        roles: ['management'],
+      },
+    ],
+  },
+  {
     version: '2026.09.01a',
     headline: 'Bulk Vendor Assignment',
     date: 'September 1, 2026',
