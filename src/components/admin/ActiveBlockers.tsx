@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
-import type { ActiveBlockers as ActiveBlockersData, BlockerGroup } from '@/lib/insights-data';
+import type { ActiveBlockers as ActiveBlockersData, BlockerGroup, BlockerFlatRemark } from '@/lib/insights-data';
 
 interface Props {
   data: ActiveBlockersData;
@@ -27,6 +27,7 @@ function BlockerSection({ title, colorClass, groups }: {
       <div className="space-y-2">
         {groups.map(group => {
           const isExpanded = expandedReason === group.reason;
+          const isPreviousActivityPending = group.reason === 'Previous Activity Pending';
           return (
             <div key={group.reason}>
               <button
@@ -68,6 +69,19 @@ function BlockerSection({ title, colorClass, groups }: {
                           </span>
                         ))}
                       </div>
+                      {/* Show flat-level remarks for "Previous Activity Pending" */}
+                      {isPreviousActivityPending && stage.floors.some(f => f.flatRemarks && f.flatRemarks.length > 0) && (
+                        <div className="mt-1.5 space-y-1">
+                          {stage.floors.map(f =>
+                            f.flatRemarks?.map(fr => (
+                              <div key={`${f.floor}-${fr.flatNumber}`} className="flex items-start gap-1.5 text-[11px] bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                                <span className="font-semibold text-amber-700 whitespace-nowrap">Flat {fr.flatNumber}:</span>
+                                <span className="text-gray-700 italic">{fr.remarks}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

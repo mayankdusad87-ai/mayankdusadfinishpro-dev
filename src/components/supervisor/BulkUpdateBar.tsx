@@ -38,7 +38,11 @@ export default function BulkUpdateBar({
   const [toast, setToast] = useState<string | null>(null);
   const [showHoldPicker, setShowHoldPicker] = useState(false);
   const [selectedReason, setSelectedReason] = useState('');
+  const [holdRemarks, setHoldRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const PREVIOUS_ACTIVITY_PENDING = 'Previous Activity Pending';
+  const needsRemarks = selectedReason === PREVIOUS_ACTIVITY_PENDING;
 
   // Compute flat-level expansion for On Hold (hook must be before any early return)
   // Find all flats that have at least one selected activity, then gather ALL activities of those flats
@@ -130,6 +134,7 @@ export default function BulkUpdateBar({
 
   async function handleBulkHold() {
     if (!selectedReason || holdSummary.holdableCount === 0) return;
+    if (needsRemarks && !holdRemarks.trim()) return;
     setSubmitting(true);
 
     await bulkUpdateStatus(
@@ -148,11 +153,13 @@ export default function BulkUpdateBar({
       projectId,
       userId,
       selectedReason,
+      needsRemarks ? holdRemarks.trim() : undefined,
     );
 
     setSubmitting(false);
     setShowHoldPicker(false);
     setSelectedReason('');
+    setHoldRemarks('');
 
     setToast(`${holdSummary.holdableCount} activit${holdSummary.holdableCount === 1 ? 'y' : 'ies'} put on hold`);
     setTimeout(() => setToast(null), 3000);
@@ -227,7 +234,7 @@ export default function BulkUpdateBar({
                 {reasons.map(r => (
                   <button
                     key={r.id}
-                    onClick={() => setSelectedReason(r.label)}
+                    onClick={() => { setSelectedReason(r.label); if (r.label !== PREVIOUS_ACTIVITY_PENDING) setHoldRemarks(''); }}
                     className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
                       selectedReason === r.label
                         ? 'bg-orange-50 text-orange-700 ring-2 ring-orange-400'
@@ -238,19 +245,38 @@ export default function BulkUpdateBar({
                   </button>
                 ))}
               </div>
+
+              {/* Remarks textarea — only for "Previous Activity Pending" */}
+              {needsRemarks && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    Which activity is pending? <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    value={holdRemarks}
+                    onChange={e => setHoldRemarks(e.target.value)}
+                    placeholder="e.g. Waterproofing not done yet on Floor 2..."
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 resize-none"
+                  />
+                  {holdRemarks.trim().length === 0 && (
+                    <p className="text-[11px] text-red-500 mt-1">Remarks are required for this reason</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Footer */}
             <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
               <button
-                onClick={() => { setShowHoldPicker(false); setSelectedReason(''); }}
+                onClick={() => { setShowHoldPicker(false); setSelectedReason(''); setHoldRemarks(''); }}
                 className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleBulkHold}
-                disabled={!selectedReason || submitting || holdSummary.holdableCount === 0}
+                disabled={!selectedReason || submitting || holdSummary.holdableCount === 0 || (needsRemarks && !holdRemarks.trim())}
                 className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitting ? (

@@ -225,6 +225,7 @@ export async function bulkUpdateStatus(
   projectId: string,
   userId: string,
   delayReason?: string,
+  remarks?: string,
 ): Promise<{ error: string | null; skippedNoPhoto?: number }> {
   let skippedNoPhoto = 0;
 
@@ -241,7 +242,7 @@ export async function bulkUpdateStatus(
       }
     }
 
-    const updates = computeBulkUpdate(row.status, row.actual_start, newStatus, delayReason);
+    const updates = computeBulkUpdate(row.status, row.actual_start, newStatus, delayReason, remarks);
 
     await updateActivityWithAudit(id, updates, {
       projectId,

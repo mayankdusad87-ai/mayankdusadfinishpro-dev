@@ -187,9 +187,15 @@ export interface PendingStage {
 
 // ---- Active Blockers (delay reason analytics) ----
 
+export interface BlockerFlatRemark {
+  flatNumber: number;
+  remarks: string;
+}
+
 export interface BlockerFloor {
   floor: number;
   flatCount: number;
+  flatRemarks?: BlockerFlatRemark[];  // populated only for "Previous Activity Pending"
 }
 
 export interface BlockerStage {
@@ -494,11 +500,13 @@ function computePendingWork(rows: InsightRow[]): PendingStage[] {
 
 const NO_REASON = 'Reason not captured';
 
+const PREV_ACTIVITY_PENDING = 'Previous Activity Pending';
+
 function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
   const today = todayISO();
 
   // Step 1: Filter to currently stuck activities
-  type StuckRow = { reason: string; type: 'delayed' | 'on_hold'; stage: string; floor: number; flat: number };
+  type StuckRow = { reason: string; type: 'delayed' | 'on_hold'; stage: string; floor: number; flat: number; remarks: string };
   const stuck: StuckRow[] = [];
 
   for (const r of rows) {
@@ -512,6 +520,7 @@ function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
         stage: r.stage,
         floor: r.floor,
         flat: r.flat_number,
+        remarks: r.remarks?.trim() || '',
       });
     }
     // Rule C + D: on_hold
@@ -522,6 +531,7 @@ function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
         stage: r.stage,
         floor: r.floor,
         flat: r.flat_number,
+        remarks: r.remarks?.trim() || '',
       });
     }
   }
@@ -534,6 +544,8 @@ function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
   function aggregate(items: StuckRow[], type: 'delayed' | 'on_hold'): BlockerGroup[] {
     // reason → stage → floor → Set<flat>
     const reasonMap = new Map<string, Map<string, Map<number, Set<number>>>>();
+    // For "Previous Activity Pending": reason → stage → floor → flat → remarks
+    const remarksMap = new Map<string, Map<number, Map<number, string>>>();
 
     for (const item of items) {
       if (!reasonMap.has(item.reason)) reasonMap.set(item.reason, new Map());
@@ -542,6 +554,15 @@ function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
       const floorMap = stageMap.get(item.stage)!;
       if (!floorMap.has(item.floor)) floorMap.set(item.floor, new Set());
       floorMap.get(item.floor)!.add(item.flat);
+
+      // Collect remarks for "Previous Activity Pending"
+      if (item.reason === PREV_ACTIVITY_PENDING && item.remarks) {
+        const key = `${item.stage}`;
+        if (!remarksMap.has(key)) remarksMap.set(key, new Map());
+        const floorRemarksMap = remarksMap.get(key)!;
+        if (!floorRemarksMap.has(item.floor)) floorRemarksMap.set(item.floor, new Map());
+        floorRemarksMap.get(item.floor)!.set(item.flat, item.remarks);
+      }
     }
 
     const groups: BlockerGroup[] = [];
@@ -555,7 +576,20 @@ function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
         for (const [floor, flats] of floorMap) {
           allFloors.add(floor);
           totalFlats += flats.size;
-          floors.push({ floor, flatCount: flats.size });
+
+          // Attach flat-level remarks for "Previous Activity Pending"
+          let flatRemarks: BlockerFlatRemark[] | undefined;
+          if (reason === PREV_ACTIVITY_PENDING) {
+            const stageRemarks = remarksMap.get(stage);
+            const floorRemarks = stageRemarks?.get(floor);
+            if (floorRemarks && floorRemarks.size > 0) {
+              flatRemarks = [...floorRemarks.entries()]
+                .map(([flatNumber, remarks]) => ({ flatNumber, remarks }))
+                .sort((a, b) => a.flatNumber - b.flatNumber);
+            }
+          }
+
+          floors.push({ floor, flatCount: flats.size, ...(flatRemarks ? { flatRemarks } : {}) });
         }
         floors.sort((a, b) => a.floor - b.floor);
         stages.push({ stage, floors });

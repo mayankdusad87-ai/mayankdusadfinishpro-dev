@@ -781,10 +781,11 @@ export interface InsightRow {
   actual_end: string;
   vendor: string;
   delay_reason: string;
+  remarks: string;
 }
 
 export async function getInsightActivities(projectId: string): Promise<InsightRow[]> {
-  const COLS = 'floor, flat_number, stage, stage_gate, activity, status, expected_start, expected_end, actual_start, actual_end, vendor, delay_reason';
+  const COLS = 'floor, flat_number, stage, stage_gate, activity, status, expected_start, expected_end, actual_start, actual_end, vendor, delay_reason, remarks';
   const PAGE = 1000;
 
   // First page + exact count in one request

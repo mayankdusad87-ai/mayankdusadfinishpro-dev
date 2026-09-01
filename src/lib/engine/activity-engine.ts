@@ -156,6 +156,7 @@ export function computeBulkUpdate(
   currentActualStart: string | null,
   newStatus: 'in_progress' | 'completed' | 'on_hold',
   delayReason?: string,
+  remarks?: string,
 ): ActivityUpdate {
   const today = todayISO();
   const updates: ActivityUpdate = { status: newStatus };
@@ -164,6 +165,7 @@ export function computeBulkUpdate(
     updates.actual_start = today;
   } else if (newStatus === 'on_hold') {
     updates.delay_reason = delayReason || null;
+    updates.remarks = remarks?.trim() || '';
   } else {
     updates.actual_end = today;
     if (!currentActualStart) updates.actual_start = today;
