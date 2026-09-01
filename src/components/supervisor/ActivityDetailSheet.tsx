@@ -182,11 +182,7 @@ export default function ActivityDetailSheet({
     <div className="fixed inset-0 z-50 flex flex-col justify-end max-w-md md:max-w-3xl mx-auto">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto">
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
-        </div>
-
-        <div className="px-5 pb-24">
+        <div className="px-5 pt-5 pb-24">
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="text-lg md:text-xl font-bold text-gray-900">{activity.activity}</h2>

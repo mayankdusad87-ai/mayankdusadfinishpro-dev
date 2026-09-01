@@ -188,7 +188,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               href={item.href}
               onClick={onMobileClose}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-colors relative group ${
+              className={`flex items-center gap-3 px-3 py-2.5 md:py-2.5 min-h-[44px] text-sm transition-colors relative group ${
                 isActive
                   ? 'bg-sidebar-hover text-white'
                   : 'text-gray-300 hover:bg-sidebar-hover hover:text-white'

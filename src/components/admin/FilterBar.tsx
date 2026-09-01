@@ -46,6 +46,18 @@ function FilterBar({
     onFiltersChange({ ...filters, [key]: value });
   }
 
+  const activeCount = [
+    filters.project,
+    filters.floor,
+    filters.flat,
+    filters.stage,
+    filters.stageGate,
+    filters.vendor,
+    filters.status,
+    filters.dateFrom,
+    filters.dateTo,
+  ].filter(Boolean).length;
+
   const selectClass =
     'h-9 w-full sm:w-auto rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary';
 
@@ -183,9 +195,13 @@ function FilterBar({
         <div className="flex items-center w-full sm:w-auto sm:ml-auto">
           <button
             onClick={onClear}
-            className="h-9 px-4 rounded-md border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+            className={`h-9 px-4 rounded-md border text-sm font-medium transition-colors cursor-pointer ${
+              activeCount > 0
+                ? 'border-primary bg-primary/10 text-primary hover:bg-primary/20'
+                : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
           >
-            Clear
+            Clear{activeCount > 0 ? ` (${activeCount})` : ''}
           </button>
         </div>
       </div>

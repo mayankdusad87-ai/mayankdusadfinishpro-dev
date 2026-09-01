@@ -38,8 +38,9 @@ function ActivityCard({
             <input
               type="checkbox"
               checked={isSelected}
-              onChange={() => onToggleSelect(row.id)}
-              className="accent-[#C8922A] w-5 h-5 mt-0.5"
+              onChange={(e) => { e.stopPropagation(); onToggleSelect(row.id); }}
+              onClick={(e) => e.stopPropagation()}
+              className="accent-[#C8922A] w-5 h-5 mt-0.5 min-w-[20px] min-h-[20px]"
             />
           )}
           {bulkMode && isCompleted && (
@@ -79,7 +80,7 @@ function ActivityCard({
         <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
           {status === 'not_started' && (
             <button
-              onClick={() => onQuickAction(row, 'start')}
+              onClick={(e) => { e.stopPropagation(); onQuickAction(row, 'start'); }}
               disabled={isSaving}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-colors ${
                 isSaving ? 'bg-blue-100 text-blue-400 cursor-not-allowed' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
@@ -96,7 +97,7 @@ function ActivityCard({
             </button>
           )}
           <button
-            onClick={() => onQuickAction(row, 'complete')}
+            onClick={(e) => { e.stopPropagation(); onQuickAction(row, 'complete'); }}
             disabled={isSaving}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold transition-colors ${
               isSaving ? 'bg-green-100 text-green-400 cursor-not-allowed' : 'bg-green-50 text-green-700 hover:bg-green-100'

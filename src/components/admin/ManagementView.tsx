@@ -241,12 +241,12 @@ function DrilldownPanel({ stage, breakdowns, activitySummaries, onClose, handove
                   <div className="text-xs font-semibold text-gray-700 mb-1.5 leading-tight truncate" title={a.activity}>{a.activity}</div>
                   <div className="flex items-baseline gap-1 mb-1.5">
                     <span className="text-base font-bold text-gray-900 tabular-nums">{a.completed}</span>
-                    <span className="text-[10px] text-gray-400 tabular-nums">/ {a.total}</span>
+                    <span className="text-[11px] text-gray-400 tabular-nums">/ {a.total}</span>
                   </div>
                   <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1">
                     <div className={`h-1.5 rounded-full transition-all duration-500 ${color.bar}`} style={{ width: `${a.pct}%` }} />
                   </div>
-                  <div className={`text-[10px] font-bold tabular-nums ${color.text}`}>{a.pct}%</div>
+                  <div className={`text-[11px] font-bold tabular-nums ${color.text}`}>{a.pct}%</div>
                 </div>
               );
             })}
@@ -390,13 +390,13 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
                           <div className={`px-1 py-0.5 rounded text-center whitespace-nowrap ${
                             dropOff.drop >= 16 ? 'bg-red-50' : dropOff.drop >= 6 ? 'bg-amber-50' : 'bg-gray-50'
                           }`}>
-                            <div className={`text-[10px] font-bold tabular-nums leading-tight ${
+                            <div className={`text-[11px] font-bold tabular-nums leading-tight ${
                               dropOff.drop >= 16 ? 'text-red-600' : dropOff.drop >= 6 ? 'text-amber-600' : 'text-gray-400'
                             }`}>
                               ↓{dropOff.drop}
                             </div>
                             {dropOff.drop >= 16 && (
-                              <div className="text-[8px] font-bold text-red-500 uppercase tracking-wide leading-tight">bottleneck</div>
+                              <div className="text-[10px] font-bold text-red-500 uppercase tracking-wider leading-tight">bottleneck</div>
                             )}
                           </div>
                         ) : (
@@ -419,7 +419,7 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
                       }`}
                     >
                       {isBottleneck && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 mb-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 mb-2">
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126Z" />
                           </svg>
@@ -483,7 +483,7 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
                         )}
                         <span className={`text-sm font-bold ${isBottleneck ? 'text-gray-900' : 'text-gray-800'}`}>{s.stage}</span>
                         {isBottleneck && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wide">Bottleneck</span>
+                          <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wide">Bottleneck</span>
                         )}
                       </div>
                       <div className="text-sm tabular-nums">
@@ -648,7 +648,7 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <span className="text-sm font-bold text-gray-900">Pending Work by Stage</span>
                 <span className="text-xs text-gray-500 tabular-nums">{pendingWorkAnalysis.totalFloors} total floors</span>
-                <span className="ml-auto text-[10px] font-semibold text-gray-400 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded">Completed hidden</span>
+                <span className="ml-auto text-[11px] font-semibold text-gray-400 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded">Completed hidden</span>
               </div>
               <div className="text-[11px] text-gray-400 mb-2">Tap stage to expand sub-stages</div>
 

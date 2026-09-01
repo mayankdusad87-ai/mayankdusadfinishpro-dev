@@ -49,12 +49,21 @@ function cellStyle(cell: RollupCell): string {
   }
 }
 
+function cellIcon(cell: RollupCell): string {
+  if (cell.total === 0) return '';
+  switch (cell.label) {
+    case 'completed': return '✓ ';
+    case 'running': return '▶ ';
+    case 'yet_to_start': return '○ ';
+  }
+}
+
 function cellText(cell: RollupCell): string {
   if (cell.total === 0) return '-';
   switch (cell.label) {
-    case 'completed': return `Completed (${cell.completed}/${cell.total})`;
-    case 'running': return `Running (${cell.running}/${cell.total})`;
-    case 'yet_to_start': return `Yet to Start (0/${cell.total})`;
+    case 'completed': return `${cellIcon(cell)}Done (${cell.completed}/${cell.total})`;
+    case 'running': return `${cellIcon(cell)}WIP (${cell.running}/${cell.total})`;
+    case 'yet_to_start': return `${cellIcon(cell)}Pending (0/${cell.total})`;
   }
 }
 
@@ -106,7 +115,7 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
           <div className="flex-1 bg-white border border-gray-200 rounded-lg py-3 shadow-sm text-center">
             <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsFirstCoatDone}</div>
             <div className="text-[11px] md:text-xs text-gray-500 mt-0.5">Fully Ready</div>
-            <div className="text-[10px] md:text-[11px] text-gray-400">Upto First Coat Paint</div>
+            <div className="text-[11px] text-gray-400">Upto First Coat Paint</div>
           </div>
           <div className="flex-1 bg-white border border-gray-200 rounded-lg py-3 shadow-sm text-center">
             <div className="text-2xl md:text-3xl font-bold text-gray-900">{data.floorsInProgress}</div>
@@ -134,6 +143,11 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
 
       {/* Heatmap Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="md:hidden flex items-center gap-1.5 px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-400">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 16l-4-4m0 0l4-4m-4 4h18" /></svg>
+          Scroll horizontally to see all stages
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
