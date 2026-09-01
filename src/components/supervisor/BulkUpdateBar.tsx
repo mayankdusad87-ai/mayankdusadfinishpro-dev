@@ -257,6 +257,7 @@ export default function BulkUpdateBar({
                     onChange={e => setHoldRemarks(e.target.value)}
                     placeholder="e.g. Waterproofing not done yet on Floor 2..."
                     rows={3}
+                    maxLength={500}
                     className="w-full border border-gray-300 rounded-xl px-3.5 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-orange-400 focus:border-orange-400 resize-none"
                   />
                   {holdRemarks.trim().length === 0 && (

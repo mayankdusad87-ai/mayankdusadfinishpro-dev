@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
-import type { ActiveBlockers as ActiveBlockersData, BlockerGroup, BlockerFlatRemark } from '@/lib/insights-data';
+import type { ActiveBlockers as ActiveBlockersData, BlockerGroup } from '@/lib/insights-data';
 
 interface Props {
   data: ActiveBlockersData;
