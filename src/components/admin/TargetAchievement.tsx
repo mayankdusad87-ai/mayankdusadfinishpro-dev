@@ -240,8 +240,8 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
         </div>
       )}
 
-      {/* ---- Target cards (vertical stack) ---- */}
-      <div className="divide-y divide-gray-100">
+      {/* ---- Target cards (2-col grid on desktop, stack on mobile) ---- */}
+      <div className={`p-4 grid gap-4 grid-cols-1 ${targets.length > 1 ? 'md:grid-cols-2' : ''}`}>
         {targets.map(t => (
           <TargetCard key={t.id} target={t} />
         ))}
@@ -330,7 +330,7 @@ function TargetCard({ target: t }: { target: TargetAchievementResult }) {
   const whyMessage = getWhyMessage(t);
 
   return (
-    <div className="px-5 py-4 flex gap-4 items-start hover:bg-gray-50/50 transition-colors">
+    <div className="px-4 py-4 flex gap-4 items-start rounded-xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
       {/* Progress ring */}
       <div className="shrink-0 pt-0.5">
         <ProgressRing pct={t.progressPct} status={t.status} size={64} />
