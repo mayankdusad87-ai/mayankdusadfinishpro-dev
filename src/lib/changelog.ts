@@ -33,6 +33,31 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.09.01d',
+    headline: 'Delay Remarks & UI Improvements',
+    date: 'September 1, 2026',
+    features: [
+      {
+        emoji: '📝',
+        title: 'Delay Remarks for Previous Activity Pending',
+        description: 'When putting activities on hold with "Previous Activity Pending" in bulk mode, a mandatory remarks field now appears — describe which activity is blocking. Remarks are saved and visible on the Insight dashboard under Active Blockers.',
+        roles: ['supervisor'],
+      },
+      {
+        emoji: '🔍',
+        title: 'Blocker Remarks on Insight Dashboard',
+        description: 'Active Blockers section now shows supervisor remarks when the delay reason is "Previous Activity Pending" — expand the blocker to see flat-level details of what\'s pending.',
+        roles: ['management', 'admin'],
+      },
+      {
+        emoji: '💀',
+        title: 'Skeleton Loading for Supervisor',
+        description: 'The supervisor home page now shows a polished skeleton placeholder while loading instead of a plain "Loading..." text — matching the page layout with animated pulse blocks.',
+        roles: ['supervisor'],
+      },
+    ],
+  },
+  {
     version: '2026.09.01b',
     headline: 'Activity Tiles in Pipeline',
     date: 'September 1, 2026',
