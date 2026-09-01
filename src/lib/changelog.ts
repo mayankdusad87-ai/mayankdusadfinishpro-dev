@@ -33,6 +33,25 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.09.01a',
+    headline: 'Bulk Vendor Assignment',
+    date: 'September 1, 2026',
+    features: [
+      {
+        emoji: '👷',
+        title: 'Bulk Assign Vendors',
+        description: 'New button on the Upload page — assign vendors to thousands of activities in one shot. Groups by stage × activity, supports floor range filtering, and autocompletes from existing vendor names.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '💾',
+        title: 'Save Default Vendor Mapping',
+        description: 'Check "Save as default" when bulk assigning — your vendor mapping is remembered and auto-applied on future uploads (empty cells only). No more re-entering the same vendors every time.',
+        roles: ['admin'],
+      },
+    ],
+  },
+  {
     version: '2026.08.31b',
     headline: 'Weekly Email Improvements',
     date: 'August 31, 2026',
