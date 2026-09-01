@@ -681,6 +681,46 @@ export async function bulkUpdateActivities(
   return { error: null };
 }
 
+/**
+ * Bulk assign vendor to activities matching stage + activity filters.
+ * Runs one UPDATE per assignment — efficient for 10K+ row projects.
+ */
+export async function bulkAssignVendorByFilter(
+  projectId: string,
+  assignments: Array<{ stage: string; activity: string; vendor: string }>,
+  options?: { floorFrom?: number; floorTo?: number; onlyEmpty?: boolean },
+): Promise<{ errors: string[] }> {
+  const errors: string[] = [];
+
+  for (const { stage, activity, vendor } of assignments) {
+    if (!vendor.trim()) continue;
+
+    let query = supabase
+      .from('activities')
+      .update({ vendor } as ActivityUpdate)
+      .eq('project_id', projectId)
+      .eq('stage', stage)
+      .eq('activity', activity);
+
+    if (options?.floorFrom !== undefined) {
+      query = query.gte('floor', options.floorFrom);
+    }
+    if (options?.floorTo !== undefined) {
+      query = query.lte('floor', options.floorTo);
+    }
+    if (options?.onlyEmpty) {
+      query = query.or('vendor.is.null,vendor.eq.');
+    }
+
+    const { error } = await query;
+    if (error) {
+      errors.push(`${stage} / ${activity}: ${error.message}`);
+    }
+  }
+
+  return { errors };
+}
+
 export async function getPhotoCount(activityId: string): Promise<number> {
   const { count, error } = await supabase
     .from('activity_photos')

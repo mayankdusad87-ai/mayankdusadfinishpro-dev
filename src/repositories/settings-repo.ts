@@ -78,6 +78,22 @@ export async function setManagementAccess(access: ManagementAccess): Promise<voi
 
 export { DEFAULT_MANAGEMENT_ACCESS };
 
+// ---- Vendor Mappings (per-project) ----
+
+export interface VendorMapping {
+  stage: string;
+  activity: string;
+  vendor: string;
+}
+
+export async function getVendorMappings(projectId: string): Promise<VendorMapping[]> {
+  return (await getAppSetting<VendorMapping[]>(`vendor_mappings_${projectId}`)) || [];
+}
+
+export async function setVendorMappings(projectId: string, mappings: VendorMapping[]): Promise<void> {
+  return setAppSetting(`vendor_mappings_${projectId}`, mappings);
+}
+
 // ---- Backdate Limit ----
 
 const DEFAULT_BACKDATE_DAYS = 3;

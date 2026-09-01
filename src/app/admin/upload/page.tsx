@@ -7,6 +7,9 @@ import { getProjectDataFromSupabase, updateActivityInSupabase } from '@/lib/supa
 import { useAuth } from '@/lib/auth-context';
 import { uploadTemplate, clearTemplate, countModifiedActivities, getUploadMergeSummary } from '@/services/project-service';
 import type { UploadMode, MergeSummary } from '@/services/project-service';
+import BulkVendorAssign from '@/components/admin/BulkVendorAssign';
+import { getVendorMappings } from '@/repositories/settings-repo';
+import { bulkAssignVendorByFilter } from '@/lib/supabase-data';
 
 type UploadStep = 'pick' | 'preview' | 'saved';
 
@@ -35,6 +38,8 @@ export default function UploadPage() {
   const [showProtectedDetails, setShowProtectedDetails] = useState(false);
   const [summaryFailed, setSummaryFailed] = useState(false);
   const [loadingProject, setLoadingProject] = useState(false);
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [autoApplyMsg, setAutoApplyMsg] = useState('');
   const isReupload = !!projectData; // true when existing data exists
 
   useEffect(() => {
@@ -171,6 +176,28 @@ export default function UploadPage() {
     try {
       await uploadTemplate(currentProject, previewData.activities, previewData.fileName, previewData.totalRows, user?.id || '', mode);
       await refreshProjects();
+
+      // Auto-apply saved vendor mappings (if any exist for this project)
+      try {
+        const savedMappings = await getVendorMappings(currentProject.id);
+        if (savedMappings.length > 0) {
+          const assignments = savedMappings.map(m => ({
+            stage: m.stage,
+            activity: m.activity,
+            vendor: m.vendor,
+          }));
+          const { errors } = await bulkAssignVendorByFilter(
+            currentProject.id,
+            assignments,
+            { onlyEmpty: true }, // only fill where vendor is missing
+          );
+          if (errors.length === 0) {
+            setAutoApplyMsg(`Auto-applied ${assignments.length} saved vendor mappings`);
+          }
+        }
+      } catch {
+        // best-effort — don't fail the upload if auto-apply fails
+      }
 
       // Reload fresh data from DB (merge may have preserved/modified rows)
       const fresh = await getProjectDataFromSupabase(currentProject.id);
@@ -328,6 +355,15 @@ export default function UploadPage() {
         </div>
         {step === 'saved' && (
           <div className="flex gap-2">
+            <button
+              onClick={() => setShowBulkAssign(true)}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+              </svg>
+              Bulk Assign Vendor
+            </button>
             <button
               onClick={startReupload}
               className="px-4 py-2 text-sm font-medium text-primary border border-primary/30 rounded-lg hover:bg-orange-50 transition-colors"
@@ -703,6 +739,24 @@ export default function UploadPage() {
             </div>
           )}
 
+          {/* Auto-applied vendor mappings notification */}
+          {autoApplyMsg && step === 'saved' && (
+            <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+              <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+              </svg>
+              <div className="flex-1">
+                <span className="text-sm font-semibold text-blue-800">{autoApplyMsg}</span>
+                <span className="text-xs text-blue-600 block">Vendors were filled from your saved default mapping (empty cells only).</span>
+              </div>
+              <button onClick={() => setAutoApplyMsg('')} className="p-1 hover:bg-blue-100 rounded text-blue-400">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+
           {/* Key metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <MetricCard label="Total Activities" value={displayData.totalRows.toLocaleString()} icon="📋" />
@@ -924,6 +978,24 @@ export default function UploadPage() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Bulk Vendor Assign Modal */}
+          {showBulkAssign && projectData && currentProject && (
+            <BulkVendorAssign
+              activities={projectData.activities}
+              projectId={currentProject.id}
+              existingVendors={projectData.vendors}
+              floors={projectData.floors}
+              onClose={() => setShowBulkAssign(false)}
+              onComplete={async () => {
+                // Refresh data after bulk assignment
+                if (currentProject) {
+                  const fresh = await getProjectDataFromSupabase(currentProject.id);
+                  if (fresh) setProjectData(fresh);
+                }
+              }}
+            />
           )}
 
           {/* Sample data in preview mode */}

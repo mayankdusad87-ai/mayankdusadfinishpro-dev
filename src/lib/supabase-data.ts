@@ -29,6 +29,7 @@ export {
   getAllFilteredActivities,
   updateActivityWithAudit,
   bulkUpdateActivities,
+  bulkAssignVendorByFilter,
   getPhotoCount,
   getAdminEmails,
   getDashboardData,
