@@ -94,6 +94,13 @@ export interface FloorActivityDetail {
   status: 'in_progress' | 'yet_to_start' | 'on_hold';
 }
 
+export interface StageActivitySummary {
+  activity: string;
+  completed: number;
+  total: number;
+  pct: number;
+}
+
 export interface StageFloorBreakdown {
   floor: number;
   /** Flats where ALL activities are completed */
@@ -211,6 +218,7 @@ export interface ManagementData {
   floors: FloorProjection[];
   bottlenecks: ManagementBottleneck[];
   stageFloorBreakdowns: Record<string, StageFloorBreakdown[]>;
+  stageActivitySummaries: Record<string, StageActivitySummary[]>;
   sitePulse: SitePulse;
   pendingWork: PendingStage[];
   activeBlockers: ActiveBlockers;
@@ -945,8 +953,9 @@ export function computeManagement(
     arr.push(r);
   }
 
-  // --- Stage floor breakdowns (for drill-down) ---
+  // --- Stage floor breakdowns (for drill-down) + activity summaries ---
   const stageFloorBreakdowns: Record<string, StageFloorBreakdown[]> = {};
+  const stageActivitySummaries: Record<string, StageActivitySummary[]> = {};
   for (const stage of PIPELINE_STAGES) {
     const breakdowns: StageFloorBreakdown[] = [];
     const stageRows = rowsByStage.get(stage) || [];
@@ -954,6 +963,8 @@ export function computeManagement(
     // Build activity drill-down + flat-level counts in a single pass
     const activityByFloor = new Map<number, FloorActivityDetail[]>();
     const floorFlatRows = new Map<number, Map<number, { total: number; completed: number; hasStarted: boolean }>>();
+    // Activity-level completion counts (for activity tiles)
+    const activityStats = new Map<string, { completed: number; total: number }>();
 
     for (const r of stageRows) {
       // Flat-level counts
@@ -965,6 +976,12 @@ export function computeManagement(
       const done = isComplete(r.status);
       if (done) { fc.completed++; fc.hasStarted = true; }
       else if (r.status === 'in_progress' || r.status === 'in_progress_delayed') fc.hasStarted = true;
+
+      // Activity-level completion for tiles
+      if (!activityStats.has(r.activity)) activityStats.set(r.activity, { completed: 0, total: 0 });
+      const as = activityStats.get(r.activity)!;
+      as.total++;
+      if (done) as.completed++;
 
       // Pending activities for drill-down
       if (!done) {
@@ -978,6 +995,19 @@ export function computeManagement(
         });
       }
     }
+
+    // Build sorted activity summaries for this stage
+    const summaries: StageActivitySummary[] = [];
+    for (const [activity, stats] of activityStats) {
+      summaries.push({
+        activity,
+        completed: stats.completed,
+        total: stats.total,
+        pct: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
+      });
+    }
+    summaries.sort((a, b) => b.pct - a.pct); // highest completion first
+    stageActivitySummaries[stage] = summaries;
 
     for (const floorRow of heatmap.floors) {
       const cell = floorRow.stages[stage];
@@ -1028,6 +1058,7 @@ export function computeManagement(
     floors,
     bottlenecks,
     stageFloorBreakdowns,
+    stageActivitySummaries,
     sitePulse,
     pendingWork,
     activeBlockers,

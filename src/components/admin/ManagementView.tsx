@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useEffect, useMemo, useState } from 'react';
-import type { ManagementData, StageFloorBreakdown, FloorActivityDetail } from '@/lib/insights-data';
+import type { ManagementData, StageFloorBreakdown, FloorActivityDetail, StageActivitySummary } from '@/lib/insights-data';
 import type { UnitStore } from '@/repositories/store-repo';
 import type { FloorHandover } from '@/repositories/handover-repo';
 import MaterialStores from '@/components/admin/MaterialStores';
@@ -194,7 +194,19 @@ function FloorCard({ b, handover }: { b: StageFloorBreakdown; handover?: FloorHa
   );
 }
 
-function DrilldownPanel({ stage, breakdowns, onClose, handoverMap }: { stage: string; breakdowns: StageFloorBreakdown[]; onClose: () => void; handoverMap: Map<number, FloorHandover> }) {
+function activityTileColor(pct: number): { bar: string; text: string } {
+  if (pct >= 70) return { bar: 'bg-emerald-500', text: 'text-emerald-600' };
+  if (pct >= 40) return { bar: 'bg-amber-500', text: 'text-amber-600' };
+  return { bar: 'bg-red-500', text: 'text-red-600' };
+}
+
+function DrilldownPanel({ stage, breakdowns, activitySummaries, onClose, handoverMap }: {
+  stage: string;
+  breakdowns: StageFloorBreakdown[];
+  activitySummaries: StageActivitySummary[];
+  onClose: () => void;
+  handoverMap: Map<number, FloorHandover>;
+}) {
   // Floors in this stage not yet handed over by RCC
   const notHandedOverFloors = breakdowns.filter(b => {
     const h = handoverMap.get(b.floor);
@@ -213,6 +225,34 @@ function DrilldownPanel({ stage, breakdowns, onClose, handoverMap }: { stage: st
           Close
         </button>
       </div>
+
+      {/* Activity tiles — horizontal scrollable row */}
+      {activitySummaries.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Activities in this stage</p>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-300">
+            {activitySummaries.map(a => {
+              const color = activityTileColor(a.pct);
+              return (
+                <div
+                  key={a.activity}
+                  className="flex-shrink-0 min-w-[130px] max-w-[170px] border border-gray-200 rounded-lg p-2.5 bg-gray-50/80 hover:border-[#C8922A]/40 transition-colors"
+                >
+                  <div className="text-xs font-semibold text-gray-700 mb-1.5 leading-tight truncate" title={a.activity}>{a.activity}</div>
+                  <div className="flex items-baseline gap-1 mb-1.5">
+                    <span className="text-base font-bold text-gray-900 tabular-nums">{a.completed}</span>
+                    <span className="text-[10px] text-gray-400 tabular-nums">/ {a.total}</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1">
+                    <div className={`h-1.5 rounded-full transition-all duration-500 ${color.bar}`} style={{ width: `${a.pct}%` }} />
+                  </div>
+                  <div className={`text-[10px] font-bold tabular-nums ${color.text}`}>{a.pct}%</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* RCC handover summary */}
       {notHandedOverFloors.length > 0 && (
@@ -239,7 +279,7 @@ function DrilldownPanel({ stage, breakdowns, onClose, handoverMap }: { stage: st
 }
 
 function ManagementView({ data, projectName, projectId, stores = [], handovers = [] }: Props) {
-  const { pipeline, /* bottlenecks, */ stageFloorBreakdowns, sitePulse, pendingWork, activeBlockers } = data;
+  const { pipeline, /* bottlenecks, */ stageFloorBreakdowns, stageActivitySummaries, sitePulse, pendingWork, activeBlockers } = data;
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
 
   // Build handover lookup: floor → FloorHandover
@@ -484,6 +524,7 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
                       <DrilldownPanel
                         stage={s.stage}
                         breakdowns={stageFloorBreakdowns[s.stage]}
+                        activitySummaries={stageActivitySummaries[s.stage] || []}
                         onClose={() => setSelectedStage(null)}
                         handoverMap={handoverMap}
                       />
@@ -502,6 +543,7 @@ function ManagementView({ data, projectName, projectId, stores = [], handovers =
           <DrilldownPanel
             stage={selectedStage}
             breakdowns={stageFloorBreakdowns[selectedStage]}
+            activitySummaries={stageActivitySummaries[selectedStage] || []}
             onClose={() => setSelectedStage(null)}
             handoverMap={handoverMap}
           />
