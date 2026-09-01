@@ -14,7 +14,9 @@ export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 
   const [selected, setSelected] = useState('');
   const [remarks, setRemarks] = useState('');
   const isOther = selected === '__other__';
-  const canSubmit = selected && (isOther ? remarks.trim().length > 0 : true);
+  const isPreviousActivityPending = selected === 'Previous Activity Pending';
+  const needsRemarks = isOther || isPreviousActivityPending;
+  const canSubmit = selected && (needsRemarks ? remarks.trim().length > 0 : true);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center max-w-md md:max-w-lg mx-auto">
@@ -53,7 +55,7 @@ export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 
             {reasons.map(r => (
               <button
                 key={r.id}
-                onClick={() => { setSelected(r.label); setRemarks(''); }}
+                onClick={() => { setSelected(r.label); if (r.label !== 'Previous Activity Pending') setRemarks(''); }}
                 className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all border ${
                   selected === r.label
                     ? 'border-red-400 bg-red-50 text-red-800'
@@ -64,7 +66,7 @@ export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 
               </button>
             ))}
             <button
-              onClick={() => setSelected('__other__')}
+              onClick={() => { setSelected('__other__'); setRemarks(''); }}
               className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all border ${
                 isOther
                   ? 'border-red-400 bg-red-50 text-red-800'
@@ -75,17 +77,25 @@ export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 
             </button>
           </div>
 
-          {/* Remarks for Other */}
-          {isOther && (
+          {/* Remarks — for "Other" or "Previous Activity Pending" */}
+          {needsRemarks && (
             <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                {isPreviousActivityPending ? 'Which activity is pending?' : 'Describe the delay reason'}
+                {' '}<span className="text-red-500">*</span>
+              </label>
               <textarea
                 rows={2}
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Describe the delay reason..."
+                placeholder={isPreviousActivityPending ? 'e.g. Waterproofing not done yet...' : 'Describe the delay reason...'}
+                maxLength={500}
                 autoFocus
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-300 focus:border-red-400 resize-none"
               />
+              {remarks.trim().length === 0 && (
+                <p className="text-[11px] text-red-500 mt-1">Remarks are required</p>
+              )}
             </div>
           )}
 
@@ -100,7 +110,7 @@ export default function DelayReasonModal({ reasons, onConfirm, onCancel, mode = 
             <button
               onClick={() => {
                 const finalReason = isOther ? remarks.trim() : selected;
-                onConfirm(finalReason, isOther ? remarks.trim() : '');
+                onConfirm(finalReason, needsRemarks ? remarks.trim() : '');
               }}
               disabled={!canSubmit}
               className={`flex-1 py-2.5 font-semibold rounded-xl text-sm transition-colors ${

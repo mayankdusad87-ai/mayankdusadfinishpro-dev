@@ -279,7 +279,7 @@ export default function ActivityDetailSheet({
                 </label>
                 <select
                   value={detailReason}
-                  onChange={(e) => { setDetailReason(e.target.value); setDetailError(''); if (e.target.value !== '__other__') setDetailRemarks(''); }}
+                  onChange={(e) => { setDetailReason(e.target.value); setDetailError(''); if (e.target.value !== '__other__' && e.target.value !== 'Previous Activity Pending') setDetailRemarks(''); }}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 >
                   <option value="">-- Select reason --</option>
@@ -291,18 +291,22 @@ export default function ActivityDetailSheet({
               </div>
             )}
 
-            {detailReason === '__other__' && (
+            {(detailReason === '__other__' || detailReason === 'Previous Activity Pending') && (
               <div className="md:col-span-2">
                 <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">
-                  Remarks <span className="text-red-500">*</span>
+                  {detailReason === 'Previous Activity Pending' ? 'Which activity is pending?' : 'Remarks'} <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   rows={2}
                   value={detailRemarks}
                   onChange={(e) => { setDetailRemarks(e.target.value); setDetailError(''); }}
-                  placeholder="Describe the reason..."
+                  placeholder={detailReason === 'Previous Activity Pending' ? 'e.g. Waterproofing not done yet...' : 'Describe the reason...'}
+                  maxLength={500}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
                 />
+                {detailRemarks.trim().length === 0 && (
+                  <p className="text-[11px] text-red-500 mt-1">Remarks are required</p>
+                )}
               </div>
             )}
 

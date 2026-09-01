@@ -355,7 +355,7 @@ export default function SupervisorHomePage() {
     setRefreshKey(k => k + 1);
   }
 
-  async function confirmDelay(reason: string) {
+  async function confirmDelay(reason: string, remarks: string) {
     if (!delayPromptRow) return;
     const row = delayPromptRow;
 
@@ -371,7 +371,7 @@ export default function SupervisorHomePage() {
     if (delayPromptMode === 'overdue_start') {
       setSavingActionId(row.id);
       // Start the overdue activity with delay reason in one save
-      const updates: ActivityUpdate = { status: 'in_progress', actual_start: TODAY, delay_reason: reason };
+      const updates: ActivityUpdate = { status: 'in_progress', actual_start: TODAY, delay_reason: reason, remarks: remarks || '' };
       await updateActivityWithAudit(row.id, updates, {
         projectId: selectedProjectId,
         changedBy: user?.id || '',
@@ -392,7 +392,7 @@ export default function SupervisorHomePage() {
     }
 
     // overdue_capture: save delay_reason to DB immediately, then open detail sheet
-    const updates: ActivityUpdate = { delay_reason: reason };
+    const updates: ActivityUpdate = { delay_reason: reason, remarks: remarks || '' };
     const result = await updateActivityWithAudit(row.id, updates, {
       projectId: selectedProjectId,
       changedBy: user?.id || '',
@@ -1206,7 +1206,7 @@ export default function SupervisorHomePage() {
         <DelayReasonModal
           reasons={reasons}
           mode={delayPromptMode}
-          onConfirm={(reason) => confirmDelay(reason)}
+          onConfirm={(reason, remarks) => confirmDelay(reason, remarks)}
           onCancel={() => { setDelayPromptRow(null); setDelayPromptMode('overdue_capture'); setPendingDetailRow(null); }}
         />
       )}

@@ -69,6 +69,9 @@ export function validateSupervisorSave(input: {
   if (input.delayReasonIsOther && !input.remarks.trim()) {
     return { field: 'remarks', message: 'Please provide remarks when selecting "Other" as reason.' };
   }
+  if (input.delayReason === 'Previous Activity Pending' && !input.remarks.trim()) {
+    return { field: 'remarks', message: 'Please specify which activity is pending.' };
+  }
   if (input.status === 'completed' && input.photoCount === 0) {
     return { field: 'photos', message: 'At least one photo is required before marking as completed.' };
   }
