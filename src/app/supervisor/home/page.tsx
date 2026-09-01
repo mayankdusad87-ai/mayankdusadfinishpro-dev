@@ -16,7 +16,7 @@ import ActivityDetailSheet from '@/components/supervisor/ActivityDetailSheet';
 import BulkUpdateBar from '@/components/supervisor/BulkUpdateBar';
 import PhotoPromptModal from '@/components/supervisor/PhotoPromptModal';
 import DelayReasonModal from '@/components/supervisor/DelayReasonModal';
-import { useCanAccess } from '@/hooks';
+import { useCanAccess, useSupervisorFilters, useBulkSelection } from '@/hooks';
 import NotificationDropdown from '@/components/shared/NotificationDropdown';
 
 export default function SupervisorHomePage() {
@@ -29,15 +29,16 @@ export default function SupervisorHomePage() {
   const [loading, setLoading] = useState(true);
   const [activeFloor, setActiveFloor] = useState<number>(0);
   const [activeView, setActiveView] = useState<PriorityView>('floor');
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [stageFilter, setStageFilter] = useState('');
-  const [subStageFilter, setSubStageFilter] = useState('');
-  const [activityFilter, setActivityFilter] = useState('');
-  const [statusDropdown, setStatusDropdown] = useState('');
-  const [search, setSearch] = useState('');
   const [selectedDetail, setSelectedDetail] = useState<UploadedActivity | null>(null);
-  const [bulkMode, setBulkMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Extracted hooks for filter & bulk state
+  const filters = useSupervisorFilters();
+  const {
+    stageFilter, setStageFilter, subStageFilter, setSubStageFilter,
+    activityFilter, setActivityFilter, statusDropdown, setStatusDropdown,
+    statusFilter, setStatusFilter, search, setSearch,
+    showFilters, setShowFilters, hasFilters,
+  } = filters;
   const [showPhotoPrompt, setShowPhotoPrompt] = useState<string | null>(null);
   const [delayPromptRow, setDelayPromptRow] = useState<UploadedActivity | null>(null);
   const [delayPromptMode, setDelayPromptMode] = useState<'complete' | 'overdue_start' | 'overdue_capture'>('overdue_capture');
@@ -48,7 +49,6 @@ export default function SupervisorHomePage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [assignedFloors, setAssignedFloors] = useState<number[] | null>(null);
   const [showProfile, setShowProfile] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
   // UI optimization states
   const [floorDisplayCount, setFloorDisplayCount] = useState(20);
   const [priorityDisplayCount, setPriorityDisplayCount] = useState(30);
@@ -270,32 +270,12 @@ export default function SupervisorHomePage() {
       .map(r => r.id);
   }, [activeView, floorRows, allFloorRows]);
 
-  const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedIds.has(id));
-  const someSelected = selectableIds.some(id => selectedIds.has(id));
+  // Bulk selection hook
+  const bulk = useBulkSelection(selectableIds);
+  const { bulkMode, selectedIds, allSelected, someSelected, toggleSelection, handleSelectAll, clearSelection, resetBulk } = bulk;
 
-  function handleSelectAll() {
-    if (allSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(selectableIds));
-    }
-  }
-
-  function toggleSelection(id: string) {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  function clearFilters() {
-    setStageFilter('');
-    setSubStageFilter('');
-    setActivityFilter('');
-    setStatusDropdown('');
-    setStatusFilter(null);
-    setSearch('');
+  function clearAllFilters() {
+    filters.clearFilters();
     setFloorDisplayCount(20);
   }
 
@@ -467,13 +447,71 @@ export default function SupervisorHomePage() {
     return [];
   }
 
-  const hasFilters = stageFilter || subStageFilter || activityFilter || statusDropdown || statusFilter;
   const todayFormatted = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-navy-dark flex items-center justify-center">
-        <div className="text-white text-sm">Loading...</div>
+      <div className="min-h-screen bg-navy-dark animate-pulse">
+        {/* Skeleton header */}
+        <div className="px-4 md:px-6 pt-4 pb-3">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-navy-light" />
+              <div className="w-28 h-5 rounded bg-navy-light" />
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-8 h-8 rounded-full bg-navy-light" />
+              <div className="w-8 h-8 rounded-full bg-navy-light" />
+            </div>
+          </div>
+
+          {/* Skeleton greeting */}
+          <div className="flex items-baseline justify-between mb-2">
+            <div className="w-40 h-4 rounded bg-navy-light" />
+            <div className="w-32 h-3 rounded bg-navy-light/60" />
+          </div>
+
+          {/* Skeleton project selector */}
+          <div className="w-full h-10 rounded-lg bg-navy-light/50 mb-2" />
+
+          {/* Skeleton priority cards */}
+          <div className="grid grid-cols-4 gap-2 md:gap-3 mb-2">
+            {[1,2,3,4].map(i => (
+              <div key={i} className="flex flex-col items-center py-3 rounded-lg bg-navy-light/60">
+                <div className="w-8 h-6 rounded bg-navy-light mb-1" />
+                <div className="w-12 h-3 rounded bg-navy-light/60" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Skeleton floor tabs */}
+        <div className="px-4 md:px-6 mb-3">
+          <div className="flex gap-2">
+            {[1,2,3,4].map(i => (
+              <div key={i} className={`h-9 rounded-lg bg-navy-light ${i === 1 ? 'w-16' : 'w-24'}`} />
+            ))}
+          </div>
+        </div>
+
+        {/* Skeleton activity cards */}
+        <div className="px-4 md:px-6 space-y-2">
+          {[1,2,3,4,5].map(i => (
+            <div key={i} className="bg-navy-light/40 rounded-xl p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <div className="w-48 h-4 rounded bg-navy-light mb-1.5" />
+                  <div className="w-32 h-3 rounded bg-navy-light/60" />
+                </div>
+                <div className="w-16 h-6 rounded-full bg-navy-light" />
+              </div>
+              <div className="flex gap-2 mt-3">
+                <div className="w-20 h-8 rounded-lg bg-navy-light/60" />
+                <div className="w-20 h-8 rounded-lg bg-navy-light/60" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -677,7 +715,7 @@ export default function SupervisorHomePage() {
           <div className="relative">
             <div className="flex gap-2 overflow-x-auto md:overflow-x-visible md:flex-wrap pb-1 scrollbar-hide">
               <button
-                onClick={() => { setActiveView('all'); clearFilters(); setSelectedIds(new Set()); setBulkMode(false); }}
+                onClick={() => { setActiveView('all'); clearAllFilters(); resetBulk(); }}
                 className={`px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
                   activeView === 'all' ? 'bg-primary text-white' : 'bg-navy-light text-gray-300 hover:bg-navy-light/80'
                 }`}
@@ -687,7 +725,7 @@ export default function SupervisorHomePage() {
               {floors.map(f => (
                 <button
                   key={f}
-                  onClick={() => { setActiveView('floor'); setActiveFloor(f); clearFilters(); setSelectedIds(new Set()); setBulkMode(false); setFloorDisplayCount(20); }}
+                  onClick={() => { setActiveView('floor'); setActiveFloor(f); clearAllFilters(); resetBulk(); }}
                   className={`px-4 py-2 md:py-2.5 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
                     activeView === 'floor' && activeFloor === f ? 'bg-primary text-white' : 'bg-navy-light text-gray-300 hover:bg-navy-light/80'
                   }`}
@@ -910,13 +948,13 @@ export default function SupervisorHomePage() {
                   subStageFilter={subStageFilter}
                   activityFilter={activityFilter}
                   statusDropdown={statusDropdown}
-                  onStageChange={(v) => { setStageFilter(v); setSubStageFilter(''); setActivityFilter(''); setSelectedIds(new Set()); }}
-                  onSubStageChange={(v) => { setSubStageFilter(v); setActivityFilter(''); setSelectedIds(new Set()); }}
-                  onActivityChange={(v) => { setActivityFilter(v); setSelectedIds(new Set()); }}
-                  onStatusChange={(v) => { setStatusDropdown(v); setSelectedIds(new Set()); }}
+                  onStageChange={(v) => { filters.setStageFilter(v); filters.setSubStageFilter(''); filters.setActivityFilter(''); clearSelection(); }}
+                  onSubStageChange={(v) => { filters.setSubStageFilter(v); filters.setActivityFilter(''); clearSelection(); }}
+                  onActivityChange={(v) => { filters.setActivityFilter(v); clearSelection(); }}
+                  onStatusChange={(v) => { filters.setStatusDropdown(v); clearSelection(); }}
                 />
                 {hasFilters && (
-                  <button onClick={() => { clearFilters(); setSelectedIds(new Set()); }} className="text-xs text-primary font-medium mb-3 flex items-center gap-1">
+                  <button onClick={() => { clearAllFilters(); clearSelection(); }} className="text-xs text-primary font-medium mb-3 flex items-center gap-1">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                     </svg>
@@ -1074,7 +1112,7 @@ export default function SupervisorHomePage() {
                   onStatusChange={(v) => setStatusDropdown(v)}
                 />
                 {hasFilters && (
-                  <button onClick={clearFilters} className="text-xs text-primary font-medium mb-3 flex items-center gap-1">
+                  <button onClick={clearAllFilters} className="text-xs text-primary font-medium mb-3 flex items-center gap-1">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                     </svg>
@@ -1151,8 +1189,8 @@ export default function SupervisorHomePage() {
         projectId={selectedProjectId}
         userId={user?.id || ''}
         reasons={reasons}
-        onToggleBulkMode={() => { setBulkMode(!bulkMode); setSelectedIds(new Set()); }}
-        onBulkComplete={() => { setBulkMode(false); setSelectedIds(new Set()); setRefreshKey(k => k + 1); }}
+        onToggleBulkMode={() => { bulk.setBulkMode(!bulkMode); clearSelection(); }}
+        onBulkComplete={() => { resetBulk(); setRefreshKey(k => k + 1); }}
       />}
 
       {/* Photo prompt when completing */}
