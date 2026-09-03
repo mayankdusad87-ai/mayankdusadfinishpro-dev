@@ -568,14 +568,14 @@ function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
     const groups: BlockerGroup[] = [];
     for (const [reason, stageMap] of reasonMap) {
       const allFloors = new Set<number>();
-      let totalFlats = 0;
+      const uniqueFlats = new Set<number>();
       const stages: BlockerStage[] = [];
 
       for (const [stage, floorMap] of stageMap) {
         const floors: BlockerFloor[] = [];
         for (const [floor, flats] of floorMap) {
           allFloors.add(floor);
-          totalFlats += flats.size;
+          for (const f of flats) uniqueFlats.add(f);
 
           // Attach flat-level remarks for "Previous Activity Pending"
           let flatRemarks: BlockerFlatRemark[] | undefined;
@@ -601,7 +601,7 @@ function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
         reason,
         type,
         floorCount: allFloors.size,
-        flatCount: totalFlats,
+        flatCount: uniqueFlats.size,
         stages,
       });
     }
