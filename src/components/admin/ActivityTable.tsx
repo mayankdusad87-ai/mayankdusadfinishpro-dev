@@ -268,31 +268,47 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     if (selectedRows.size === 0) return;
     setDeleteLoading(true);
     setShowDeleteModal(true);
-    const info = await getActivitiesDeleteInfo([...selectedRows]);
-    setDeleteInfo(info);
-    setDeleteLoading(false);
+    try {
+      const info = await getActivitiesDeleteInfo([...selectedRows]);
+      if (info.length === 0) {
+        showToast('Activities not found — they may have been deleted already.', 'error');
+        setShowDeleteModal(false);
+        return;
+      }
+      setDeleteInfo(info);
+    } catch {
+      showToast('Failed to load activity details.', 'error');
+      setShowDeleteModal(false);
+    } finally {
+      setDeleteLoading(false);
+    }
   }
 
   async function handleDeleteConfirm() {
     if (!user || deleteInfo.length === 0) return;
     setDeleting(true);
-    const result = await deleteActivitiesFromDB(
-      deleteInfo.map(i => i.id),
-      deleteInfo,
-      user.id,
-      projectId,
-    );
-    if (result.error) {
-      showToast(`Delete failed: ${result.error}`, 'error');
-    } else {
-      setTableRows(prev => prev.filter(r => !selectedRows.has(r.id)));
-      setTableTotal(prev => prev - result.deletedCount);
-      showToast(`Deleted ${result.deletedCount} activities.`, 'success');
-      setSelectedRows(new Set());
+    try {
+      const result = await deleteActivitiesFromDB(
+        deleteInfo.map(i => i.id),
+        deleteInfo,
+        user.id,
+        projectId,
+      );
+      if (result.error) {
+        showToast(`Delete failed: ${result.error}`, 'error');
+      } else {
+        setTableRows(prev => prev.filter(r => !selectedRows.has(r.id)));
+        setTableTotal(prev => prev - result.deletedCount);
+        showToast(`Deleted ${result.deletedCount} activities.`, 'success');
+        setSelectedRows(new Set());
+      }
+    } catch {
+      showToast('Delete failed — network error.', 'error');
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+      setDeleteInfo([]);
     }
-    setDeleting(false);
-    setShowDeleteModal(false);
-    setDeleteInfo([]);
   }
 
   async function exportExcel() {
