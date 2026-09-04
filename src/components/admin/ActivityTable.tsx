@@ -13,7 +13,10 @@ import { normalizeToBaseStatus, formatDate, todayISO } from '@/lib/utils';
 import { updateActivityStatus, updateActivityField, bulkUpdateField } from '@/services/activity-service';
 import { exportToExcel, exportToPDF } from '@/services/export-service';
 import { useToast } from '@/hooks/use-toast';
-import { useCanAccess, useCanEdit } from '@/hooks';
+import { useCanAccess, useCanEdit, useRole } from '@/hooks';
+import { useAuth } from '@/lib/auth-context';
+import { getActivitiesDeleteInfo, deleteActivitiesFromDB } from '@/repositories/activity-repo';
+import type { ActivityDeleteInfo } from '@/repositories/activity-repo';
 
 interface EditingCell {
   rowId: string;
@@ -64,6 +67,15 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
   const [exporting, setExporting] = useState(false);
   const [dateEditTarget, setDateEditTarget] = useState<DateEditTarget | null>(null);
   const [dateEditSaving, setDateEditSaving] = useState(false);
+
+  // Delete state
+  const role = useRole();
+  const { user } = useAuth();
+  const isAdmin = role === 'admin';
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteInfo, setDeleteInfo] = useState<ActivityDeleteInfo[]>([]);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const activeFilters = useMemo(() => {
     const f: { floor?: string; flat?: string; stage?: string; stageGate?: string; vendor?: string; status?: string; search?: string } = { ...filters };
@@ -252,6 +264,37 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
     setDateEditTarget(null);
   }
 
+  async function handleDeleteClick() {
+    if (selectedRows.size === 0) return;
+    setDeleteLoading(true);
+    setShowDeleteModal(true);
+    const info = await getActivitiesDeleteInfo([...selectedRows]);
+    setDeleteInfo(info);
+    setDeleteLoading(false);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!user || deleteInfo.length === 0) return;
+    setDeleting(true);
+    const result = await deleteActivitiesFromDB(
+      deleteInfo.map(i => i.id),
+      deleteInfo,
+      user.id,
+      projectId,
+    );
+    if (result.error) {
+      showToast(`Delete failed: ${result.error}`, 'error');
+    } else {
+      setTableRows(prev => prev.filter(r => !selectedRows.has(r.id)));
+      setTableTotal(prev => prev - result.deletedCount);
+      showToast(`Deleted ${result.deletedCount} activities.`, 'success');
+      setSelectedRows(new Set());
+    }
+    setDeleting(false);
+    setShowDeleteModal(false);
+    setDeleteInfo([]);
+  }
+
   async function exportExcel() {
     setExporting(true);
     try {
@@ -419,6 +462,16 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
                   Update Expected Dates
                 </button>
               </>
+            )}
+
+            {isAdmin && (
+              <button
+                onClick={handleDeleteClick}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-300 rounded-md text-sm text-red-700 bg-red-50 hover:bg-red-100 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+                Delete
+              </button>
             )}
           </div>
         )}
@@ -724,6 +777,119 @@ export default function ActivityTable({ projectId, filters, statusFilter, projec
               </button>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <Modal open={showDeleteModal} onClose={() => { if (!deleting) { setShowDeleteModal(false); setDeleteInfo([]); } }} title="Delete Activities" maxWidth="max-w-md">
+          {deleteLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+              <span className="ml-2 text-sm text-gray-600">Checking activity data...</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
+                <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                </svg>
+                <p className="text-sm text-red-800 font-medium">
+                  This will permanently delete <strong>{deleteInfo.length}</strong> {deleteInfo.length === 1 ? 'activity' : 'activities'}. This action cannot be undone.
+                </p>
+              </div>
+
+              {/* Warnings */}
+              {(() => {
+                const withPhotos = deleteInfo.filter(i => i.photoCount > 0);
+                const withStatus = deleteInfo.filter(i => i.status !== 'not_started');
+                const totalPhotos = withPhotos.reduce((sum, i) => sum + i.photoCount, 0);
+                return (
+                  <>
+                    {withPhotos.length > 0 && (
+                      <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
+                        </svg>
+                        <span className="text-xs text-amber-800">
+                          <strong>{totalPhotos}</strong> {totalPhotos === 1 ? 'photo' : 'photos'} attached across <strong>{withPhotos.length}</strong> {withPhotos.length === 1 ? 'activity' : 'activities'} will also be deleted.
+                        </span>
+                      </div>
+                    )}
+                    {withStatus.length > 0 && (
+                      <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+                        </svg>
+                        <span className="text-xs text-amber-800">
+                          <strong>{withStatus.length}</strong> {withStatus.length === 1 ? 'activity has' : 'activities have'} status updates that will be lost.
+                        </span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Activity summary */}
+              <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="text-left px-2 py-1.5 font-medium text-gray-600">Floor</th>
+                      <th className="text-left px-2 py-1.5 font-medium text-gray-600">Flat</th>
+                      <th className="text-left px-2 py-1.5 font-medium text-gray-600">Activity</th>
+                      <th className="text-left px-2 py-1.5 font-medium text-gray-600">Status</th>
+                      <th className="text-center px-2 py-1.5 font-medium text-gray-600">📷</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {deleteInfo.map(info => (
+                      <tr key={info.id}>
+                        <td className="px-2 py-1.5 text-gray-700">{info.floor}</td>
+                        <td className="px-2 py-1.5 text-gray-700">{info.flat_number}</td>
+                        <td className="px-2 py-1.5 text-gray-700 truncate max-w-[120px]">{info.activity}</td>
+                        <td className="px-2 py-1.5">
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                            info.status === 'completed' ? 'bg-green-100 text-green-700'
+                            : info.status === 'in_progress' ? 'bg-blue-100 text-blue-700'
+                            : info.status === 'on_hold' ? 'bg-amber-100 text-amber-700'
+                            : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {info.status.replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5 text-center text-gray-500">{info.photoCount || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => { setShowDeleteModal(false); setDeleteInfo([]); }}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {deleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete Permanently'
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </Modal>
       )}
     </div>

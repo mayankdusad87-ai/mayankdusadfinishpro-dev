@@ -823,3 +823,107 @@ export async function getInsightActivities(projectId: string): Promise<InsightRo
 
   return all;
 }
+
+// ---------------------------------------------------------------------------
+// Admin: delete activities (hard delete with cleanup)
+// ---------------------------------------------------------------------------
+
+export interface ActivityDeleteInfo {
+  id: string;
+  floor: number;
+  flat_number: number;
+  stage: string;
+  stage_gate: string;
+  activity: string;
+  status: string;
+  photoCount: number;
+}
+
+/** Fetch activity details + photo counts for the delete confirmation dialog */
+export async function getActivitiesDeleteInfo(activityIds: string[]): Promise<ActivityDeleteInfo[]> {
+  const { data: rows, error } = await supabase
+    .from('activities')
+    .select('id, floor, flat_number, stage, stage_gate, activity, status')
+    .in('id', activityIds);
+
+  if (error || !rows) return [];
+
+  // Get photo counts per activity in one query
+  const { data: photoCounts } = await supabase
+    .from('activity_photos')
+    .select('activity_id')
+    .in('activity_id', activityIds);
+
+  const photoMap = new Map<string, number>();
+  for (const p of photoCounts || []) {
+    photoMap.set(p.activity_id, (photoMap.get(p.activity_id) || 0) + 1);
+  }
+
+  return rows.map(r => ({
+    id: r.id,
+    floor: r.floor,
+    flat_number: r.flat_number,
+    stage: r.stage,
+    stage_gate: r.stage_gate || '',
+    activity: r.activity,
+    status: r.status || 'not_started',
+    photoCount: photoMap.get(r.id) || 0,
+  }));
+}
+
+/** Hard-delete activities, their photos (storage + DB), and log to audit */
+export async function deleteActivitiesFromDB(
+  activityIds: string[],
+  deleteInfo: ActivityDeleteInfo[],
+  userId: string,
+  projectId: string,
+): Promise<{ error: string | null; deletedCount: number }> {
+  // 1. Delete photos from storage + DB
+  const { data: photos } = await supabase
+    .from('activity_photos')
+    .select('id, storage_path')
+    .in('activity_id', activityIds);
+
+  if (photos && photos.length > 0) {
+    // Delete from storage
+    const paths = photos.map(p => p.storage_path);
+    await supabase.storage.from('activity-photos').remove(paths);
+    // Delete photo records
+    const photoIds = photos.map(p => p.id);
+    await supabase.from('activity_photos').delete().in('id', photoIds);
+  }
+
+  // 2. Insert audit log entries BEFORE deleting (so we have a record)
+  const auditEntries = deleteInfo.map(info => ({
+    activity_id: info.id,
+    project_id: projectId,
+    changed_by: userId,
+    old_status: info.status,
+    new_status: 'deleted',
+    floor: info.floor,
+    flat_number: info.flat_number,
+    stage: info.stage,
+    stage_gate: info.stage_gate,
+    activity_name: info.activity,
+  }));
+
+  // Insert in chunks (audit_log might not have cascade delete on activity_id FK)
+  for (let i = 0; i < auditEntries.length; i += 100) {
+    await supabase.from('audit_log').insert(auditEntries.slice(i, i + 100));
+  }
+
+  // 3. Nullify activity_id on existing audit_log rows (FK constraint)
+  await supabase
+    .from('audit_log')
+    .update({ activity_id: null })
+    .in('activity_id', activityIds);
+
+  // 4. Delete the activities
+  const { error, count } = await supabase
+    .from('activities')
+    .delete({ count: 'exact' })
+    .in('id', activityIds);
+
+  if (error) return { error: error.message, deletedCount: 0 };
+  return { error: null, deletedCount: count || activityIds.length };
+}

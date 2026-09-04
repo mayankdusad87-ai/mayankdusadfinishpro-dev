@@ -411,7 +411,6 @@ export default function ActivityDetailSheet({
                   <input
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     multiple
                     onChange={handlePhotoCapture}
                     disabled={photoUploading}
