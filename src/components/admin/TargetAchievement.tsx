@@ -413,12 +413,21 @@ function TargetCard({ target: t }: { target: TargetAchievementResult }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {t.delayReasons.map((r, i) => (
+                {t.delayReasons.flatMap((r, i) => [
                   <tr key={i}>
                     <td className="px-3 py-1.5 text-gray-700">{r.reason}</td>
                     <td className="px-3 py-1.5 text-right font-semibold text-gray-900 tabular-nums">{r.count}</td>
-                  </tr>
-                ))}
+                  </tr>,
+                  ...(r.remarkDetails || []).map((rd, j) => (
+                    <tr key={`${i}-rd-${j}`} className="bg-amber-50/60">
+                      <td className="pl-6 pr-3 py-1 text-[11px] text-amber-800">
+                        <span className="text-amber-400 mr-1">↳</span>
+                        {rd.remark}
+                      </td>
+                      <td className="px-3 py-1 text-right text-[11px] font-semibold text-amber-700 tabular-nums">{rd.count}</td>
+                    </tr>
+                  )),
+                ])}
               </tbody>
             </table>
           </div>

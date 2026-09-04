@@ -41,12 +41,18 @@ export interface StatusBreakdown {
   onHold: number;
 }
 
+/** Sub-detail for "Previous Activity Pending" — what the supervisor typed */
+export interface RemarkDetail {
+  remark: string;
+  count: number;
+}
+
 /** Aggregated flat-level data for a single target's scope */
 export interface TargetScopeData {
   totalFlats: number;          // distinct (floor, flat_number) combos
   completedFlats: number;      // flats where ALL activities are completed
   lastCompletionDate: string | null;  // latest actual_end across completed activities
-  delayReasons: { reason: string; count: number }[];  // top 3 reasons
+  delayReasons: { reason: string; count: number; remarkDetails?: RemarkDetail[] }[];  // top 3 reasons
   statusBreakdown: StatusBreakdown;  // flat-level status counts
 }
 
@@ -65,7 +71,7 @@ export interface TargetAchievementResult {
   status: TargetStatus;
   daysRemaining: number;       // negative = overdue
   daysLate: number | null;     // only for 'delayed' status: how many days late
-  delayReasons: { reason: string; count: number }[];
+  delayReasons: { reason: string; count: number; remarkDetails?: RemarkDetail[] }[];
   statusBreakdown: StatusBreakdown;  // flat-level status counts
 }
 
@@ -243,6 +249,7 @@ export interface RawActivityRow {
   status: string;
   actual_end: string | null;
   delay_reason: string | null;
+  remarks: string | null;
 }
 
 /**
@@ -258,6 +265,8 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
     return { totalFlats: 0, completedFlats: 0, lastCompletionDate: null, delayReasons: [], statusBreakdown: { notStarted: 0, inProgress: 0, completed: 0, onHold: 0 } };
   }
 
+  const PREV_PENDING = 'Previous Activity Pending';
+
   // Group by flat key — track per-flat activity statuses + reasons
   const flatMap = new Map<string, {
     total: number;
@@ -267,13 +276,14 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
     latestEnd: string | null;
     reasons: Map<string, number>; // reason → count of incomplete activities with this reason
     noReasonCount: number;        // incomplete activities with no reason
+    prevPendingRemarks: string[]; // remarks for "Previous Activity Pending" activities
   }>();
 
   for (const row of rows) {
     const key = `${row.floor}-${row.flat_number}`;
     let entry = flatMap.get(key);
     if (!entry) {
-      entry = { total: 0, completed: 0, inProgress: 0, onHold: 0, latestEnd: null, reasons: new Map(), noReasonCount: 0 };
+      entry = { total: 0, completed: 0, inProgress: 0, onHold: 0, latestEnd: null, reasons: new Map(), noReasonCount: 0, prevPendingRemarks: [] };
       flatMap.set(key, entry);
     }
 
@@ -297,6 +307,10 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
       const reason = row.delay_reason?.trim();
       if (reason) {
         entry.reasons.set(reason, (entry.reasons.get(reason) || 0) + 1);
+        // Collect remarks for "Previous Activity Pending"
+        if (reason === PREV_PENDING && row.remarks?.trim()) {
+          entry.prevPendingRemarks.push(row.remarks.trim());
+        }
       } else {
         entry.noReasonCount++;
       }
@@ -337,6 +351,8 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
   // Top delay reasons — flat level (each incomplete flat counted once under its dominant reason)
   const NO_REASON = 'No reason captured';
   const flatReasonCounts = new Map<string, number>();
+  // Collect all "Previous Activity Pending" remarks across flats whose dominant reason is PREV_PENDING
+  const allPrevRemarks: string[] = [];
 
   for (const entry of flatMap.values()) {
     // Skip completed flats
@@ -354,11 +370,31 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
         if (c > maxCount) { dominant = r; maxCount = c; }
       }
       flatReasonCounts.set(dominant, (flatReasonCounts.get(dominant) || 0) + 1);
+      // If dominant is "Previous Activity Pending", collect its remarks
+      if (dominant === PREV_PENDING) {
+        allPrevRemarks.push(...entry.prevPendingRemarks);
+      }
     }
   }
 
+  // Build remark details for "Previous Activity Pending" — aggregate by remark text
+  const remarkCounts = new Map<string, number>();
+  for (const r of allPrevRemarks) {
+    remarkCounts.set(r, (remarkCounts.get(r) || 0) + 1);
+  }
+  const prevRemarkDetails: RemarkDetail[] = [...remarkCounts.entries()]
+    .map(([remark, count]) => ({ remark, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5); // top 5 blocking remarks
+
   const delayReasons = [...flatReasonCounts.entries()]
-    .map(([reason, count]) => ({ reason, count }))
+    .map(([reason, count]) => ({
+      reason,
+      count,
+      ...(reason === PREV_PENDING && prevRemarkDetails.length > 0
+        ? { remarkDetails: prevRemarkDetails }
+        : {}),
+    }))
     .sort((a, b) => {
       // "No reason captured" always last
       if (a.reason === NO_REASON && b.reason !== NO_REASON) return 1;
