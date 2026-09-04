@@ -33,6 +33,31 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.09.04',
+    headline: 'Photo Upload, Admin Delete & Target Insights',
+    date: 'September 4, 2026',
+    features: [
+      {
+        emoji: '📷',
+        title: 'Camera & Gallery Photo Upload',
+        description: 'Supervisors now see two buttons — "Take Photo" (opens camera) and "Gallery" (upload from gallery) — so photos can be saved offline and uploaded later.',
+        roles: ['supervisor'],
+      },
+      {
+        emoji: '🗑️',
+        title: 'Admin Delete Activities',
+        description: 'Admins can select activities from the table and permanently delete them. A confirmation popup shows photo and status warnings before deletion. All deletes are logged in the audit trail.',
+        roles: ['admin'],
+      },
+      {
+        emoji: '🔍',
+        title: 'Blocking Activity Details in Targets',
+        description: 'When a target\'s delay reason is "Previous Activity Pending", the specific blocking activities (from supervisor remarks) now appear as sub-rows so management can see exactly what\'s stuck.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.09.01d',
     headline: 'Delay Remarks & UI Improvements',
     date: 'September 1, 2026',
