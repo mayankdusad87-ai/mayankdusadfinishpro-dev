@@ -33,6 +33,30 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.09.05',
+    headline: 'UI Modernization — Professional Dashboard',
+    date: 'September 5, 2026',
+    features: [
+      {
+        emoji: '🎨',
+        title: 'Modernized Dashboard & Sidebar',
+        description: 'The sidebar, top bar, and dashboard status cards have been redesigned with navy-gold branding, gradient accents, hover lift effects, and smoother transitions for a polished, professional look.',
+      },
+      {
+        emoji: '📊',
+        title: 'Floor Heatmap Redesign',
+        description: 'The floor heatmap now features a navy gradient title bar, status pills instead of plain text, a gold milestone divider, and hover transitions on data rows.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📱',
+        title: 'Supervisor Card Refresh',
+        description: 'Activity cards now show a colored left accent bar by status, hover-lift animations, and a redesigned detail sheet with a navy header and gradient save button.',
+        roles: ['supervisor'],
+      },
+    ],
+  },
+  {
     version: '2026.09.04',
     headline: 'Photo Upload, Admin Delete & Target Insights',
     date: 'September 4, 2026',
@@ -53,6 +77,12 @@ export const CHANGELOG: ChangelogEntry[] = [
         emoji: '🔍',
         title: 'Blocking Activity Details in Targets',
         description: 'When a target\'s delay reason is "Previous Activity Pending", the specific blocking activities (from supervisor remarks) now appear as sub-rows so management can see exactly what\'s stuck.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '🐛',
+        title: 'Heatmap Labels Restored',
+        description: 'Floor heatmap cells now show "Running", "Completed", "Yet to Start" labels again instead of the abbreviated WIP/Done/Pending.',
         roles: ['admin', 'management'],
       },
     ],
