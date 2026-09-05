@@ -180,23 +180,30 @@ export default function ActivityDetailSheet({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end max-w-md md:max-w-3xl mx-auto">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-t-2xl max-h-[85vh] overflow-y-auto">
-        <div className="px-5 pt-5 pb-24">
-          <div className="flex items-start justify-between mb-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-t-3xl max-h-[85vh] overflow-y-auto shadow-2xl">
+        {/* Header with navy accent */}
+        <div className="bg-gradient-to-r from-navy to-navy-light px-5 pt-5 pb-4 rounded-t-3xl">
+          <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-lg md:text-xl font-bold text-gray-900">{activity.activity}</h2>
-              <p className="text-xs md:text-sm text-gray-500 mt-0.5">
-                Floor {activity.floor} &bull; Flat {activity.flat_number} &bull; {activity.stage}
+              <h2 className="text-lg md:text-xl font-bold text-white font-heading">{activity.activity}</h2>
+              <p className="text-xs md:text-sm text-gray-400 mt-1">
+                <span className="inline-flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M2 20h20M5 20V8l7-5 7 5v12M9 20v-4h6v4" /></svg>
+                  Floor {activity.floor} · Flat {activity.flat_number} · {activity.stage}
+                </span>
               </p>
               <p className="text-xs md:text-sm text-primary font-medium mt-0.5">Sub Stage: {activity.stage_gate}</p>
             </div>
-            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg">
+            <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
               <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
+        </div>
+
+        <div className="px-5 pt-4 pb-24">
 
           {normalizeStatus(activity.status) !== 'completed' && activity.expected_end && activity.expected_end < TODAY && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
@@ -446,12 +453,14 @@ export default function ActivityDetailSheet({
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-5 py-3">
+        <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 px-5 py-3">
           <button
             onClick={saveDetail}
             disabled={photoUploading || saving}
-            className={`w-full py-3 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 ${
-              photoUploading || saving ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark'
+            className={`w-full py-3.5 text-white font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg text-sm tracking-wide ${
+              photoUploading || saving
+                ? 'bg-gray-400 cursor-not-allowed shadow-none'
+                : 'bg-gradient-to-r from-primary to-primary-dark hover:shadow-primary/30 hover:shadow-xl active:scale-[0.98]'
             }`}
           >
             {photoUploading ? (

@@ -145,12 +145,12 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
   const sidebarContent = (
     <aside
-      className={`flex flex-col h-screen bg-sidebar text-white transition-all duration-200 flex-shrink-0 ${
+      className={`flex flex-col h-screen bg-gradient-to-b from-navy to-navy-dark text-white transition-all duration-300 flex-shrink-0 ${
         collapsed ? 'w-[60px]' : 'w-[220px]'
       }`}
     >
       {/* Logo */}
-      <div className={`flex items-center gap-2 px-3 py-4 border-b border-white/10 ${collapsed ? 'justify-center' : ''}`}>
+      <div className={`flex items-center gap-2 px-3 py-4 border-b border-white/8 ${collapsed ? 'justify-center' : ''}`}>
         <div className="w-8 h-8 flex-shrink-0">
           <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
             <ellipse cx="20" cy="14" rx="16" ry="10" fill="#C8922A" />
@@ -161,15 +161,15 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <div className="text-xs font-bold leading-tight tracking-wide">FINISHING PRO</div>
-            <div className="text-xs text-gray-400 leading-tight">Head Office</div>
+            <div className="text-xs font-bold leading-tight tracking-widest text-primary">FINISHING PRO</div>
+            <div className="text-[10px] text-gray-500 leading-tight tracking-wide mt-0.5">Head Office</div>
           </div>
         )}
         {/* Close button on mobile */}
         {!collapsed && (
           <button
             onClick={onMobileClose}
-            className="md:hidden p-1 hover:bg-sidebar-hover rounded-lg transition-colors"
+            className="md:hidden p-1 hover:bg-white/10 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -179,7 +179,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-2 overflow-y-auto">
+      <nav className="flex-1 py-3 px-2 overflow-y-auto space-y-0.5">
         {visibleItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
@@ -188,40 +188,40 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               href={item.href}
               onClick={onMobileClose}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 md:py-2.5 min-h-[44px] text-sm transition-colors relative group ${
+              className={`flex items-center gap-3 px-3 py-2.5 md:py-2.5 min-h-[44px] text-sm rounded-lg transition-all duration-200 relative ${
                 isActive
-                  ? 'bg-sidebar-hover text-white'
-                  : 'text-gray-300 hover:bg-sidebar-hover hover:text-white'
+                  ? 'bg-primary/15 text-primary shadow-sm'
+                  : 'text-gray-400 hover:bg-white/8 hover:text-white'
               } ${collapsed ? 'justify-center' : ''}`}
             >
               {isActive && (
-                <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary rounded-r" />
+                <span className="absolute left-0 top-2 bottom-2 w-[3px] bg-primary rounded-r" />
               )}
-              <span className="flex-shrink-0">{item.icon}</span>
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              <span className={`flex-shrink-0 transition-colors duration-200 ${isActive ? 'text-primary' : ''}`}>{item.icon}</span>
+              {!collapsed && <span className="truncate font-medium">{item.label}</span>}
             </Link>
           );
         })}
       </nav>
 
       {/* Profile */}
-      <div className={`border-t border-white/10 px-3 py-3 ${collapsed ? 'flex justify-center' : ''}`}>
+      <div className={`border-t border-white/8 px-3 py-3 ${collapsed ? 'flex justify-center' : ''}`}>
         {collapsed ? (
           <div
-            className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-primary text-sm font-bold cursor-default"
+            className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary text-sm font-bold cursor-default"
             title={`${profile?.full_name || 'User'}\n${user?.email || ''}\n${(profile?.role || 'admin').toUpperCase()}`}
           >
             {(profile?.full_name || 'U').charAt(0).toUpperCase()}
           </div>
         ) : (
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-primary text-sm font-bold flex-shrink-0">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/30 flex items-center justify-center text-primary text-sm font-bold flex-shrink-0">
               {(profile?.full_name || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-white text-xs font-semibold truncate">{profile?.full_name || 'User'}</div>
-              <div className="text-gray-400 text-xs truncate">{user?.email || ''}</div>
-              <div className="text-[11px] uppercase tracking-wider text-primary/70 font-medium mt-0.5">{profile?.role || 'admin'}</div>
+              <div className="text-gray-500 text-[11px] truncate">{user?.email || ''}</div>
+              <div className="text-[10px] uppercase tracking-widest text-primary/60 font-semibold mt-0.5">{profile?.role || 'admin'}</div>
             </div>
           </div>
         )}
@@ -230,20 +230,20 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       {/* Logout */}
       <button
         onClick={handleLogout}
-        className="flex items-center gap-2 px-3 py-2.5 text-gray-400 hover:text-red-400 hover:bg-sidebar-hover transition-colors border-t border-white/10 cursor-pointer"
+        className="flex items-center gap-2 mx-2 mb-1 px-3 py-2.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all duration-200 cursor-pointer"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 flex-shrink-0">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
           <polyline points="16 17 21 12 16 7" />
           <line x1="21" y1="12" x2="9" y2="12" />
         </svg>
-        {!collapsed && <span className="text-xs">Logout</span>}
+        {!collapsed && <span className="text-xs font-medium">Logout</span>}
       </button>
 
       {/* Collapse toggle - desktop only */}
       <button
         onClick={toggleCollapsed}
-        className="hidden md:flex items-center justify-center gap-2 px-3 py-3 text-gray-400 hover:text-white hover:bg-sidebar-hover transition-colors border-t border-white/10 cursor-pointer"
+        className="hidden md:flex items-center justify-center gap-2 px-3 py-3 text-gray-500 hover:text-white hover:bg-white/8 transition-all duration-200 border-t border-white/8 cursor-pointer"
       >
         <svg
           viewBox="0 0 24 24"
@@ -252,7 +252,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={`w-5 h-5 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`}
+          className={`w-5 h-5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
         >
           <path d="M15 18l-6-6 6-6" />
         </svg>

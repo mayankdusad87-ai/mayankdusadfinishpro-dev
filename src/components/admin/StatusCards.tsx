@@ -100,35 +100,48 @@ export default function StatusCards({ counts, activeFilter, onFilterChange }: St
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
       {cards.map((card) => {
         const isActive =
           (card.key === 'total' && activeFilter === null) ||
           activeFilter === card.key;
 
+        const count = getCount(card.key);
+        const pct = card.key !== 'total' && counts.total > 0
+          ? ((count / counts.total) * 100).toFixed(1)
+          : null;
+
         return (
           <button
             key={card.key}
             onClick={() => handleClick(card.key)}
-            className={`bg-white rounded-lg shadow-sm p-4 text-left transition-all hover:shadow-md cursor-pointer ${
-              isActive ? 'ring-2 ring-primary' : ''
-            }`}
+            className={`relative bg-white rounded-xl border p-4 text-left cursor-pointer
+              transition-all duration-200 hover:shadow-md hover:-translate-y-0.5
+              ${isActive
+                ? 'border-primary shadow-md ring-1 ring-primary/30'
+                : 'border-gray-200 shadow-sm'
+              }`}
           >
-            <div className="flex items-center gap-3 mb-2">
+            {/* Active indicator bar */}
+            {isActive && (
+              <span className="absolute top-0 left-3 right-3 h-[3px] bg-primary rounded-b" />
+            )}
+
+            <div className="flex items-center justify-between mb-3">
               <div className={`w-9 h-9 rounded-lg ${card.iconBg} flex items-center justify-center flex-shrink-0`}>
                 {card.icon}
               </div>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">
-              {getCount(card.key).toLocaleString()}
-            </div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-gray-500">{card.label}</span>
-              {card.key !== 'total' && counts.total > 0 && (
-                <span className="text-xs text-gray-400">
-                  {((getCount(card.key) / counts.total) * 100).toFixed(1)}%
+              {pct && (
+                <span className="text-[11px] font-medium text-gray-400 tabular-nums">
+                  {pct}%
                 </span>
               )}
+            </div>
+            <div className="text-2xl font-bold text-navy tabular-nums">
+              {count.toLocaleString()}
+            </div>
+            <div className="text-[11px] md:text-xs text-gray-500 font-medium mt-1">
+              {card.label}
             </div>
           </button>
         );
