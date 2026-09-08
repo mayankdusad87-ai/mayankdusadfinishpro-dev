@@ -312,8 +312,14 @@ export function weeklyReportEmailHtml(
     verdictTitle = 'Project needs attention';
     const parts: string[] = [];
     if (behindTargets.length > 0) parts.push(`${behindTargets.length} target${behindTargets.length > 1 ? 's' : ''} behind pace`);
-    if (bottleneck) parts.push(`${bottleneck.stage} is a bottleneck`);
-    if (blockers.length > 0) parts.push(`${totalBlockerFloors} floor${totalBlockerFloors !== 1 ? 's' : ''} blocked`);
+    if (bottleneck) {
+      // Tie the floor count to the bottleneck stage specifically
+      const bnFloors = bottleneck.pendingFloors.length;
+      parts.push(`${bottleneck.stage} is a bottleneck${bnFloors > 0 ? `. ${bnFloors} floor${bnFloors !== 1 ? 's' : ''} delayed in ${bottleneck.stage}` : ''}`);
+    } else if (blockers.length > 0) {
+      // No bottleneck — fall back to total unique delayed floors across all stages
+      parts.push(`${totalBlockerFloors} floor${totalBlockerFloors !== 1 ? 's' : ''} with delays`);
+    }
     verdictDesc = parts.join('. ') + '.';
     verdictBg = '#fef2f2'; verdictBorder = '#fecaca'; verdictColor = '#991b1b'; verdictIcon = '⚠';
   } else if (atRiskTargets.length > 0) {
