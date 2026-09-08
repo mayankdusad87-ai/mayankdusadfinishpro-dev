@@ -298,7 +298,7 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
         }
       }
     } else {
-      if (s === 'in_progress') {
+      if (s === 'in_progress' || s === 'in_progress_delayed') {
         entry.inProgress++;
       } else if (s === 'on_hold') {
         entry.onHold++;
