@@ -272,11 +272,15 @@ async function fetchBlockers(projectId: string): Promise<WeeklyBlocker[]> {
     from += PAGE;
   }
 
-  // Group by reason
+  // Filter out generic dependency statuses — these are normal pipeline flow,
+  // not actionable blockers for management
+  const DEPENDENCY_REASONS = new Set(['Previous Activity Pending']);
+
+  // Group by reason (only real blockers)
   const grouped = new Map<string, { count: number; floors: Set<number> }>();
   for (const row of all) {
     const reason = row.delay_reason.trim();
-    if (!reason) continue;
+    if (!reason || DEPENDENCY_REASONS.has(reason)) continue;
     const entry = grouped.get(reason) || { count: 0, floors: new Set() };
     entry.count++;
     entry.floors.add(row.floor);
