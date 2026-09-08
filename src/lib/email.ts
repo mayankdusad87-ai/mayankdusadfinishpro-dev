@@ -238,6 +238,7 @@ export interface WeeklyBlocker {
   reason: string;
   activityCount: number;
   floorCount: number;
+  floors: number[];           // actual floor numbers (for deduplication across reasons)
 }
 
 const TARGET_BADGE: Record<string, { label: string; bg: string; color: string; borderColor: string; bgCard: string; timingColor: string }> = {
@@ -297,8 +298,8 @@ export function weeklyReportEmailHtml(
   const behindTargets = targets.filter(t => t.status === 'missed' || t.status === 'behind');
   const atRiskTargets = targets.filter(t => t.status === 'at_risk' || t.status === 'delayed' || t.status === 'not_started');
   const bottleneck = pipeline.find(s => s.isBottleneck);
-  const totalAffectedFloors = new Set(blockers.flatMap(b => Array.from({ length: b.floorCount }, (_, i) => i))).size;
-  const totalBlockerFloors = blockers.reduce((sum, b) => sum + b.floorCount, 0);
+  // Deduplicate floors across all blocker reasons to get the true count
+  const totalBlockerFloors = new Set(blockers.flatMap(b => b.floors)).size;
 
   let verdictTitle: string;
   let verdictDesc: string;

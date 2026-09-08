@@ -288,6 +288,7 @@ async function fetchBlockers(projectId: string): Promise<WeeklyBlocker[]> {
       reason,
       activityCount: count,
       floorCount: floors.size,
+      floors: [...floors],
     }))
     .sort((a, b) => b.activityCount - a.activityCount)
     .slice(0, 5);
