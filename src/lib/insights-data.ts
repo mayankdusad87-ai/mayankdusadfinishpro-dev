@@ -996,7 +996,7 @@ export function computeManagement(
 
     // Build activity drill-down + flat-level counts in a single pass
     const activityByFloor = new Map<number, FloorActivityDetail[]>();
-    const floorFlatRows = new Map<number, Map<number, { total: number; completed: number; hasStarted: boolean }>>();
+    const floorFlatRows = new Map<number, Map<number, { total: number; completed: number; hasStarted: boolean; hasOnHold: boolean }>>();
     // Activity-level completion counts (for activity tiles)
     const activityStats = new Map<string, { completed: number; total: number }>();
 
@@ -1004,11 +1004,12 @@ export function computeManagement(
       // Flat-level counts
       if (!floorFlatRows.has(r.floor)) floorFlatRows.set(r.floor, new Map());
       const flatMap = floorFlatRows.get(r.floor)!;
-      if (!flatMap.has(r.flat_number)) flatMap.set(r.flat_number, { total: 0, completed: 0, hasStarted: false });
+      if (!flatMap.has(r.flat_number)) flatMap.set(r.flat_number, { total: 0, completed: 0, hasStarted: false, hasOnHold: false });
       const fc = flatMap.get(r.flat_number)!;
       fc.total++;
       const done = isComplete(r.status);
       if (done) { fc.completed++; fc.hasStarted = true; }
+      else if (r.status === 'on_hold') fc.hasOnHold = true;
       else if (r.status === 'in_progress' || r.status === 'in_progress_delayed') fc.hasStarted = true;
 
       // Activity-level completion for tiles
@@ -1060,6 +1061,7 @@ export function computeManagement(
         for (const fc of flatMap.values()) {
           totalUnits++;
           if (fc.completed === fc.total) completedUnits++;
+          else if (fc.hasOnHold) { /* counted via onHoldFlats below */ }
           else if (fc.hasStarted) inProgressUnits++;
           else yetToStartUnits++;
         }
