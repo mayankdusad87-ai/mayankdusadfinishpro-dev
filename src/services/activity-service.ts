@@ -62,6 +62,7 @@ export async function updateActivityStatus(
   newUserStatus: string,
   projectId: string,
   projectName: string,
+  photoMandatory = true,
 ): Promise<StatusUpdateResult> {
   const photoCount = newUserStatus === 'completed' ? await getPhotoCount(row.id) : 1;
 
@@ -73,6 +74,7 @@ export async function updateActivityStatus(
     actualEnd: row.actual_end,
     photoCount,
     delayReason: row.delay_reason || '',
+    photoMandatory,
   });
 
   if (validation) {
@@ -152,6 +154,7 @@ export interface SupervisorSaveInput {
   stageGate: string;
   activityName: string;
   backdateCutoff?: string; // ISO date — earliest allowed date
+  photoMandatory?: boolean; // defaults to true for backward compat
 }
 
 export async function saveActivityDetail(input: SupervisorSaveInput): Promise<StatusUpdateResult> {
@@ -168,6 +171,7 @@ export async function saveActivityDetail(input: SupervisorSaveInput): Promise<St
     photoCount: input.photoCount,
     today,
     backdateCutoff: input.backdateCutoff,
+    photoMandatory: input.photoMandatory,
   });
 
   if (validation) {
@@ -226,19 +230,24 @@ export async function bulkUpdateStatus(
   userId: string,
   delayReason?: string,
   remarks?: string,
+  photoMandatoryList?: string[],
 ): Promise<{ error: string | null; skippedNoPhoto?: number }> {
   let skippedNoPhoto = 0;
+  const mandatorySet = new Set(photoMandatoryList || []);
 
   for (const id of activityIds) {
     const row = allActivities.find(r => r.id === id);
     if (!row || normalizeToDisplayStatus(row.status) === 'completed') continue;
 
-    // For bulk complete: skip activities that have no photos
+    // For bulk complete: skip activities that have no photos only if photo is mandatory
     if (newStatus === 'completed') {
-      const photoCount = await getPhotoCount(id);
-      if (photoCount === 0) {
-        skippedNoPhoto++;
-        continue;
+      const isPhotoMandatory = mandatorySet.size === 0 || mandatorySet.has(row.activity);
+      if (isPhotoMandatory) {
+        const photoCount = await getPhotoCount(id);
+        if (photoCount === 0) {
+          skippedNoPhoto++;
+          continue;
+        }
       }
     }
 

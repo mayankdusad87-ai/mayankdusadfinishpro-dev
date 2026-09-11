@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getReasons, createReason, updateReason, deleteReason, Reason } from '@/lib/supabase-data';
 import { getSupervisors, resetUserPassword } from '@/repositories/supervisor-repo';
-import { getBackdateLimit, setBackdateLimit } from '@/repositories/settings-repo';
+import { getBackdateLimit, setBackdateLimit, getPhotoMandatoryActivities, setPhotoMandatoryActivities, getDistinctActivityNames } from '@/repositories/settings-repo';
 import { useDataLoader } from '@/hooks/use-data-loader';
 import { useProject } from '@/lib/project-context';
 import { useAuth } from '@/lib/auth-context';
@@ -58,6 +58,80 @@ export default function SettingsPage() {
       setEditingId(null);
       await loadReasons();
     }
+  }
+
+  // ---- Photo Mandatory Activities state ----
+  const [allActivityNames, setAllActivityNames] = useState<string[]>([]);
+  const [photoMandatory, setPhotoMandatory] = useState<Set<string>>(new Set());
+  const [photoMandatoryInitial, setPhotoMandatoryInitial] = useState<Set<string>>(new Set());
+  const [photoMandatoryLoading, setPhotoMandatoryLoading] = useState(true);
+  const [photoMandatorySaving, setPhotoMandatorySaving] = useState(false);
+  const [photoMandatoryMsg, setPhotoMandatoryMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [photoSearch, setPhotoSearch] = useState('');
+
+  useEffect(() => {
+    if (!currentProject) return;
+    setPhotoMandatoryLoading(true);
+    Promise.all([
+      getDistinctActivityNames(currentProject.id),
+      getPhotoMandatoryActivities(currentProject.id),
+    ]).then(([names, mandatory]) => {
+      setAllActivityNames(names);
+      setPhotoMandatory(new Set(mandatory));
+      setPhotoMandatoryInitial(new Set(mandatory));
+      setPhotoMandatoryLoading(false);
+    }).catch(() => setPhotoMandatoryLoading(false));
+  }, [currentProject]);
+
+  function togglePhotoMandatory(activity: string) {
+    setPhotoMandatory(prev => {
+      const next = new Set(prev);
+      if (next.has(activity)) next.delete(activity);
+      else next.add(activity);
+      return next;
+    });
+    setPhotoMandatoryMsg(null);
+  }
+
+  function selectAllPhotoMandatory() {
+    setPhotoMandatory(new Set(filteredActivityNames));
+    setPhotoMandatoryMsg(null);
+  }
+
+  function deselectAllPhotoMandatory() {
+    // Only deselect the filtered/visible ones
+    setPhotoMandatory(prev => {
+      const next = new Set(prev);
+      for (const name of filteredActivityNames) next.delete(name);
+      return next;
+    });
+    setPhotoMandatoryMsg(null);
+  }
+
+  const filteredActivityNames = useMemo(() => {
+    if (!photoSearch.trim()) return allActivityNames;
+    const q = photoSearch.toLowerCase();
+    return allActivityNames.filter(n => n.toLowerCase().includes(q));
+  }, [allActivityNames, photoSearch]);
+
+  const photoMandatoryChanged = useMemo(() => {
+    if (photoMandatory.size !== photoMandatoryInitial.size) return true;
+    for (const a of photoMandatory) if (!photoMandatoryInitial.has(a)) return true;
+    return false;
+  }, [photoMandatory, photoMandatoryInitial]);
+
+  async function handleSavePhotoMandatory() {
+    if (!currentProject) return;
+    setPhotoMandatorySaving(true);
+    setPhotoMandatoryMsg(null);
+    try {
+      await setPhotoMandatoryActivities(currentProject.id, [...photoMandatory].sort());
+      setPhotoMandatoryInitial(new Set(photoMandatory));
+      setPhotoMandatoryMsg({ type: 'success', text: `Photo mandatory settings saved. ${photoMandatory.size} activit${photoMandatory.size !== 1 ? 'ies' : 'y'} marked as mandatory.` });
+    } catch {
+      setPhotoMandatoryMsg({ type: 'error', text: 'Failed to save. Please try again.' });
+    }
+    setPhotoMandatorySaving(false);
   }
 
   // ---- Password Reset state ----
@@ -367,6 +441,115 @@ export default function SettingsPage() {
           </span>
         </div>
       </div>
+
+      {/* ---- Mandatory Photo Activities ---- */}
+      {currentProject && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Mandatory Photo Activities</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Select activities where photo evidence is required before marking as completed.
+              Unselected activities allow completion without a photo.
+            </p>
+          </div>
+
+          {photoMandatoryMsg && (
+            <div className={`mb-4 rounded-lg p-3 text-sm ${photoMandatoryMsg.type === 'success' ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+              {photoMandatoryMsg.text}
+            </div>
+          )}
+
+          {photoMandatoryLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-6 h-6 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : allActivityNames.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">
+              No activities found for this project.
+            </div>
+          ) : (
+            <>
+              {/* Search + Select All / Deselect All */}
+              <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                <input
+                  type="text"
+                  value={photoSearch}
+                  onChange={e => setPhotoSearch(e.target.value)}
+                  placeholder="Search activities..."
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={selectAllPhotoMandatory}
+                    className="px-3 py-2 text-xs font-medium text-primary bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={deselectAllPhotoMandatory}
+                    className="px-3 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+
+              {/* Counter */}
+              <div className="text-xs text-gray-500 mb-3">
+                {photoMandatory.size} of {allActivityNames.length} activities marked as mandatory
+                {photoSearch.trim() && ` · Showing ${filteredActivityNames.length} results`}
+              </div>
+
+              {/* Activity list with toggles */}
+              <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                {filteredActivityNames.map(name => (
+                  <label
+                    key={name}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={photoMandatory.has(name)}
+                      onChange={() => togglePhotoMandatory(name)}
+                      className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary/30"
+                    />
+                    <span className="text-sm text-gray-800 flex-1">{name}</span>
+                    {photoMandatory.has(name) && (
+                      <span className="text-[10px] font-medium text-primary bg-orange-50 px-2 py-0.5 rounded-full">
+                        Required
+                      </span>
+                    )}
+                  </label>
+                ))}
+              </div>
+
+              {/* Save button */}
+              <div className="mt-4 flex items-center gap-3">
+                <button
+                  onClick={handleSavePhotoMandatory}
+                  disabled={photoMandatorySaving || !photoMandatoryChanged}
+                  className="px-4 py-2.5 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {photoMandatorySaving ? 'Saving...' : 'Save Changes'}
+                </button>
+                {photoMandatoryChanged && (
+                  <span className="text-xs text-amber-600">Unsaved changes</span>
+                )}
+              </div>
+            </>
+          )}
+
+          <div className="mt-4 flex items-start gap-2 text-xs text-gray-500">
+            <svg className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>
+              When a supervisor marks a <strong>mandatory</strong> activity as completed, they must upload at least one photo.
+              Non-mandatory activities can be completed without a photo — the photo section will show as optional.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ---- Reset User Password ---- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">

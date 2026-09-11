@@ -78,6 +78,28 @@ export async function setManagementAccess(access: ManagementAccess): Promise<voi
 
 export { DEFAULT_MANAGEMENT_ACCESS };
 
+// ---- Photo Mandatory Activities (per-project) ----
+
+export async function getPhotoMandatoryActivities(projectId: string): Promise<string[]> {
+  return (await getAppSetting<string[]>(`photo_mandatory_${projectId}`)) || [];
+}
+
+export async function setPhotoMandatoryActivities(projectId: string, activities: string[]): Promise<void> {
+  return setAppSetting(`photo_mandatory_${projectId}`, activities);
+}
+
+/** Fetch distinct activity names for a project (sorted alphabetically) */
+export async function getDistinctActivityNames(projectId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('activities')
+    .select('activity')
+    .eq('project_id', projectId)
+    .neq('status', 'not_applicable');
+  if (error || !data) return [];
+  const unique = [...new Set(data.map(r => r.activity as string))].filter(Boolean).sort();
+  return unique;
+}
+
 // ---- Vendor Mappings (per-project) ----
 
 export interface VendorMapping {

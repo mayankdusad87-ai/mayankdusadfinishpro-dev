@@ -15,6 +15,7 @@ interface ActivityDetailSheetProps {
   projectId: string;
   projectName: string;
   backdateCutoff?: string; // ISO date — earliest date supervisor can pick for actual dates
+  photoMandatory?: boolean; // defaults to true for backward compat
   onClose: () => void;
   onSaved: () => void;
 }
@@ -26,6 +27,7 @@ export default function ActivityDetailSheet({
   projectId,
   projectName,
   backdateCutoff,
+  photoMandatory = true,
   onClose,
   onSaved,
 }: ActivityDetailSheetProps) {
@@ -167,6 +169,7 @@ export default function ActivityDetailSheet({
       stageGate: activity.stage_gate,
       activityName: activity.activity,
       backdateCutoff: backdateCutoff || undefined,
+      photoMandatory,
     });
 
     if (result.error) {
@@ -358,6 +361,10 @@ export default function ActivityDetailSheet({
             <div className="md:col-span-2">
               <label className="block text-xs md:text-sm font-medium text-gray-700 mb-2">
                 Photo Evidence <span className="text-gray-400 font-normal">({detailPhotos.length + pendingPhotos.length}/3)</span>
+                {photoMandatory
+                  ? <span className="text-red-500 font-normal ml-1">• Required</span>
+                  : <span className="text-gray-400 font-normal ml-1">• Optional</span>
+                }
                 {pendingPhotos.length > 0 && (
                   <span className="text-amber-600 font-normal ml-1">• {pendingPhotos.length} unsaved</span>
                 )}

@@ -18,6 +18,7 @@ import PhotoPromptModal from '@/components/supervisor/PhotoPromptModal';
 import DelayReasonModal from '@/components/supervisor/DelayReasonModal';
 import { useCanAccess, useSupervisorFilters, useBulkSelection } from '@/hooks';
 import NotificationDropdown from '@/components/shared/NotificationDropdown';
+import { getPhotoMandatoryActivities } from '@/repositories/settings-repo';
 
 export default function SupervisorHomePage() {
   const allowBulk = useCanAccess('bulk-status-update');
@@ -59,6 +60,7 @@ export default function SupervisorHomePage() {
   const pullStartY = useRef<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [backdateCutoff, setBackdateCutoff] = useState<string>('');
+  const [photoMandatoryList, setPhotoMandatoryList] = useState<string[]>([]);
 
   // ---- Session cache helpers (stale-while-revalidate) ----
   const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
@@ -129,7 +131,11 @@ export default function SupervisorHomePage() {
     // Step 1: Get assignments first (fast, small query) so we know which floors to filter by
     const fetchData = async () => {
       try {
-        const assignments = user ? await getSupervisorAssignments(user.id) : [];
+        const [assignments, mandatoryActivities] = await Promise.all([
+          user ? getSupervisorAssignments(user.id) : Promise.resolve([]),
+          getPhotoMandatoryActivities(selectedProjectId),
+        ]);
+        setPhotoMandatoryList(mandatoryActivities);
         const assignment = assignments.find(a => a.project_id === selectedProjectId);
         const myFloors = assignment?.assigned_floors?.length ? assignment.assigned_floors : null;
         setAssignedFloors(myFloors);
@@ -327,7 +333,19 @@ export default function SupervisorHomePage() {
         setDelayPromptMode('complete');
         return;
       }
-      setShowPhotoPrompt(row.id);
+      // If photo is mandatory for this activity, show photo prompt
+      const isPhotoMandatory = photoMandatoryList.length === 0 || photoMandatoryList.includes(row.activity);
+      if (isPhotoMandatory) {
+        setShowPhotoPrompt(row.id);
+        return;
+      }
+      // Photo not mandatory — go straight to detail sheet with completed status
+      setSelectedDetail({
+        ...row,
+        status: 'completed',
+        actual_end: row.actual_end || TODAY,
+        actual_start: row.actual_start || TODAY,
+      });
       return;
     }
     // action === 'start': check if activity is already overdue
@@ -360,11 +378,24 @@ export default function SupervisorHomePage() {
     const row = delayPromptRow;
 
     if (delayPromptMode === 'complete') {
-      // Store reason and proceed to photo prompt
+      // Store reason and proceed to photo prompt (if mandatory)
+      const isPhotoMandatory = photoMandatoryList.length === 0 || photoMandatoryList.includes(row.activity);
       setPendingCompleteReason(reason);
       setDelayPromptRow(null);
       setDelayPromptMode('overdue_capture');
-      setShowPhotoPrompt(row.id);
+      if (isPhotoMandatory) {
+        setShowPhotoPrompt(row.id);
+      } else {
+        // Photo not mandatory — go straight to detail sheet
+        setSelectedDetail({
+          ...row,
+          status: 'completed',
+          actual_end: row.actual_end || TODAY,
+          actual_start: row.actual_start || TODAY,
+          delay_reason: reason,
+        });
+        setPendingCompleteReason(null);
+      }
       return;
     }
 
@@ -1189,6 +1220,7 @@ export default function SupervisorHomePage() {
         projectId={selectedProjectId}
         userId={user?.id || ''}
         reasons={reasons}
+        photoMandatoryList={photoMandatoryList}
         onToggleBulkMode={() => { bulk.setBulkMode(!bulkMode); clearSelection(); }}
         onBulkComplete={() => { resetBulk(); setRefreshKey(k => k + 1); }}
       />}
@@ -1220,6 +1252,7 @@ export default function SupervisorHomePage() {
           projectId={selectedProjectId}
           projectName={availableProjects.find(p => p.id === selectedProjectId)?.name || ''}
           backdateCutoff={backdateCutoff}
+          photoMandatory={photoMandatoryList.length === 0 || photoMandatoryList.includes(selectedDetail.activity)}
           onClose={() => setSelectedDetail(null)}
           onSaved={() => { setSelectedDetail(null); setRefreshKey(k => k + 1); }}
         />

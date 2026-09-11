@@ -17,6 +17,7 @@ interface BulkUpdateBarProps {
   projectId: string;
   userId: string;
   reasons: Reason[];
+  photoMandatoryList?: string[];
   onToggleBulkMode: () => void;
   onBulkComplete: () => void;
 }
@@ -32,6 +33,7 @@ export default function BulkUpdateBar({
   projectId,
   userId,
   reasons,
+  photoMandatoryList,
   onToggleBulkMode,
   onBulkComplete,
 }: BulkUpdateBarProps) {
@@ -121,6 +123,9 @@ export default function BulkUpdateBar({
       newStatus,
       projectId,
       userId,
+      undefined,
+      undefined,
+      photoMandatoryList,
     );
 
     if (result.skippedNoPhoto && result.skippedNoPhoto > 0) {

@@ -9,6 +9,7 @@ export interface StatusChangeInput {
   actualEnd: string | null;
   photoCount: number;
   delayReason: string;
+  photoMandatory?: boolean; // defaults to true for backward compat
 }
 
 export interface StatusChangeResult {
@@ -27,7 +28,8 @@ export function validateStatusChange(input: StatusChangeInput): ValidationError 
   if (isDelayReasonRequired(input.userStatus, input.expectedEnd) && !input.delayReason) {
     return { field: 'delay_reason', message: 'Delay reason is required for overdue activities.' };
   }
-  if (input.userStatus === 'completed' && input.photoCount === 0) {
+  const photoRequired = input.photoMandatory !== false; // defaults to true
+  if (photoRequired && input.userStatus === 'completed' && input.photoCount === 0) {
     return { field: 'photos', message: 'At least one photo is required before marking as completed.' };
   }
   return null;
@@ -44,6 +46,7 @@ export function validateSupervisorSave(input: {
   photoCount: number;
   today: string;
   backdateCutoff?: string; // ISO date — earliest allowed date for actual dates
+  photoMandatory?: boolean; // defaults to true for backward compat
 }): ValidationError | null {
   if (input.actualStart && input.actualStart > input.today) {
     return { field: 'actual_start', message: 'Actual start date cannot be a future date.' };
@@ -72,7 +75,8 @@ export function validateSupervisorSave(input: {
   if (input.delayReason === 'Previous Activity Pending' && !input.remarks.trim()) {
     return { field: 'remarks', message: 'Please specify which activity is pending.' };
   }
-  if (input.status === 'completed' && input.photoCount === 0) {
+  const photoRequired = input.photoMandatory !== false; // defaults to true
+  if (photoRequired && input.status === 'completed' && input.photoCount === 0) {
     return { field: 'photos', message: 'At least one photo is required before marking as completed.' };
   }
   return null;
