@@ -18,7 +18,6 @@ import PhotoPromptModal from '@/components/supervisor/PhotoPromptModal';
 import DelayReasonModal from '@/components/supervisor/DelayReasonModal';
 import { useCanAccess, useSupervisorFilters, useBulkSelection } from '@/hooks';
 import NotificationDropdown from '@/components/shared/NotificationDropdown';
-import { getPhotoMandatoryActivities } from '@/repositories/settings-repo';
 
 export default function SupervisorHomePage() {
   const allowBulk = useCanAccess('bulk-status-update');
@@ -131,11 +130,13 @@ export default function SupervisorHomePage() {
     // Step 1: Get assignments first (fast, small query) so we know which floors to filter by
     const fetchData = async () => {
       try {
-        const [assignments, mandatoryActivities] = await Promise.all([
+        const [assignments, mandatoryRes] = await Promise.all([
           user ? getSupervisorAssignments(user.id) : Promise.resolve([]),
-          getPhotoMandatoryActivities(selectedProjectId),
+          fetch(`/api/settings/photo-mandatory?projectId=${selectedProjectId}`)
+            .then(r => r.ok ? r.json() : { activities: [] })
+            .catch(() => ({ activities: [] })),
         ]);
-        setPhotoMandatoryList(mandatoryActivities);
+        setPhotoMandatoryList(mandatoryRes.activities || []);
         const assignment = assignments.find(a => a.project_id === selectedProjectId);
         const myFloors = assignment?.assigned_floors?.length ? assignment.assigned_floors : null;
         setAssignedFloors(myFloors);
