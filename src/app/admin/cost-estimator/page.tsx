@@ -10,7 +10,7 @@ import PaymentsTab from '@/components/cost-estimator/PaymentsTab';
 
 type Tab = 'overview' | 'breakdown' | 'payments';
 
-const emptyData: ProjectCostData = { packages: [], categories: [], lineItems: [], payments: [] };
+const emptyData: ProjectCostData = { packages: [], categories: [], subcategories: [], activities: [], payments: [] };
 
 export default function CostEstimatorPage() {
   const { currentProject } = useProject();

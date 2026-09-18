@@ -24,9 +24,18 @@ export interface CostCategory {
   updated_at: string;
 }
 
-export interface CostLineItem {
+export interface CostSubcategory {
   id: string;
   category_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CostActivity {
+  id: string;
+  subcategory_id: string;
   name: string;
   uom: string;
   is_lump_sum: boolean;
@@ -106,7 +115,7 @@ export async function getCategories(packageId: string): Promise<CostCategory[]> 
   return data || [];
 }
 
-export async function getCategoriesByProject(projectId: string): Promise<(CostCategory & { package_id: string })[]> {
+export async function getCategoriesByProject(projectId: string): Promise<CostCategory[]> {
   const { data: packages } = await db
     .from('cost_packages')
     .select('id')
@@ -149,11 +158,11 @@ export async function deleteCategory(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// ---- Line Items ----
+// ---- Subcategories ----
 
-export async function getLineItems(categoryId: string): Promise<CostLineItem[]> {
+export async function getSubcategories(categoryId: string): Promise<CostSubcategory[]> {
   const { data, error } = await db
-    .from('cost_line_items')
+    .from('cost_subcategories')
     .select('*')
     .eq('category_id', categoryId)
     .order('sort_order', { ascending: true })
@@ -162,22 +171,47 @@ export async function getLineItems(categoryId: string): Promise<CostLineItem[]> 
   return data || [];
 }
 
-export async function getLineItemsByProject(projectId: string): Promise<CostLineItem[]> {
-  const categories = await getCategoriesByProject(projectId);
-  if (categories.length === 0) return [];
+export async function createSubcategory(categoryId: string, name: string, sortOrder: number = 0): Promise<CostSubcategory> {
+  const { data, error } = await db
+    .from('cost_subcategories')
+    .insert({ category_id: categoryId, name, sort_order: sortOrder })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
 
-  const categoryIds = categories.map((c: { id: string }) => c.id);
+export async function updateSubcategory(id: string, updates: { name?: string; sort_order?: number }): Promise<CostSubcategory> {
+  const { data, error } = await db
+    .from('cost_subcategories')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteSubcategory(id: string): Promise<void> {
+  const { error } = await db.from('cost_subcategories').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ---- Activities (line items with area/rate) ----
+
+export async function getActivities(subcategoryId: string): Promise<CostActivity[]> {
   const { data, error } = await db
     .from('cost_line_items')
     .select('*')
-    .in('category_id', categoryIds)
-    .order('sort_order', { ascending: true });
+    .eq('subcategory_id', subcategoryId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
   if (error) throw error;
   return data || [];
 }
 
-export async function createLineItem(
-  categoryId: string,
+export async function createActivity(
+  subcategoryId: string,
   item: {
     name: string;
     uom?: string;
@@ -191,20 +225,20 @@ export async function createLineItem(
     work_contract_lump?: number;
     sort_order?: number;
   },
-): Promise<CostLineItem> {
+): Promise<CostActivity> {
   const { data, error } = await db
     .from('cost_line_items')
-    .insert({ category_id: categoryId, ...item })
+    .insert({ subcategory_id: subcategoryId, ...item })
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function updateLineItem(
+export async function updateActivity(
   id: string,
-  updates: Partial<Omit<CostLineItem, 'id' | 'category_id' | 'created_at'>>,
-): Promise<CostLineItem> {
+  updates: Partial<Omit<CostActivity, 'id' | 'subcategory_id' | 'created_at'>>,
+): Promise<CostActivity> {
   const { data, error } = await db
     .from('cost_line_items')
     .update({ ...updates, updated_at: new Date().toISOString() })
@@ -215,22 +249,12 @@ export async function updateLineItem(
   return data;
 }
 
-export async function deleteLineItem(id: string): Promise<void> {
+export async function deleteActivity(id: string): Promise<void> {
   const { error } = await db.from('cost_line_items').delete().eq('id', id);
   if (error) throw error;
 }
 
-// ---- Payments ----
-
-export async function getPayments(categoryId: string): Promise<CostPayment[]> {
-  const { data, error } = await db
-    .from('cost_payments')
-    .select('*')
-    .eq('category_id', categoryId)
-    .order('payment_date', { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
+// ---- Payments (at category level) ----
 
 export async function getPaymentsByProject(projectId: string): Promise<CostPayment[]> {
   const categories = await getCategoriesByProject(projectId);
@@ -275,14 +299,15 @@ export async function deletePayment(id: string): Promise<void> {
 export interface ProjectCostData {
   packages: CostPackage[];
   categories: CostCategory[];
-  lineItems: CostLineItem[];
+  subcategories: CostSubcategory[];
+  activities: CostActivity[];
   payments: CostPayment[];
 }
 
 export async function getFullProjectCostData(projectId: string): Promise<ProjectCostData> {
   const packages = await getPackages(projectId);
   if (packages.length === 0) {
-    return { packages: [], categories: [], lineItems: [], payments: [] };
+    return { packages: [], categories: [], subcategories: [], activities: [], payments: [] };
   }
 
   const packageIds = packages.map((p: { id: string }) => p.id);
@@ -295,16 +320,27 @@ export async function getFullProjectCostData(projectId: string): Promise<Project
 
   const catIds = (categories || []).map((c: { id: string }) => c.id);
 
-  let lineItems: CostLineItem[] = [];
+  let subcategories: CostSubcategory[] = [];
+  let activities: CostActivity[] = [];
   let payments: CostPayment[] = [];
 
   if (catIds.length > 0) {
-    const { data: items } = await db
-      .from('cost_line_items')
+    const { data: subs } = await db
+      .from('cost_subcategories')
       .select('*')
       .in('category_id', catIds)
       .order('sort_order', { ascending: true });
-    lineItems = items || [];
+    subcategories = subs || [];
+
+    const subIds = subcategories.map((s: { id: string }) => s.id);
+    if (subIds.length > 0) {
+      const { data: items } = await db
+        .from('cost_line_items')
+        .select('*')
+        .in('subcategory_id', subIds)
+        .order('sort_order', { ascending: true });
+      activities = items || [];
+    }
 
     const { data: pays } = await db
       .from('cost_payments')
@@ -317,7 +353,8 @@ export async function getFullProjectCostData(projectId: string): Promise<Project
   return {
     packages,
     categories: categories || [],
-    lineItems,
+    subcategories,
+    activities,
     payments,
   };
 }

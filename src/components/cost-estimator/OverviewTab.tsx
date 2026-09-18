@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import type { ProjectCostData, CostLineItem } from '@/repositories/cost-repo';
-import { computeSummaries, formatINR, formatINRFull, lineItemTotal } from './cost-helpers';
+import type { ProjectCostData, CostActivity } from '@/repositories/cost-repo';
+import { computeSummaries, formatINR, formatINRFull, activityTotal } from './cost-helpers';
 
 interface Props {
   data: ProjectCostData;
@@ -65,7 +65,7 @@ export default function OverviewTab({ data, onRefresh }: Props) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
             </svg>
             <span className="text-sm text-amber-800 font-medium">
-              What-if mode: {excludedIds.size} item{excludedIds.size > 1 ? 's' : ''} excluded
+              What-if mode: {excludedIds.size} activit{excludedIds.size > 1 ? 'ies' : 'y'} excluded
             </span>
           </div>
           <button
@@ -79,7 +79,7 @@ export default function OverviewTab({ data, onRefresh }: Props) {
 
       {/* Package breakdown */}
       {packageSummaries.length === 0 ? (
-        <EmptyState onRefresh={onRefresh} />
+        <EmptyState />
       ) : (
         <div className="space-y-3">
           {packageSummaries.map(ps => {
@@ -87,7 +87,6 @@ export default function OverviewTab({ data, onRefresh }: Props) {
             const pkgPaidPct = ps.totalBudget > 0 ? Math.round((ps.totalPaid / ps.totalBudget) * 100) : 0;
             return (
               <div key={ps.pkg.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                {/* Package header */}
                 <button
                   onClick={() => togglePkg(ps.pkg.id)}
                   className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
@@ -117,17 +116,13 @@ export default function OverviewTab({ data, onRefresh }: Props) {
                     </div>
                     <div className="w-20">
                       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500 rounded-full transition-all"
-                          style={{ width: `${pkgPaidPct}%` }}
-                        />
+                        <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pkgPaidPct}%` }} />
                       </div>
                       <div className="text-xs text-gray-400 text-center mt-0.5">{pkgPaidPct}%</div>
                     </div>
                   </div>
                 </button>
 
-                {/* Expanded category table */}
                 {expanded && (
                   <div className="border-t border-gray-100">
                     <table className="w-full text-sm">
@@ -143,19 +138,21 @@ export default function OverviewTab({ data, onRefresh }: Props) {
                       <tbody>
                         {ps.categories.map(cs => {
                           const catPct = cs.totalBudget > 0 ? Math.round((cs.totalPaid / cs.totalBudget) * 100) : 0;
-                          const items = data.lineItems.filter(li => li.category_id === cs.category.id && li.is_active);
+                          const catSubs = data.subcategories.filter(s => s.category_id === cs.category.id);
+                          const catSubIds = new Set(catSubs.map(s => s.id));
+                          const activities = data.activities.filter(a => catSubIds.has(a.subcategory_id) && a.is_active);
                           return (
                             <tr key={cs.category.id} className="border-t border-gray-50 hover:bg-gray-50/50">
                               <td className="px-5 py-3">
                                 <div className="font-medium text-gray-800">{cs.category.name}</div>
-                                {items.length > 0 && (
+                                {activities.length > 0 && (
                                   <div className="flex flex-wrap gap-1 mt-1.5">
-                                    {items.map(item => (
+                                    {activities.map(act => (
                                       <WhatIfChip
-                                        key={item.id}
-                                        item={item}
-                                        excluded={excludedIds.has(item.id)}
-                                        onToggle={() => toggleExclude(item.id)}
+                                        key={act.id}
+                                        activity={act}
+                                        excluded={excludedIds.has(act.id)}
+                                        onToggle={() => toggleExclude(act.id)}
                                       />
                                     ))}
                                   </div>
@@ -187,11 +184,7 @@ export default function OverviewTab({ data, onRefresh }: Props) {
 }
 
 function KPICard({ label, value, sub, color, custom }: {
-  label: string;
-  value: string;
-  sub?: string;
-  color: string;
-  custom?: React.ReactNode;
+  label: string; value: string; sub?: string; color: string; custom?: React.ReactNode;
 }) {
   const colorMap: Record<string, string> = {
     blue: 'from-blue-500/10 to-blue-500/5 border-blue-200/50',
@@ -200,12 +193,8 @@ function KPICard({ label, value, sub, color, custom }: {
     purple: 'from-purple-500/10 to-purple-500/5 border-purple-200/50',
   };
   const textColor: Record<string, string> = {
-    blue: 'text-blue-700',
-    green: 'text-emerald-700',
-    amber: 'text-amber-700',
-    purple: 'text-purple-700',
+    blue: 'text-blue-700', green: 'text-emerald-700', amber: 'text-amber-700', purple: 'text-purple-700',
   };
-
   return (
     <div className={`bg-gradient-to-br ${colorMap[color]} border rounded-xl p-4`}>
       <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</div>
@@ -230,8 +219,8 @@ function SplitRow({ label, amount, total, color }: { label: string; amount: numb
   );
 }
 
-function WhatIfChip({ item, excluded, onToggle }: { item: CostLineItem; excluded: boolean; onToggle: () => void }) {
-  const cost = lineItemTotal(item);
+function WhatIfChip({ activity, excluded, onToggle }: { activity: CostActivity; excluded: boolean; onToggle: () => void }) {
+  const cost = activityTotal(activity);
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
@@ -240,15 +229,15 @@ function WhatIfChip({ item, excluded, onToggle }: { item: CostLineItem; excluded
           ? 'bg-amber-100 text-amber-700 line-through'
           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
       }`}
-      title={`${item.name}: ${formatINRFull(cost)} — click to ${excluded ? 'include' : 'exclude'}`}
+      title={`${activity.name}: ${formatINRFull(cost)} — click to ${excluded ? 'include' : 'exclude'}`}
     >
-      {item.name}
+      {activity.name}
       <span className="opacity-60">{formatINR(cost)}</span>
     </button>
   );
 }
 
-function EmptyState({ onRefresh }: { onRefresh: () => void }) {
+function EmptyState() {
   return (
     <div className="text-center py-16">
       <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
@@ -259,7 +248,7 @@ function EmptyState({ onRefresh }: { onRefresh: () => void }) {
       </svg>
       <h3 className="text-lg font-semibold text-gray-700">No budget data yet</h3>
       <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
-        Start by adding packages and categories in the Detailed Breakdown tab, then add line items with costs.
+        Start by adding packages, categories, subcategories and activities in the Detailed Breakdown tab.
       </p>
     </div>
   );

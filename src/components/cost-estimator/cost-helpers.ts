@@ -1,6 +1,6 @@
-import type { CostLineItem, CostPayment, CostCategory, CostPackage, ProjectCostData } from '@/repositories/cost-repo';
+import type { CostActivity, CostPayment, CostCategory, CostSubcategory, CostPackage, ProjectCostData } from '@/repositories/cost-repo';
 
-export function lineItemBudget(item: CostLineItem) {
+export function activityBudget(item: CostActivity) {
   if (item.is_lump_sum) {
     return {
       material: Number(item.material_lump) || 0,
@@ -16,8 +16,8 @@ export function lineItemBudget(item: CostLineItem) {
   };
 }
 
-export function lineItemTotal(item: CostLineItem): number {
-  const b = lineItemBudget(item);
+export function activityTotal(item: CostActivity): number {
+  const b = activityBudget(item);
   return b.material + b.labour + b.workContract;
 }
 
@@ -63,8 +63,11 @@ export function computeSummaries(data: ProjectCostData, excludedItemIds: Set<str
     let pkgPaid = 0;
 
     const categories: CategorySummary[] = pkgCategories.map(cat => {
-      const items = data.lineItems.filter(
-        li => li.category_id === cat.id && li.is_active && !excludedItemIds.has(li.id),
+      // Category → Subcategories → Activities
+      const catSubs = data.subcategories.filter(s => s.category_id === cat.id);
+      const catSubIds = new Set(catSubs.map(s => s.id));
+      const activities = data.activities.filter(
+        a => catSubIds.has(a.subcategory_id) && a.is_active && !excludedItemIds.has(a.id),
       );
       const payments = data.payments.filter(p => p.category_id === cat.id);
 
@@ -72,8 +75,8 @@ export function computeSummaries(data: ProjectCostData, excludedItemIds: Set<str
       let labourBudget = 0;
       let workContractBudget = 0;
 
-      for (const item of items) {
-        const b = lineItemBudget(item);
+      for (const item of activities) {
+        const b = activityBudget(item);
         materialBudget += b.material;
         labourBudget += b.labour;
         workContractBudget += b.workContract;
