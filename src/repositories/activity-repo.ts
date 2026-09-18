@@ -53,7 +53,8 @@ export async function getSupervisorActivities(
       .from('activities')
       .select(COLS)
       .eq('project_id', projectId)
-      .order('sort_order', { ascending: true });
+      .order('sort_order', { ascending: true })
+      .order('id', { ascending: true });
 
     if (assignedFloors && assignedFloors.length > 0) {
       query = query.in('floor', assignedFloors);
@@ -81,6 +82,7 @@ export async function getActivitiesFromSupabase(projectId: string): Promise<Uplo
       .select('*')
       .eq('project_id', projectId)
       .order('sort_order', { ascending: true })
+      .order('id', { ascending: true })
       .range(from, from + PAGE - 1);
 
     if (error) throw error;
