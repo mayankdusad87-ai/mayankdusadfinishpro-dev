@@ -81,6 +81,22 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    label: 'Cost Estimator',
+    href: '/admin/cost-estimator',
+    feature: 'cost-estimator',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+        <rect x="4" y="2" width="16" height="20" rx="2" />
+        <line x1="8" y1="6" x2="16" y2="6" />
+        <line x1="16" y1="14" x2="16" y2="18" />
+        <line x1="14" y1="16" x2="18" y2="16" />
+        <circle cx="9" cy="11" r="1" />
+        <circle cx="15" cy="11" r="1" />
+        <circle cx="9" cy="15" r="1" />
+      </svg>
+    ),
+  },
+  {
     label: 'Settings',
     href: '/admin/settings',
     feature: 'settings',

@@ -15,6 +15,7 @@ export type Feature =
   | 'insights-view'
   | 'export-download'
   | 'settings'
+  | 'cost-estimator'
   | 'activity-updates'
   | 'photo-upload'
   | 'bulk-status-update';
@@ -36,6 +37,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'insights-view': 'full',
       'export-download': 'full',
       settings: 'full',
+      'cost-estimator': 'full',
       'activity-updates': 'none',
       'photo-upload': 'none',
       'bulk-status-update': 'none',
@@ -53,6 +55,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'insights-view': 'full',
       'export-download': 'none',
       settings: 'none',
+      'cost-estimator': 'none',
       'activity-updates': 'none',
       'photo-upload': 'none',
       'bulk-status-update': 'none',
@@ -72,6 +75,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'insights-view': 'full',
       'export-download': 'full',
       settings: 'none',
+      'cost-estimator': 'none',
       'activity-updates': 'none',
       'photo-upload': 'none',
       'bulk-status-update': 'none',
@@ -89,6 +93,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'insights-view': 'full',
       'export-download': 'none',
       settings: 'none',
+      'cost-estimator': 'none',
       'activity-updates': 'none',
       'photo-upload': 'none',
       'bulk-status-update': 'none',
@@ -108,6 +113,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'insights-view': 'full',
       'export-download': 'full',
       settings: 'full',
+      'cost-estimator': 'none',
       'activity-updates': 'none',
       'photo-upload': 'none',
       'bulk-status-update': 'none',
@@ -125,6 +131,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'insights-view': 'full',
       'export-download': 'none',
       settings: 'none',
+      'cost-estimator': 'none',
       'activity-updates': 'none',
       'photo-upload': 'none',
       'bulk-status-update': 'none',
@@ -144,6 +151,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'insights-view': 'none',
       'export-download': 'none',
       settings: 'none',
+      'cost-estimator': 'none',
       'activity-updates': 'full',
       'photo-upload': 'full',
       'bulk-status-update': 'full',
@@ -161,6 +169,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'insights-view': 'none',
       'export-download': 'none',
       settings: 'none',
+      'cost-estimator': 'none',
       'activity-updates': 'full',
       'photo-upload': 'full',
       'bulk-status-update': 'restricted',
