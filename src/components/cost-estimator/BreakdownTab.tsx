@@ -197,14 +197,30 @@ export default function BreakdownTab({ data, projectId, onRefresh }: Props) {
                                       {filteredActivities.map(act => {
                                         const b = activityBudget(act);
                                         const total = b.material + b.labour + b.workContract;
+                                        const isLS = act.is_lump_sum;
                                         return (
                                           <tr key={act.id} className={`border-t border-gray-50 ${!act.is_active ? 'opacity-40' : ''}`}>
                                             <td className="py-2 pr-2 text-gray-800 font-medium">{act.name}</td>
-                                            <td className="py-2 px-2 text-gray-500">{act.is_lump_sum ? 'Lump Sum' : act.uom}</td>
-                                            <td className="py-2 px-2 text-right text-gray-600">{act.is_lump_sum ? '-' : Number(act.quantity).toLocaleString('en-IN')}</td>
-                                            <td className="py-2 px-2 text-right text-gray-600">{formatINR(b.material)}</td>
-                                            <td className="py-2 px-2 text-right text-gray-600">{formatINR(b.labour)}</td>
-                                            <td className="py-2 px-2 text-right text-gray-600">{formatINR(b.workContract)}</td>
+                                            <td className="py-2 px-2 text-gray-500">{isLS ? 'LS' : act.uom.toUpperCase()}</td>
+                                            <td className="py-2 px-2 text-right text-gray-600">{isLS ? '-' : Number(act.quantity).toLocaleString('en-IN')}</td>
+                                            <td className="py-2 px-2 text-right">
+                                              <div className="text-gray-600">{formatINR(b.material)}</div>
+                                              {!isLS && Number(act.material_rate) > 0 && (
+                                                <div className="text-[10px] text-gray-400">@{formatINR(Number(act.material_rate))}/{act.uom}</div>
+                                              )}
+                                            </td>
+                                            <td className="py-2 px-2 text-right">
+                                              <div className="text-gray-600">{formatINR(b.labour)}</div>
+                                              {!isLS && Number(act.labour_rate) > 0 && (
+                                                <div className="text-[10px] text-gray-400">@{formatINR(Number(act.labour_rate))}/{act.uom}</div>
+                                              )}
+                                            </td>
+                                            <td className="py-2 px-2 text-right">
+                                              <div className="text-gray-600">{formatINR(b.workContract)}</div>
+                                              {!isLS && Number(act.work_contract_rate) > 0 && (
+                                                <div className="text-[10px] text-gray-400">@{formatINR(Number(act.work_contract_rate))}/{act.uom}</div>
+                                              )}
+                                            </td>
                                             <td className="py-2 px-2 text-right font-medium text-gray-900">{formatINR(total)}</td>
                                             <td className="py-2 pl-2">
                                               <div className="flex items-center gap-0.5 justify-end">
