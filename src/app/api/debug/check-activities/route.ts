@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { verifyAdmin } from '@/lib/auth-guard';
+import { verifyAuth } from '@/lib/auth-guard';
 
 /**
  * GET /api/debug/check-activities?projectId=xxx&floor=21&stageGate=Door+Locks
  *
  * Diagnostic: compares what supabaseAdmin sees vs what a supervisor would see.
- * Admin-only access.
+ * Temporary debug endpoint — authenticated users only.
  */
 export async function GET(req: NextRequest) {
   try {
-    const auth = await verifyAdmin(req, ['admin']);
+    const auth = await verifyAuth(req);
     if (auth.error) return auth.error;
 
     const projectId = req.nextUrl.searchParams.get('projectId');
