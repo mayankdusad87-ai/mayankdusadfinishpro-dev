@@ -27,6 +27,7 @@ function cellBg(cell: RollupCell): string {
   switch (cell.label) {
     case 'completed': return 'bg-emerald-50';
     case 'running': return 'bg-amber-50';
+    case 'on_hold': return 'bg-orange-50';
     case 'yet_to_start': return 'bg-red-50';
   }
 }
@@ -36,6 +37,7 @@ function pillClass(cell: RollupCell): string {
   switch (cell.label) {
     case 'completed': return 'bg-emerald-100 text-emerald-700';
     case 'running': return 'bg-amber-100 text-amber-700';
+    case 'on_hold': return 'bg-orange-100 text-orange-700';
     case 'yet_to_start': return 'bg-red-100 text-red-700';
   }
 }
@@ -44,23 +46,32 @@ function cellIcon(label: RollupCell['label']): string {
   switch (label) {
     case 'completed': return '✓';
     case 'running': return '▶';
+    case 'on_hold': return '⏸';
     case 'yet_to_start': return '○';
   }
 }
 
+function buildBreakdown(cell: RollupCell): string {
+  const parts: string[] = [];
+  if (cell.completed > 0) parts.push(`Done: ${cell.completed}`);
+  if (cell.running > 0) parts.push(`Running: ${cell.running}`);
+  if (cell.onHold > 0) parts.push(`On Hold: ${cell.onHold}`);
+  if (cell.yetToStart > 0) parts.push(`Yet to Start: ${cell.yetToStart}`);
+  return parts.join(', ');
+}
+
 function cellContent(cell: RollupCell): string {
   if (cell.total === 0) return '–';
-  switch (cell.label) {
-    case 'completed': return `${cellIcon(cell.label)} Completed (${cell.completed}/${cell.total})`;
-    case 'running': return `${cellIcon(cell.label)} Running (${cell.running}/${cell.total})`;
-    case 'yet_to_start': return `${cellIcon(cell.label)} Yet to Start (0/${cell.total})`;
-  }
+  if (cell.label === 'completed') return `✓ ${cell.completed}/${cell.total}`;
+  if (cell.label === 'yet_to_start') return `○ 0/${cell.total}`;
+  return `${cellIcon(cell.label)} ${buildBreakdown(cell)}`;
 }
 
 function readinessStyle(r: string): string {
   switch (r) {
     case 'completed': return 'bg-emerald-50 text-emerald-700';
     case 'running': return 'bg-amber-50 text-amber-700';
+    case 'on_hold': return 'bg-orange-50 text-orange-700';
     default: return 'bg-gray-50 text-gray-500';
   }
 }
@@ -69,6 +80,7 @@ function readinessText(r: string): string {
   switch (r) {
     case 'completed': return '✓ Ready';
     case 'running': return '▶ Running';
+    case 'on_hold': return '⏸ On Hold';
     default: return 'Not Ready';
   }
 }
@@ -123,6 +135,7 @@ function FloorHeatmap({ data, projectName }: FloorHeatmapProps) {
       <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 px-1">
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" /> Completed</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500" /> Running</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-orange-500" /> On Hold</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-red-500" /> Yet to Start</span>
       </div>
 

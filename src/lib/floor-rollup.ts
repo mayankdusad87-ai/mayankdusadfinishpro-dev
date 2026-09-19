@@ -2,16 +2,18 @@ import { UploadedActivity } from './project-data-store';
 import type { SubstageRollup } from './supabase-data';
 
 export interface RollupCell {
-  label: 'completed' | 'running' | 'yet_to_start';
+  label: 'completed' | 'running' | 'on_hold' | 'yet_to_start';
   completed: number;
   running: number;
+  onHold: number;
+  yetToStart: number;
   total: number;
 }
 
 export interface FloorRow {
   floor: number;
   stages: Record<string, RollupCell>;
-  readiness: 'completed' | 'running' | 'not_ready';
+  readiness: 'completed' | 'running' | 'on_hold' | 'not_ready';
 }
 
 export interface HeatmapData {
@@ -52,16 +54,22 @@ function isYetToStart(s: string): boolean {
   return s === 'not_started';
 }
 
+function isOnHold(s: string): boolean {
+  return s === 'on_hold';
+}
+
 function isApplicable(s: string): boolean {
   return s !== 'not_applicable';
 }
 
-function rollup(completed: number, yetToStart: number, total: number): RollupCell {
-  const running = total - completed - yetToStart;
-  if (total === 0) return { label: 'yet_to_start', completed: 0, running: 0, total: 0 };
-  if (completed === total) return { label: 'completed', completed: total, running: 0, total };
-  if (yetToStart === total) return { label: 'yet_to_start', completed: 0, running: 0, total };
-  return { label: 'running', completed, running, total };
+function rollup(completed: number, yetToStart: number, onHold: number, total: number): RollupCell {
+  const running = total - completed - yetToStart - onHold;
+  const base = { completed, running, onHold, yetToStart, total };
+  if (total === 0) return { label: 'yet_to_start', ...base };
+  if (completed === total) return { label: 'completed', ...base };
+  if (yetToStart === total) return { label: 'yet_to_start', ...base };
+  if (onHold > 0) return { label: 'on_hold', ...base };
+  return { label: 'running', ...base };
 }
 
 export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
@@ -81,33 +89,35 @@ export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
 
   // Level 1: Activities → Substage (per flat, per stage, per stage_gate)
   // Key: `flat|stage|stageGate`
-  const substageMap = new Map<string, { c: number; y: number; t: number }>();
+  const substageMap = new Map<string, { c: number; y: number; h: number; t: number }>();
   for (const a of applicable) {
     const key = `${a.flat_number}|${a.stage}|${a.stage_gate}`;
     let entry = substageMap.get(key);
-    if (!entry) { entry = { c: 0, y: 0, t: 0 }; substageMap.set(key, entry); }
+    if (!entry) { entry = { c: 0, y: 0, h: 0, t: 0 }; substageMap.set(key, entry); }
     entry.t++;
     if (isCompleted(a.status)) entry.c++;
     else if (isYetToStart(a.status)) entry.y++;
+    else if (isOnHold(a.status)) entry.h++;
   }
 
   // Level 2: Substages → Flat's Stage status
   // Key: `flat|stage`
-  const flatStageMap = new Map<string, { c: number; y: number; t: number }>();
+  const flatStageMap = new Map<string, { c: number; y: number; h: number; t: number }>();
   for (const [key, counts] of substageMap) {
     const parts = key.split('|');
     const flatStageKey = `${parts[0]}|${parts[1]}`;
     let entry = flatStageMap.get(flatStageKey);
-    if (!entry) { entry = { c: 0, y: 0, t: 0 }; flatStageMap.set(flatStageKey, entry); }
+    if (!entry) { entry = { c: 0, y: 0, h: 0, t: 0 }; flatStageMap.set(flatStageKey, entry); }
     entry.t++;
-    const sub = rollup(counts.c, counts.y, counts.t);
+    const sub = rollup(counts.c, counts.y, counts.h, counts.t);
     if (sub.label === 'completed') entry.c++;
     else if (sub.label === 'yet_to_start') entry.y++;
+    else if (sub.label === 'on_hold') entry.h++;
   }
 
   // Level 3: Flats → Floor's Stage status
   // Key: `floor|stage`
-  const floorStageMap = new Map<string, { c: number; y: number; t: number }>();
+  const floorStageMap = new Map<string, { c: number; y: number; h: number; t: number }>();
   for (const [key, counts] of flatStageMap) {
     const parts = key.split('|');
     const flat = parts[0];
@@ -116,11 +126,12 @@ export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
     if (floorNum === undefined) continue;
     const floorStageKey = `${floorNum}|${stage}`;
     let entry = floorStageMap.get(floorStageKey);
-    if (!entry) { entry = { c: 0, y: 0, t: 0 }; floorStageMap.set(floorStageKey, entry); }
+    if (!entry) { entry = { c: 0, y: 0, h: 0, t: 0 }; floorStageMap.set(floorStageKey, entry); }
     entry.t++;
-    const flatStatus = rollup(counts.c, counts.y, counts.t);
+    const flatStatus = rollup(counts.c, counts.y, counts.h, counts.t);
     if (flatStatus.label === 'completed') entry.c++;
     else if (flatStatus.label === 'yet_to_start') entry.y++;
+    else if (flatStatus.label === 'on_hold') entry.h++;
   }
 
   // Build floor rows
@@ -128,21 +139,24 @@ export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
     const stageStatuses: Record<string, RollupCell> = {};
     let allCompleted = true;
     let anyStarted = false;
+    let anyOnHold = false;
 
     for (const stage of stages) {
       const key = `${floor}|${stage}`;
       const entry = floorStageMap.get(key);
       if (entry) {
-        stageStatuses[stage] = rollup(entry.c, entry.y, entry.t);
+        stageStatuses[stage] = rollup(entry.c, entry.y, entry.h, entry.t);
       } else {
-        stageStatuses[stage] = { label: 'yet_to_start', completed: 0, running: 0, total: 0 };
+        stageStatuses[stage] = { label: 'yet_to_start', completed: 0, running: 0, onHold: 0, yetToStart: 0, total: 0 };
       }
       if (stageStatuses[stage].label !== 'completed') allCompleted = false;
       if (stageStatuses[stage].label !== 'yet_to_start') anyStarted = true;
+      if (stageStatuses[stage].label === 'on_hold') anyOnHold = true;
     }
 
-    let readiness: 'completed' | 'running' | 'not_ready';
+    let readiness: 'completed' | 'running' | 'on_hold' | 'not_ready';
     if (allCompleted) readiness = 'completed';
+    else if (anyOnHold) readiness = 'on_hold';
     else if (anyStarted) readiness = 'running';
     else readiness = 'not_ready';
 
@@ -152,29 +166,31 @@ export function computeHeatmap(activities: UploadedActivity[]): HeatmapData {
   // Stage Wise Completion (Floors): per stage, how many floors are completed
   const stageCompletionFloors: Record<string, RollupCell> = {};
   for (const stage of stages) {
-    let c = 0, y = 0, t = 0;
+    let c = 0, y = 0, h = 0, t = 0;
     for (const row of floorRows) {
       const cell = row.stages[stage];
       if (!cell || cell.total === 0) continue;
       t++;
       if (cell.label === 'completed') c++;
       else if (cell.label === 'yet_to_start') y++;
+      else if (cell.label === 'on_hold') h++;
     }
-    stageCompletionFloors[stage] = rollup(c, y, t);
+    stageCompletionFloors[stage] = rollup(c, y, h, t);
   }
 
   // Stage Wise Completion (Units): per stage, how many flats are completed
   const stageCompletionUnits: Record<string, RollupCell> = {};
   for (const stage of stages) {
-    let c = 0, y = 0, t = 0;
+    let c = 0, y = 0, h = 0, t = 0;
     for (const [key, counts] of flatStageMap) {
       if (key.split('|')[1] !== stage) continue;
       t++;
-      const flatStatus = rollup(counts.c, counts.y, counts.t);
+      const flatStatus = rollup(counts.c, counts.y, counts.h, counts.t);
       if (flatStatus.label === 'completed') c++;
       else if (flatStatus.label === 'yet_to_start') y++;
+      else if (flatStatus.label === 'on_hold') h++;
     }
-    stageCompletionUnits[stage] = rollup(c, y, t);
+    stageCompletionUnits[stage] = rollup(c, y, h, t);
   }
 
   const floorsFullyReady = floorRows.filter(r => r.readiness === 'completed').length;
@@ -225,22 +241,23 @@ export function computeHeatmapFromRollup(rollupData: SubstageRollup[], stagesLis
   const stages = sortStages(rawStages);
   const floorNumbers = [...new Set(rollupData.map(r => r.floor))].sort((a, b) => a - b);
 
-  const substageMap = new Map<string, { c: number; y: number; t: number }>();
+  const substageMap = new Map<string, { c: number; y: number; h: number; t: number }>();
   for (const r of rollupData) {
     const key = `${r.flat_number}|${r.stage}|${r.stage_gate}`;
-    substageMap.set(key, { c: r.completed, y: r.yet_to_start, t: r.total });
+    substageMap.set(key, { c: r.completed, y: r.yet_to_start, h: r.on_hold || 0, t: r.total });
   }
 
-  const flatStageMap = new Map<string, { c: number; y: number; t: number }>();
+  const flatStageMap = new Map<string, { c: number; y: number; h: number; t: number }>();
   for (const [key, counts] of substageMap) {
     const parts = key.split('|');
     const flatStageKey = `${parts[0]}|${parts[1]}`;
     let entry = flatStageMap.get(flatStageKey);
-    if (!entry) { entry = { c: 0, y: 0, t: 0 }; flatStageMap.set(flatStageKey, entry); }
+    if (!entry) { entry = { c: 0, y: 0, h: 0, t: 0 }; flatStageMap.set(flatStageKey, entry); }
     entry.t++;
-    const sub = rollup(counts.c, counts.y, counts.t);
+    const sub = rollup(counts.c, counts.y, counts.h, counts.t);
     if (sub.label === 'completed') entry.c++;
     else if (sub.label === 'yet_to_start') entry.y++;
+    else if (sub.label === 'on_hold') entry.h++;
   }
 
   const flatFloorMap = new Map<string, number>();
@@ -248,7 +265,7 @@ export function computeHeatmapFromRollup(rollupData: SubstageRollup[], stagesLis
     flatFloorMap.set(String(r.flat_number), r.floor);
   }
 
-  const floorStageMap = new Map<string, { c: number; y: number; t: number }>();
+  const floorStageMap = new Map<string, { c: number; y: number; h: number; t: number }>();
   for (const [key, counts] of flatStageMap) {
     const parts = key.split('|');
     const flat = parts[0];
@@ -257,32 +274,36 @@ export function computeHeatmapFromRollup(rollupData: SubstageRollup[], stagesLis
     if (floorNum === undefined) continue;
     const floorStageKey = `${floorNum}|${stage}`;
     let entry = floorStageMap.get(floorStageKey);
-    if (!entry) { entry = { c: 0, y: 0, t: 0 }; floorStageMap.set(floorStageKey, entry); }
+    if (!entry) { entry = { c: 0, y: 0, h: 0, t: 0 }; floorStageMap.set(floorStageKey, entry); }
     entry.t++;
-    const flatStatus = rollup(counts.c, counts.y, counts.t);
+    const flatStatus = rollup(counts.c, counts.y, counts.h, counts.t);
     if (flatStatus.label === 'completed') entry.c++;
     else if (flatStatus.label === 'yet_to_start') entry.y++;
+    else if (flatStatus.label === 'on_hold') entry.h++;
   }
 
   const floorRows: FloorRow[] = floorNumbers.map(floor => {
     const stageStatuses: Record<string, RollupCell> = {};
     let allCompleted = true;
     let anyStarted = false;
+    let anyOnHold = false;
 
     for (const stage of stages) {
       const key = `${floor}|${stage}`;
       const entry = floorStageMap.get(key);
       if (entry) {
-        stageStatuses[stage] = rollup(entry.c, entry.y, entry.t);
+        stageStatuses[stage] = rollup(entry.c, entry.y, entry.h, entry.t);
       } else {
-        stageStatuses[stage] = { label: 'yet_to_start', completed: 0, running: 0, total: 0 };
+        stageStatuses[stage] = { label: 'yet_to_start', completed: 0, running: 0, onHold: 0, yetToStart: 0, total: 0 };
       }
       if (stageStatuses[stage].label !== 'completed') allCompleted = false;
       if (stageStatuses[stage].label !== 'yet_to_start') anyStarted = true;
+      if (stageStatuses[stage].label === 'on_hold') anyOnHold = true;
     }
 
-    let readiness: 'completed' | 'running' | 'not_ready';
+    let readiness: 'completed' | 'running' | 'on_hold' | 'not_ready';
     if (allCompleted) readiness = 'completed';
+    else if (anyOnHold) readiness = 'on_hold';
     else if (anyStarted) readiness = 'running';
     else readiness = 'not_ready';
 
@@ -291,28 +312,30 @@ export function computeHeatmapFromRollup(rollupData: SubstageRollup[], stagesLis
 
   const stageCompletionFloors: Record<string, RollupCell> = {};
   for (const stage of stages) {
-    let c = 0, y = 0, t = 0;
+    let c = 0, y = 0, h = 0, t = 0;
     for (const row of floorRows) {
       const cell = row.stages[stage];
       if (!cell || cell.total === 0) continue;
       t++;
       if (cell.label === 'completed') c++;
       else if (cell.label === 'yet_to_start') y++;
+      else if (cell.label === 'on_hold') h++;
     }
-    stageCompletionFloors[stage] = rollup(c, y, t);
+    stageCompletionFloors[stage] = rollup(c, y, h, t);
   }
 
   const stageCompletionUnits: Record<string, RollupCell> = {};
   for (const stage of stages) {
-    let c = 0, y = 0, t = 0;
+    let c = 0, y = 0, h = 0, t = 0;
     for (const [key, counts] of flatStageMap) {
       if (key.split('|')[1] !== stage) continue;
       t++;
-      const flatStatus = rollup(counts.c, counts.y, counts.t);
+      const flatStatus = rollup(counts.c, counts.y, counts.h, counts.t);
       if (flatStatus.label === 'completed') c++;
       else if (flatStatus.label === 'yet_to_start') y++;
+      else if (flatStatus.label === 'on_hold') h++;
     }
-    stageCompletionUnits[stage] = rollup(c, y, t);
+    stageCompletionUnits[stage] = rollup(c, y, h, t);
   }
 
   const floorsFullyReady = floorRows.filter(r => r.readiness === 'completed').length;

@@ -37,7 +37,7 @@ export const PERMISSIONS: PermissionMatrix = {
       'insights-view': 'full',
       'export-download': 'full',
       settings: 'full',
-      'cost-estimator': 'full',
+      'cost-estimator': 'none',
       'activity-updates': 'none',
       'photo-upload': 'none',
       'bulk-status-update': 'none',
