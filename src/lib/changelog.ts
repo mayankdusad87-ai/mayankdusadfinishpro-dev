@@ -33,6 +33,31 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.09.29',
+    headline: 'Heatmap On Hold Status & Smarter Weekly Emails',
+    date: 'September 29, 2026',
+    features: [
+      {
+        emoji: '⏸',
+        title: 'On Hold Status in Heatmap',
+        description: 'The floor heatmap now tracks 4 statuses: Completed, Running, On Hold, and Yet to Start. Cells show a detailed breakdown (Done, Running, On Hold, Yet to Start counts) with orange highlighting for on-hold items.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📧',
+        title: 'Smarter Weekly Management Emails',
+        description: 'Completed targets now appear once in a green "Completed This Week" section, then are excluded from future emails — reducing noise and keeping reports focused on what needs attention.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '💰',
+        title: 'Rate Per Unit in Activity Table',
+        description: 'Budget cells in the activity breakdown now show the rate per unit below the budget amount (e.g. @₹60/SQM) for quick reference.',
+        roles: ['admin'],
+      },
+    ],
+  },
+  {
     version: '2026.09.05',
     headline: 'UI Modernization — Professional Dashboard',
     date: 'September 5, 2026',
