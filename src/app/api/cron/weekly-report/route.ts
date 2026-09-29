@@ -136,6 +136,7 @@ export async function GET(req: NextRequest) {
         .order('target_date', { ascending: true });
 
       const targetRows: WeeklyTargetRow[] = [];
+      const completedThisWeek: WeeklyTargetRow[] = [];
 
       if (rawTargets && rawTargets.length > 0) {
         for (const target of rawTargets as TargetRow[]) {
@@ -147,6 +148,30 @@ export async function GET(req: NextRequest) {
           );
           const scopeData = aggregateScopeData(activities);
           const result = computeTargetStatus(target, scopeData, now);
+
+          const isComplete = result.status === 'achieved' || result.status === 'delayed';
+
+          if (isComplete) {
+            const completionDate = scopeData.lastCompletionDate
+              ? new Date(scopeData.lastCompletionDate)
+              : null;
+            const completedInWindow = completionDate && completionDate >= weekStart && completionDate <= weekEnd;
+
+            if (completedInWindow) {
+              completedThisWeek.push({
+                stage: target.stage,
+                floorFrom: target.floor_from,
+                floorTo: target.floor_to,
+                totalFlats: result.totalFlats,
+                completedFlats: result.completedFlats,
+                progressPct: result.progressPct,
+                daysRemaining: result.daysRemaining,
+                status: result.status,
+              });
+            }
+            // Completed before this week → skip entirely
+            continue;
+          }
 
           targetRows.push({
             stage: target.stage,
@@ -175,6 +200,7 @@ export async function GET(req: NextRequest) {
         pipeline,
         blockers,
         DASHBOARD_URL,
+        completedThisWeek,
       );
 
       // 3e. Send (TO management, CC admins)
