@@ -293,6 +293,7 @@ export function weeklyReportEmailHtml(
   pipeline: WeeklyPipelineStage[],
   blockers: WeeklyBlocker[],
   dashboardUrl: string,
+  completedThisWeek: WeeklyTargetRow[] = [],
 ): string {
   // ---- Verdict ----
   const behindTargets = targets.filter(t => t.status === 'missed' || t.status === 'behind');
@@ -435,8 +436,30 @@ export function weeklyReportEmailHtml(
 
         ${targets.length > 0 ? `
         <div style="margin-bottom: 28px;">
-          <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 12px;">Targets · ${targets.filter(t => t.status === 'achieved' || t.status === 'delayed').length} of ${targets.length} achieved</div>
+          <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 12px;">Active Targets · ${targets.length} in progress</div>
           ${targetRows}
+        </div>` : ''}
+
+        ${completedThisWeek.length > 0 ? `
+        <div style="margin-bottom: 28px;">
+          <div style="font-size: 12px; font-weight: 700; color: #16a34a; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 12px;">✓ Completed This Week · ${completedThisWeek.length} target${completedThisWeek.length > 1 ? 's' : ''}</div>
+          ${completedThisWeek.map(t => {
+            const timing = t.status === 'achieved' ? 'Completed on time' : `Completed ${Math.abs(t.daysRemaining)} day${Math.abs(t.daysRemaining) !== 1 ? 's' : ''} late`;
+            return `
+            <table style="width: 100%; margin-bottom: 8px;"><tr>
+              <td style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 16px;">
+                <table style="width: 100%;"><tr>
+                  <td style="font-size: 15px; font-weight: 700; color: #1e293b;">${t.stage}</td>
+                  <td style="text-align: right;">
+                    <span style="background: #dcfce7; color: #166534; padding: 3px 10px; border-radius: 10px; font-weight: 700; font-size: 11px; letter-spacing: 0.3px;">${t.status === 'achieved' ? 'ACHIEVED' : 'COMPLETED LATE'}</span>
+                  </td>
+                </tr></table>
+                <div style="margin-top: 6px; font-size: 13px; color: #64748b; line-height: 1.5;">
+                  ${floorRangeLabel(t.floorFrom, t.floorTo)} · <strong style="color: #166534;">${t.completedFlats}/${t.totalFlats}</strong> flats · <span style="color: #16a34a; font-weight: 600;">${timing}</span>
+                </div>
+              </td>
+            </tr></table>`;
+          }).join('')}
         </div>` : ''}
 
         ${attentionItems.length > 0 ? `

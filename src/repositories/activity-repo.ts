@@ -748,6 +748,7 @@ export interface SubstageRollup {
   floor: number;
   completed: number;
   yet_to_start: number;
+  on_hold: number;
   total: number;
 }
 
