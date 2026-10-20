@@ -404,7 +404,7 @@ export function weeklyReportEmailHtml(
     const blockerList = blockers.slice(0, 5).map(b =>
       `<div style="margin-top: 8px; font-size: 13px; line-height: 1.5;">
         <span style="font-weight: 700; color: #1e293b;">${b.reason}</span>
-        <span style="color: #64748b;"> — Fl ${compressFloors(b.floors)}</span>
+        <span style="color: #64748b;"> — ${compressFloors(b.floors)}</span>
         <span style="color: #94a3b8;"> (${b.activityCount} activit${b.activityCount !== 1 ? 'ies' : 'y'})</span>
       </div>`
     ).join('');
