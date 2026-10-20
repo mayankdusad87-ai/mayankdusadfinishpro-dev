@@ -385,25 +385,35 @@ export function weeklyReportEmailHtml(
     const prevStage = prevIdx >= 0 ? pipeline[prevIdx] : null;
     const drop = prevStage ? prevStage.completedFlats - bottleneck.completedFlats : 0;
     if (drop > 0 && prevStage) {
+      const pendingText = bottleneck.pendingFloors.length > 0
+        ? `<div style="margin-top: 6px; font-size: 13px; color: #92400e; font-weight: 600;">Pending floors: ${compressFloors(bottleneck.pendingFloors)}</div>`
+        : '';
       attentionItems.push(`
         <tr>
           <td style="width: 5px; background: #f59e0b; border-radius: 4px 0 0 4px;"></td>
           <td style="background: #fffbeb; padding: 14px 16px; border-radius: 0 8px 8px 0;">
             <div style="font-size: 15px; font-weight: 700; color: #1e293b;">${bottleneck.stage} is the bottleneck</div>
             <div style="font-size: 13px; color: #64748b; margin-top: 4px; line-height: 1.5;">${drop} flats dropped between ${prevStage.stage} → ${bottleneck.stage}. Only ${bottleneck.pct}% complete vs ${prevStage.pct}% at ${prevStage.stage}.</div>
+            ${pendingText}
           </td>
         </tr>`);
     }
   }
 
   if (blockers.length > 0) {
-    const topReasons = blockers.slice(0, 3).map(b => `${b.reason} (${b.floorCount} floor${b.floorCount !== 1 ? 's' : ''})`).join(', ');
+    const blockerList = blockers.slice(0, 5).map(b =>
+      `<div style="margin-top: 8px; font-size: 13px; line-height: 1.5;">
+        <span style="font-weight: 700; color: #1e293b;">${b.reason}</span>
+        <span style="color: #64748b;"> — Fl ${compressFloors(b.floors)}</span>
+        <span style="color: #94a3b8;"> (${b.activityCount} activit${b.activityCount !== 1 ? 'ies' : 'y'})</span>
+      </div>`
+    ).join('');
     attentionItems.push(`
       <tr>
         <td style="width: 5px; background: #ef4444; border-radius: 4px 0 0 4px;"></td>
         <td style="background: #fef2f2; padding: 14px 16px; border-radius: 0 8px 8px 0;">
           <div style="font-size: 15px; font-weight: 700; color: #1e293b;">${totalBlockerFloors} floor${totalBlockerFloors !== 1 ? 's have' : ' has'} unresolved blockers</div>
-          <div style="font-size: 13px; color: #64748b; margin-top: 4px; line-height: 1.5;">Top reasons: ${topReasons}.</div>
+          ${blockerList}
         </td>
       </tr>`);
   }
