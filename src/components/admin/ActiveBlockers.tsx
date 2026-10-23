@@ -94,10 +94,69 @@ function BlockerSection({ title, colorClass, groups }: {
   );
 }
 
+function PipelineQueueSection({ groups }: { groups: BlockerGroup[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (groups.length === 0) return null;
+
+  const totalFlats = groups.reduce((sum, g) => sum + g.flatCount, 0);
+  const stageNames = groups.flatMap(g => g.stages.map(s => s.stage));
+  const uniqueStages = [...new Set(stageNames)];
+
+  return (
+    <div className="px-3.5 py-3">
+      <div className="text-[10px] font-bold uppercase tracking-wider mb-2 text-gray-400">Pipeline Queue</div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-left cursor-pointer transition-colors hover:bg-gray-100"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[13px] font-semibold text-gray-600">Waiting for earlier stages</span>
+            <div className="text-[11px] text-gray-400 mt-0.5">
+              {uniqueStages.slice(0, 3).join(', ')}{uniqueStages.length > 3 ? ` +${uniqueStages.length - 3} more` : ''}
+            </div>
+          </div>
+          <span className="text-xs font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-500 tabular-nums">
+            {totalFlats} {totalFlats === 1 ? 'flat' : 'flats'}
+          </span>
+        </div>
+      </button>
+
+      {expanded && groups.map(group => (
+        <div key={group.reason} className="bg-gray-50 rounded-lg px-3 py-2.5 mt-1 space-y-2">
+          {group.stages.map(stage => (
+            <div key={stage.stage}>
+              <div className="text-[11px] font-semibold text-gray-500 mb-1">{stage.stage}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {stage.floors.map(f => (
+                  <span
+                    key={f.floor}
+                    className="inline-flex items-center gap-1 text-[11px] bg-white border border-gray-200 rounded-md px-2 py-1 tabular-nums"
+                  >
+                    <span className="font-bold text-gray-700">Floor {f.floor}</span>
+                    <span className="text-gray-300">·</span>
+                    <span className="text-gray-500">{f.flatCount} {f.flatCount === 1 ? 'unit' : 'units'}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ActiveBlockers({ data }: Props) {
-  const { delayed, onHold, totalFloors, totalActivities } = data;
+  const { delayed, onHoldExternal, onHoldPipeline, totalFloors, totalActivities } = data;
 
   if (totalActivities === 0) return null;
+
+  const actionableCount = delayed.reduce((s, g) => s + g.floorCount, 0)
+    + onHoldExternal.reduce((s, g) => s + g.floorCount, 0);
+  const pipelineFlats = onHoldPipeline.reduce((s, g) => s + g.flatCount, 0);
+  const hasActionable = delayed.length > 0 || onHoldExternal.length > 0;
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -107,9 +166,17 @@ function ActiveBlockers({ data }: Props) {
           <h4 className="text-sm font-bold text-gray-900">Active Blockers</h4>
           <p className="text-[11px] text-gray-400 mt-0.5">Needs management attention</p>
         </div>
-        <div className="flex flex-col items-center bg-red-50 border border-red-200 rounded-lg px-2.5 py-1 min-w-[48px]">
-          <span className="text-lg font-extrabold text-red-500 leading-tight tabular-nums">{totalFloors}</span>
-          <span className="text-[8px] font-bold text-red-500 uppercase tracking-wide">Total</span>
+        <div className="flex items-center gap-2">
+          {pipelineFlats > 0 && (
+            <div className="flex flex-col items-center bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 min-w-[44px]">
+              <span className="text-sm font-extrabold text-gray-400 leading-tight tabular-nums">{pipelineFlats}</span>
+              <span className="text-[7px] font-bold text-gray-400 uppercase tracking-wide">Queue</span>
+            </div>
+          )}
+          <div className="flex flex-col items-center bg-red-50 border border-red-200 rounded-lg px-2.5 py-1 min-w-[48px]">
+            <span className="text-lg font-extrabold text-red-500 leading-tight tabular-nums">{actionableCount}</span>
+            <span className="text-[8px] font-bold text-red-500 uppercase tracking-wide">Blocked</span>
+          </div>
         </div>
       </div>
 
@@ -119,12 +186,20 @@ function ActiveBlockers({ data }: Props) {
         <BlockerSection title="Overdue — Not Started" colorClass="red" groups={delayed} />
 
         {/* Separator */}
-        {delayed.length > 0 && onHold.length > 0 && (
+        {delayed.length > 0 && onHoldExternal.length > 0 && (
           <div className="border-t border-gray-100 mx-3.5" />
         )}
 
-        {/* On Hold */}
-        <BlockerSection title="On Hold" colorClass="amber" groups={onHold} />
+        {/* External blockers (actionable) */}
+        <BlockerSection title="On Hold — Needs Action" colorClass="amber" groups={onHoldExternal} />
+
+        {/* Separator */}
+        {hasActionable && onHoldPipeline.length > 0 && (
+          <div className="border-t border-gray-100 mx-3.5" />
+        )}
+
+        {/* Pipeline queue (informational) */}
+        <PipelineQueueSection groups={onHoldPipeline} />
       </div>
     </div>
   );

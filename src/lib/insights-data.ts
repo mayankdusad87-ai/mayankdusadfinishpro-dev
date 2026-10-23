@@ -212,10 +212,11 @@ export interface BlockerGroup {
 }
 
 export interface ActiveBlockers {
-  delayed: BlockerGroup[];   // not_started + overdue — sorted by floorCount desc, "Reason not captured" last
-  onHold: BlockerGroup[];    // on_hold — sorted by floorCount desc, "Reason not captured" last
-  totalFloors: number;       // distinct floors across all blockers
-  totalActivities: number;   // raw activity count for header badge
+  delayed: BlockerGroup[];        // not_started + overdue — sorted by floorCount desc, "Reason not captured" last
+  onHoldExternal: BlockerGroup[]; // on_hold with actionable reasons (Sales office, Labour Camp, etc.)
+  onHoldPipeline: BlockerGroup[]; // on_hold due to "Previous Activity Pending" — normal pipeline queue
+  totalFloors: number;            // distinct floors across all blockers
+  totalActivities: number;        // raw activity count for header badge
 }
 
 export interface ManagementData {
@@ -537,7 +538,7 @@ function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
   }
 
   if (stuck.length === 0) {
-    return { delayed: [], onHold: [], totalFloors: 0, totalActivities: 0 };
+    return { delayed: [], onHoldExternal: [], onHoldPipeline: [], totalFloors: 0, totalActivities: 0 };
   }
 
   // Step 2: Group by type → reason → stage → floor
@@ -622,12 +623,16 @@ function computeActiveBlockers(rows: InsightRow[]): ActiveBlockers {
   const delayed = aggregate(delayedItems, 'delayed');
   const onHold = aggregate(onHoldItems, 'on_hold');
 
+  const onHoldExternal = onHold.filter(g => g.reason !== PREV_ACTIVITY_PENDING);
+  const onHoldPipeline = onHold.filter(g => g.reason === PREV_ACTIVITY_PENDING);
+
   const allFloors = new Set<number>();
   for (const s of stuck) allFloors.add(s.floor);
 
   return {
     delayed,
-    onHold,
+    onHoldExternal,
+    onHoldPipeline,
     totalFloors: allFloors.size,
     totalActivities: stuck.length,
   };
