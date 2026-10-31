@@ -54,6 +54,8 @@ export interface TargetScopeData {
   lastCompletionDate: string | null;  // latest actual_end across completed activities
   delayReasons: { reason: string; count: number; remarkDetails?: RemarkDetail[] }[];  // top 3 reasons
   statusBreakdown: StatusBreakdown;  // flat-level status counts
+  activityPct: number;         // 0-100 — activity-level completion % (more granular than flat-level)
+  onHoldStageGates: string[];  // distinct stage_gate names that are on hold
 }
 
 /** Computed result for one target */
@@ -73,6 +75,8 @@ export interface TargetAchievementResult {
   daysLate: number | null;     // only for 'delayed' status: how many days late
   delayReasons: { reason: string; count: number; remarkDetails?: RemarkDetail[] }[];
   statusBreakdown: StatusBreakdown;  // flat-level status counts
+  activityPct: number;         // 0-100 — activity-level completion %
+  onHoldStageGates: string[];  // distinct stage_gate names that are on hold
 }
 
 /** Summary across all targets for a project */
@@ -105,7 +109,7 @@ export function computeTargetStatus(
   const targetDate = stripTime(new Date(target.target_date));
   const daysRemaining = diffDays(today, targetDate);
 
-  const { totalFlats, completedFlats, lastCompletionDate, delayReasons, statusBreakdown } = scope;
+  const { totalFlats, completedFlats, lastCompletionDate, delayReasons, statusBreakdown, activityPct, onHoldStageGates } = scope;
 
   // Guard: no flats in scope → 0%
   const progressPct = totalFlats > 0
@@ -158,6 +162,8 @@ export function computeTargetStatus(
     daysLate,
     delayReasons,
     statusBreakdown,
+    activityPct,
+    onHoldStageGates,
   };
 }
 
@@ -249,6 +255,7 @@ export interface RawActivityRow {
   status: string;
   actual_end: string | null;
   delay_reason: string | null;
+  stage_gate?: string | null;
   remarks: string | null;
 }
 
@@ -262,7 +269,7 @@ export interface RawActivityRow {
  */
 export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
   if (rows.length === 0) {
-    return { totalFlats: 0, completedFlats: 0, lastCompletionDate: null, delayReasons: [], statusBreakdown: { notStarted: 0, inProgress: 0, completed: 0, onHold: 0 } };
+    return { totalFlats: 0, completedFlats: 0, lastCompletionDate: null, delayReasons: [], statusBreakdown: { notStarted: 0, inProgress: 0, completed: 0, onHold: 0 }, activityPct: 0, onHoldStageGates: [] };
   }
 
   const PREV_PENDING = 'Previous Activity Pending';
@@ -403,7 +410,27 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
     })
     .slice(0, 3);
 
-  return { totalFlats, completedFlats, lastCompletionDate, delayReasons, statusBreakdown };
+  // Activity-level completion % (more granular than flat-level)
+  let totalActivities = 0;
+  let completedActivities = 0;
+  const onHoldGateSet = new Set<string>();
+
+  for (const row of rows) {
+    totalActivities++;
+    const s = row.status;
+    if (s === 'completed' || s === 'completed_delayed') {
+      completedActivities++;
+    } else if (s === 'on_hold' && row.stage_gate) {
+      onHoldGateSet.add(row.stage_gate);
+    }
+  }
+
+  const activityPct = totalActivities > 0
+    ? Math.round((completedActivities / totalActivities) * 100)
+    : 0;
+  const onHoldStageGates = [...onHoldGateSet].sort();
+
+  return { totalFlats, completedFlats, lastCompletionDate, delayReasons, statusBreakdown, activityPct, onHoldStageGates };
 }
 
 // ---- Helpers ----

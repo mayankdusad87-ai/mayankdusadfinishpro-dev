@@ -97,7 +97,7 @@ async function fetchScopeActivities(
   while (true) {
     const { data, error } = await supabaseAdmin
       .from('activities')
-      .select('floor, flat_number, status, actual_end, delay_reason, remarks')
+      .select('floor, flat_number, status, actual_end, delay_reason, remarks, stage_gate')
       .eq('project_id', projectId)
       .eq('stage', stage)
       .gte('floor', floorFrom)

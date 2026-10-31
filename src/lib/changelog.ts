@@ -33,6 +33,31 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.10.31',
+    headline: 'Smarter Target Achievement & Blocker Dashboard',
+    date: 'October 31, 2026',
+    features: [
+      {
+        emoji: '🎯',
+        title: 'Activity-level progress in targets',
+        description: 'Target cards now show activity completion % alongside flat count, so you see real progress even when no flat is fully done yet.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '⏸️',
+        title: 'On-hold substage names',
+        description: 'When flats are on hold, the target card now names the specific substage blocking progress (e.g. "Wall Tiling pending").',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '🚧',
+        title: 'Active Blockers split view',
+        description: 'Active Blockers now separates actionable blockers (needs management action) from pipeline queue (waiting for earlier stages).',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.09.29',
     headline: 'Heatmap On Hold Status & Smarter Weekly Emails',
     date: 'September 29, 2026',
