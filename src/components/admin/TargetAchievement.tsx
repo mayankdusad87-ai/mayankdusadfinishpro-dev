@@ -285,7 +285,12 @@ function getWhyMessage(t: TargetAchievementResult): string | null {
     return `${sb.inProgress} ${sb.inProgress === 1 ? 'flat' : 'flats'} in progress but no completions yet`;
   }
   if (sb.onHold > 0) {
-    return `${sb.onHold} ${sb.onHold === 1 ? 'flat' : 'flats'} on hold — blocking progress`;
+    const gateText = t.onHoldStageGates.length > 0
+      ? t.onHoldStageGates.slice(0, 2).join(', ')
+      : null;
+    return gateText
+      ? `${sb.onHold} ${sb.onHold === 1 ? 'flat' : 'flats'} on hold — ${gateText} pending`
+      : `${sb.onHold} ${sb.onHold === 1 ? 'flat' : 'flats'} on hold — blocking progress`;
   }
   return null;
 }
@@ -358,6 +363,12 @@ function TargetCard({ target: t }: { target: TargetAchievementResult }) {
         <div className="flex items-center gap-4 mt-2">
           <span className="text-xs text-gray-600 tabular-nums">
             <span className="font-bold text-gray-800">{t.completedFlats}</span>/{t.totalFlats} flats
+            {t.activityPct > t.progressPct && t.status !== 'achieved' && t.status !== 'delayed' && (
+              <>
+                <span className="text-gray-300 mx-1">·</span>
+                <span className="font-semibold text-emerald-600">{t.activityPct}% activities done</span>
+              </>
+            )}
           </span>
           {timingText && (
             <span className={`text-xs font-semibold ${timingColor}`}>
