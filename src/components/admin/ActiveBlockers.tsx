@@ -1,7 +1,8 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo, useState, useRef, useMemo } from 'react';
 import type { ActiveBlockers as ActiveBlockersData, BlockerGroup } from '@/lib/insights-data';
+import WhatsAppShareButton from '@/components/ui/WhatsAppShareButton';
 
 interface Props {
   data: ActiveBlockersData;
@@ -149,41 +150,39 @@ function PipelineQueueSection({ groups }: { groups: BlockerGroup[] }) {
   );
 }
 
-function formatBlockerGroupsForShare(label: string, groups: BlockerGroup[]): string {
+function formatGroupsText(label: string, groups: BlockerGroup[]): string {
   if (groups.length === 0) return '';
   const lines = groups.map(g => {
     const floors = g.stages.flatMap(s => s.floors.map(f => f.floor));
-    const uniqueFloors = [...new Set(floors)].sort((a, b) => a - b);
-    const floorText = uniqueFloors.length <= 5
-      ? uniqueFloors.map(f => `Fl ${f}`).join(', ')
-      : `${uniqueFloors.slice(0, 4).map(f => `Fl ${f}`).join(', ')} +${uniqueFloors.length - 4} more`;
+    const unique = [...new Set(floors)].sort((a, b) => a - b);
+    const floorText = unique.length <= 5
+      ? unique.map(f => `Fl ${f}`).join(', ')
+      : `${unique.slice(0, 4).map(f => `Fl ${f}`).join(', ')} +${unique.length - 4} more`;
     return `• ${g.reason} — ${g.flatCount} flat${g.flatCount !== 1 ? 's' : ''} (${floorText})`;
   });
   return `*${label}:*\n${lines.join('\n')}`;
 }
 
-function shareBlockersOnWhatsApp(data: ActiveBlockersData, projectName: string) {
+function buildBlockerShareText(data: ActiveBlockersData, projectName: string): string {
   const parts: string[] = [`🚧 *Active Blockers — ${projectName}*\n`];
-
-  const delayed = formatBlockerGroupsForShare('Overdue — Not Started', data.delayed);
-  if (delayed) parts.push(delayed);
-
-  const onHold = formatBlockerGroupsForShare('On Hold — Needs Action', data.onHoldExternal);
-  if (onHold) parts.push(onHold);
-
-  const pipelineFlats = data.onHoldPipeline.reduce((s, g) => s + g.flatCount, 0);
-  if (pipelineFlats > 0) {
-    parts.push(`Pipeline Queue: ${pipelineFlats} flat${pipelineFlats !== 1 ? 's' : ''} waiting`);
-  }
-
+  const d = formatGroupsText('Overdue — Not Started', data.delayed);
+  if (d) parts.push(d);
+  const h = formatGroupsText('On Hold — Needs Action', data.onHoldExternal);
+  if (h) parts.push(h);
+  const pf = data.onHoldPipeline.reduce((s, g) => s + g.flatCount, 0);
+  if (pf > 0) parts.push(`Pipeline Queue: ${pf} flat${pf !== 1 ? 's' : ''} waiting`);
   parts.push('— FinishPro Dashboard');
-
-  const text = parts.join('\n\n');
-  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  return parts.join('\n\n');
 }
 
 function ActiveBlockers({ data, projectName }: Props) {
   const { delayed, onHoldExternal, onHoldPipeline, totalFloors, totalActivities } = data;
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const shareText = useMemo(
+    () => projectName ? buildBlockerShareText(data, projectName) : '',
+    [data, projectName],
+  );
 
   if (totalActivities === 0) return null;
 
@@ -193,7 +192,7 @@ function ActiveBlockers({ data, projectName }: Props) {
   const hasActionable = delayed.length > 0 || onHoldExternal.length > 0;
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden">
+    <div ref={cardRef} className="border border-gray-200 rounded-xl overflow-hidden bg-white">
       {/* Compact header */}
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-gray-200">
         <div>
@@ -202,15 +201,11 @@ function ActiveBlockers({ data, projectName }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {projectName && (
-            <button
-              onClick={() => shareBlockersOnWhatsApp(data, projectName)}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
-              title="Share on WhatsApp"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-            </button>
+            <WhatsAppShareButton
+              targetRef={cardRef}
+              filename={`blockers-${projectName.toLowerCase().replace(/\s+/g, '-')}`}
+              text={shareText}
+            />
           )}
           {pipelineFlats > 0 && (
             <div className="flex flex-col items-center bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 min-w-[44px]">
