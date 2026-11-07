@@ -358,8 +358,8 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
   // Top delay reasons — flat level (each incomplete flat counted once under its dominant reason)
   const NO_REASON = 'No reason captured';
   const flatReasonCounts = new Map<string, number>();
-  // Collect all "Previous Activity Pending" remarks across flats whose dominant reason is PREV_PENDING
-  const allPrevRemarks: string[] = [];
+  // Collect unique remarks per flat (not per activity) for "Previous Activity Pending"
+  const remarkFlatCounts = new Map<string, number>();
 
   for (const entry of flatMap.values()) {
     // Skip completed flats
@@ -377,18 +377,18 @@ export function aggregateScopeData(rows: RawActivityRow[]): TargetScopeData {
         if (c > maxCount) { dominant = r; maxCount = c; }
       }
       flatReasonCounts.set(dominant, (flatReasonCounts.get(dominant) || 0) + 1);
-      // If dominant is "Previous Activity Pending", collect its remarks
+      // If dominant is "Previous Activity Pending", count unique remarks at flat level
       if (dominant === PREV_PENDING) {
-        allPrevRemarks.push(...entry.prevPendingRemarks);
+        const uniqueRemarks = new Set(entry.prevPendingRemarks);
+        for (const remark of uniqueRemarks) {
+          remarkFlatCounts.set(remark, (remarkFlatCounts.get(remark) || 0) + 1);
+        }
       }
     }
   }
 
-  // Build remark details for "Previous Activity Pending" — aggregate by remark text
-  const remarkCounts = new Map<string, number>();
-  for (const r of allPrevRemarks) {
-    remarkCounts.set(r, (remarkCounts.get(r) || 0) + 1);
-  }
+  // Build remark details for "Previous Activity Pending" — flat-level counts
+  const remarkCounts = remarkFlatCounts;
   const prevRemarkDetails: RemarkDetail[] = [...remarkCounts.entries()]
     .map(([remark, count]) => ({ remark, count }))
     .sort((a, b) => b.count - a.count)
