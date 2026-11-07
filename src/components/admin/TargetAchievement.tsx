@@ -7,7 +7,6 @@ import {
   type TargetAchievementResult,
   type TargetSummary,
   type TargetStatus,
-  type StatusBreakdown,
 } from '@/lib/target-engine';
 
 interface Props {
@@ -64,15 +63,36 @@ const DOT_COLORS: Record<TargetStatus, string> = {
   behind: '#EF4444',
 };
 
-const ROW_STYLES: Record<TargetStatus, { bg: string; border: string; accent: string }> = {
-  achieved: { bg: 'bg-emerald-50/50', border: 'border-l-emerald-500', accent: '#10B981' },
-  delayed: { bg: 'bg-amber-50/40', border: 'border-l-amber-500', accent: '#F59E0B' },
-  missed: { bg: 'bg-red-50/50', border: 'border-l-red-500', accent: '#EF4444' },
-  on_track: { bg: 'bg-green-50/30', border: 'border-l-green-500', accent: '#22C55E' },
-  at_risk: { bg: 'bg-orange-50/40', border: 'border-l-orange-400', accent: '#F97316' },
-  not_started: { bg: 'bg-gray-50/40', border: 'border-l-gray-300', accent: '#9CA3AF' },
-  behind: { bg: 'bg-red-50/40', border: 'border-l-red-400', accent: '#EF4444' },
+const ROW_STYLES: Record<TargetStatus, { bg: string; border: string }> = {
+  achieved: { bg: 'bg-emerald-50/50', border: 'border-l-emerald-500' },
+  delayed: { bg: 'bg-amber-50/40', border: 'border-l-amber-500' },
+  missed: { bg: 'bg-red-50/50', border: 'border-l-red-500' },
+  on_track: { bg: 'bg-green-50/30', border: 'border-l-green-500' },
+  at_risk: { bg: 'bg-orange-50/40', border: 'border-l-orange-400' },
+  not_started: { bg: 'bg-gray-50/40', border: 'border-l-gray-300' },
+  behind: { bg: 'bg-red-50/40', border: 'border-l-red-400' },
 };
+
+// ---- Stat tile styles ----
+const TILE_STYLES = {
+  green: { bg: 'bg-emerald-50', label: 'text-emerald-800', count: 'text-emerald-700', sub: 'text-emerald-600/70' },
+  amber: { bg: 'bg-amber-50', label: 'text-amber-800', count: 'text-amber-700', sub: 'text-amber-600/70' },
+  red: { bg: 'bg-red-50', label: 'text-red-800', count: 'text-red-700', sub: 'text-red-600/70' },
+  gray: { bg: 'bg-gray-50', label: 'text-gray-600', count: 'text-gray-700', sub: 'text-gray-500/70' },
+};
+
+function StatTile({ label, count, total, variant }: { label: string; count: number; total: number; variant: keyof typeof TILE_STYLES }) {
+  const s = TILE_STYLES[variant];
+  return (
+    <div className={`${s.bg} rounded-lg px-3 py-2.5`}>
+      <div className={`text-[11px] font-semibold ${s.label} tracking-wide`}>{label}</div>
+      <div className="flex items-baseline gap-1 mt-0.5">
+        <span className={`text-xl font-bold ${s.count} tabular-nums`}>{count}</span>
+        <span className={`text-[11px] ${s.sub}`}>of {total}</span>
+      </div>
+    </div>
+  );
+}
 
 // ---- Circular progress ring (SVG) ----
 function ProgressRing({ pct, status, size = 32 }: { pct: number; status: TargetStatus; size?: number }) {
@@ -175,6 +195,10 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
 
   const { targets, summary } = data;
   const achievedCount = summary.achieved + summary.delayed;
+  const onTrackCount = targets.filter(t => t.status === 'achieved' || t.status === 'delayed' || t.status === 'on_track').length;
+  const needsAttentionCount = targets.filter(t => t.status === 'at_risk' || t.status === 'behind').length;
+  const missedCount = targets.filter(t => t.status === 'missed').length;
+  const notStartedCount = targets.filter(t => t.status === 'not_started').length;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -249,8 +273,21 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
         </div>
       )}
 
-      {/* ---- Accordion rows ---- */}
-      <div className="px-2.5 py-2 space-y-1">
+      {/* ---- Stat tiles ---- */}
+      <div className="px-3 pt-3 pb-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <StatTile label="On track" count={onTrackCount} total={targets.length} variant="green" />
+          <StatTile label="Needs attention" count={needsAttentionCount} total={targets.length} variant="amber" />
+          <StatTile label="Missed" count={missedCount} total={targets.length} variant="red" />
+          <StatTile label="Not started" count={notStartedCount} total={targets.length} variant="gray" />
+        </div>
+      </div>
+
+      {/* ---- Target rows ---- */}
+      <div className="px-3 pt-2 pb-1">
+        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">All targets</span>
+      </div>
+      <div className="px-2.5 pb-2.5 space-y-1">
         {targets.map(t => (
           <TargetRow key={t.id} target={t} />
         ))}
@@ -260,16 +297,6 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
 }
 
 // ---- Target card sub-component ----
-
-/** Build a concise flat-level breakdown string, e.g. "5 flats not started · 2 in progress" */
-function formatStatusBreakdown(sb: StatusBreakdown): string {
-  const parts: string[] = [];
-  const f = (n: number) => n === 1 ? 'flat' : 'flats';
-  if (sb.notStarted > 0) parts.push(`${sb.notStarted} ${f(sb.notStarted)} not started`);
-  if (sb.inProgress > 0) parts.push(`${sb.inProgress} in progress`);
-  if (sb.onHold > 0) parts.push(`${sb.onHold} on hold`);
-  return parts.join(' · ');
-}
 
 /** Smart "why" message for actionable statuses */
 function getWhyMessage(t: TargetAchievementResult): string | null {
@@ -328,8 +355,6 @@ function TargetRow({ target: t }: { target: TargetAchievementResult }) {
 
   const whyMessage = getWhyMessage(t);
   const hasDetails = whyMessage || (t.delayReasons.length > 0 && !isComplete && t.status !== 'on_track') || t.notes || t.status === 'missed';
-  const pctToShow = t.activityPct > t.progressPct ? t.activityPct : t.progressPct;
-
   return (
     <div className={`border-l-[3px] ${rowStyle.border} ${rowStyle.bg} rounded-r-lg my-1`}>
       {/* Collapsed row — always visible */}
@@ -365,13 +390,6 @@ function TargetRow({ target: t }: { target: TargetAchievementResult }) {
                 <span className="text-[11px] font-semibold text-emerald-600">{t.activityPct}% activities</span>
               </>
             )}
-            {/* Inline progress bar */}
-            <div className="flex-1 ml-1 h-1.5 bg-gray-200/60 rounded-full overflow-hidden min-w-[40px]">
-              <div
-                className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${pctToShow}%`, backgroundColor: rowStyle.accent }}
-              />
-            </div>
           </div>
         </div>
 
