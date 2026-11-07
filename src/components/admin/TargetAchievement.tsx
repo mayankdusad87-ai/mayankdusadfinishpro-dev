@@ -287,7 +287,7 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
       <div className="px-3 pt-2 pb-1">
         <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">All targets</span>
       </div>
-      <div className="px-2.5 pb-2.5 space-y-1">
+      <div className="px-2.5 pb-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1">
         {targets.map(t => (
           <TargetRow key={t.id} target={t} />
         ))}
@@ -356,7 +356,7 @@ function TargetRow({ target: t }: { target: TargetAchievementResult }) {
   const whyMessage = getWhyMessage(t);
   const hasDetails = whyMessage || (t.delayReasons.length > 0 && !isComplete && t.status !== 'on_track') || t.notes || t.status === 'missed';
   return (
-    <div className={`border-l-[3px] ${rowStyle.border} ${rowStyle.bg} rounded-r-lg my-1`}>
+    <div className={`border-l-[3px] ${rowStyle.border} ${rowStyle.bg} rounded-r-lg self-start`}>
       {/* Collapsed row — always visible */}
       <button
         onClick={() => hasDetails && setExpanded(p => !p)}
