@@ -33,6 +33,37 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.11.07',
+    headline: 'Target Achievement Redesign & Fixes',
+    date: 'November 7, 2026',
+    features: [
+      {
+        emoji: '📊',
+        title: 'Stat tiles for quick status overview',
+        description: 'Target Achievement now shows 4 summary tiles at the top — On Track, Needs Attention, Missed, Not Started — so you can scan project health in 2 seconds.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📧',
+        title: 'Activity % in weekly email',
+        description: 'Weekly management report emails now show activity completion % alongside flat counts for each target, matching the dashboard display.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '📱',
+        title: 'WhatsApp share for stage drilldowns',
+        description: 'Share individual stage progress as an image via WhatsApp directly from the Active Blockers and Pending Work sections.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '🔢',
+        title: 'Fixed remark flat counts',
+        description: 'Delay reason remark sub-rows now correctly show the number of affected flats instead of inflated activity counts.',
+        roles: ['admin', 'management'],
+      },
+    ],
+  },
+  {
     version: '2026.10.31',
     headline: 'Smarter Target Achievement & Blocker Dashboard',
     date: 'October 31, 2026',
