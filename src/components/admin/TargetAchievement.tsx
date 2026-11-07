@@ -64,6 +64,16 @@ const DOT_COLORS: Record<TargetStatus, string> = {
   behind: '#EF4444',
 };
 
+const ROW_STYLES: Record<TargetStatus, { bg: string; border: string; accent: string }> = {
+  achieved: { bg: 'bg-emerald-50/50', border: 'border-l-emerald-500', accent: '#10B981' },
+  delayed: { bg: 'bg-amber-50/40', border: 'border-l-amber-500', accent: '#F59E0B' },
+  missed: { bg: 'bg-red-50/50', border: 'border-l-red-500', accent: '#EF4444' },
+  on_track: { bg: 'bg-green-50/30', border: 'border-l-green-500', accent: '#22C55E' },
+  at_risk: { bg: 'bg-orange-50/40', border: 'border-l-orange-400', accent: '#F97316' },
+  not_started: { bg: 'bg-gray-50/40', border: 'border-l-gray-300', accent: '#9CA3AF' },
+  behind: { bg: 'bg-red-50/40', border: 'border-l-red-400', accent: '#EF4444' },
+};
+
 // ---- Circular progress ring (SVG) ----
 function ProgressRing({ pct, status, size = 32 }: { pct: number; status: TargetStatus; size?: number }) {
   const strokeWidth = size <= 36 ? 3 : 5;
@@ -240,7 +250,7 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
       )}
 
       {/* ---- Accordion rows ---- */}
-      <div className="px-2 py-1.5 divide-y divide-gray-100">
+      <div className="px-2.5 py-2 space-y-1">
         {targets.map(t => (
           <TargetRow key={t.id} target={t} />
         ))}
@@ -297,8 +307,8 @@ function getWhyMessage(t: TargetAchievementResult): string | null {
 function TargetRow({ target: t }: { target: TargetAchievementResult }) {
   const [expanded, setExpanded] = useState(false);
   const cfg = TARGET_STATUS_CONFIG[t.status];
+  const rowStyle = ROW_STYLES[t.status];
   const floorLabel = formatFloorRange(t.floorFrom, t.floorTo);
-  const isProblem = t.status === 'missed' || t.status === 'at_risk' || t.status === 'behind';
   const isComplete = t.status === 'achieved' || t.status === 'delayed';
 
   function fmtDate(d: string): string {
@@ -318,36 +328,55 @@ function TargetRow({ target: t }: { target: TargetAchievementResult }) {
 
   const whyMessage = getWhyMessage(t);
   const hasDetails = whyMessage || (t.delayReasons.length > 0 && !isComplete && t.status !== 'on_track') || t.notes || t.status === 'missed';
+  const pctToShow = t.activityPct > t.progressPct ? t.activityPct : t.progressPct;
 
   return (
-    <div className={`${isProblem ? 'bg-red-50/40' : ''}`}>
+    <div className={`border-l-[3px] ${rowStyle.border} ${rowStyle.bg} rounded-r-lg my-1`}>
       {/* Collapsed row — always visible */}
       <button
         onClick={() => hasDetails && setExpanded(p => !p)}
-        className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${hasDetails ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'}`}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${hasDetails ? 'cursor-pointer hover:brightness-[0.97]' : 'cursor-default'}`}
       >
-        <ProgressRing pct={t.progressPct} status={t.status} size={32} />
+        <ProgressRing pct={t.progressPct} status={t.status} size={36} />
 
-        <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-          <span className="text-[13px] font-bold text-gray-900 truncate">{t.stage}</span>
-          <span className={`inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[9px] font-bold uppercase tracking-wide ${cfg.bg} ${cfg.text}`}>
-            <span className={`w-1 h-1 rounded-full ${cfg.dot}`} />
-            {cfg.label}
-          </span>
-          <span className="text-[11px] text-gray-400">{floorLabel}</span>
-          <span className="text-[11px] text-gray-600 tabular-nums">
-            <strong className="text-gray-800">{t.completedFlats}/{t.totalFlats}</strong> flats
-            {t.activityPct > t.progressPct && !isComplete && (
-              <> · <strong className="text-emerald-600">{t.activityPct}% activities</strong></>
+        <div className="flex-1 min-w-0">
+          {/* Top line: stage name + badge + timing */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[13px] font-bold text-gray-900">{t.stage}</span>
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide ${cfg.bg} ${cfg.text}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+              {cfg.label}
+            </span>
+            {timingText && (
+              <span className={`text-[11px] font-bold ${timingColor} ml-auto`}>{timingText}</span>
             )}
-          </span>
-          {timingText && (
-            <span className={`text-[11px] font-semibold ${timingColor}`}>{timingText}</span>
-          )}
+          </div>
+
+          {/* Bottom line: floor, flats, activity %, progress bar */}
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[11px] text-gray-400">{floorLabel}</span>
+            <span className="text-gray-300">·</span>
+            <span className="text-[11px] text-gray-600 tabular-nums">
+              <strong className="text-gray-800">{t.completedFlats}/{t.totalFlats}</strong> flats
+            </span>
+            {t.activityPct > t.progressPct && !isComplete && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span className="text-[11px] font-semibold text-emerald-600">{t.activityPct}% activities</span>
+              </>
+            )}
+            {/* Inline progress bar */}
+            <div className="flex-1 ml-1 h-1.5 bg-gray-200/60 rounded-full overflow-hidden min-w-[40px]">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${pctToShow}%`, backgroundColor: rowStyle.accent }}
+              />
+            </div>
+          </div>
         </div>
 
         {hasDetails && (
-          <svg className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
           </svg>
         )}
@@ -355,40 +384,40 @@ function TargetRow({ target: t }: { target: TargetAchievementResult }) {
 
       {/* Expanded details */}
       {expanded && (
-        <div className="pl-12 pr-3 pb-3 space-y-2">
+        <div className="pl-14 pr-4 pb-3 space-y-2">
           {/* Target date */}
           <div className="text-[11px] text-gray-500">
-            Target: {fmtDate(t.targetDate)}
+            Target: <strong className="text-gray-700">{fmtDate(t.targetDate)}</strong>
             {t.status === 'not_started' && ' — not started'}
             {t.status === 'behind' && ' — no progress'}
             {t.status === 'at_risk' && ' — pace slow'}
           </div>
 
-          {/* Status breakdown dots */}
+          {/* Status breakdown */}
           {t.status !== 'achieved' && (
-            <div className="flex items-center gap-2 text-[11px] text-gray-500">
-              {t.statusBreakdown.notStarted > 0 && (
+            <div className="flex items-center gap-3 text-[11px] text-gray-500">
+              {t.statusBreakdown.completed > 0 && !isComplete && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                  {t.statusBreakdown.notStarted} not started
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  {t.statusBreakdown.completed} done
                 </span>
               )}
               {t.statusBreakdown.inProgress > 0 && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
                   {t.statusBreakdown.inProgress} in progress
                 </span>
               )}
               {t.statusBreakdown.onHold > 0 && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                  <span className="w-2 h-2 rounded-full bg-orange-500" />
                   {t.statusBreakdown.onHold} on hold
                 </span>
               )}
-              {t.statusBreakdown.completed > 0 && !isComplete && (
+              {t.statusBreakdown.notStarted > 0 && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {t.statusBreakdown.completed} done
+                  <span className="w-2 h-2 rounded-full bg-gray-300" />
+                  {t.statusBreakdown.notStarted} not started
                 </span>
               )}
             </div>
@@ -396,37 +425,37 @@ function TargetRow({ target: t }: { target: TargetAchievementResult }) {
 
           {/* Why message */}
           {whyMessage && (
-            <div className="flex items-center gap-1.5 text-[11px]">
-              <svg className={`w-3 h-3 flex-shrink-0 ${t.status === 'not_started' ? 'text-gray-400' : 'text-red-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className={`flex items-center gap-1.5 text-[11px] px-2 py-1.5 rounded-md ${t.status === 'not_started' ? 'bg-gray-100 text-gray-600' : 'bg-red-50 text-red-700'}`}>
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
               </svg>
-              <span className={`font-medium ${t.status === 'not_started' ? 'text-gray-500' : 'text-red-600'}`}>{whyMessage}</span>
+              <span className="font-medium">{whyMessage}</span>
             </div>
           )}
 
           {/* Delay reasons */}
           {t.delayReasons.length > 0 && !isComplete && t.status !== 'on_track' && (
-            <div className="rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
+            <div className="rounded-lg bg-white border border-gray-200 overflow-hidden shadow-sm">
               <table className="w-full text-[11px]">
                 <thead>
-                  <tr className="bg-gray-100/80">
-                    <th className="text-left px-3 py-1 font-semibold text-gray-500">Delay Reason</th>
-                    <th className="text-right px-3 py-1 font-semibold text-gray-500 w-14">Flats</th>
+                  <tr className="bg-gray-50">
+                    <th className="text-left px-3 py-1.5 font-semibold text-gray-500">Delay Reason</th>
+                    <th className="text-right px-3 py-1.5 font-semibold text-gray-500 w-14">Flats</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {t.delayReasons.flatMap((r, i) => [
                     <tr key={i}>
-                      <td className="px-3 py-1 text-gray-700">{r.reason}</td>
-                      <td className="px-3 py-1 text-right font-semibold text-gray-900 tabular-nums">{r.count}</td>
+                      <td className="px-3 py-1.5 text-gray-700">{r.reason}</td>
+                      <td className="px-3 py-1.5 text-right font-bold text-gray-900 tabular-nums">{r.count}</td>
                     </tr>,
                     ...(r.remarkDetails || []).map((rd, j) => (
                       <tr key={`${i}-rd-${j}`} className="bg-amber-50/60">
-                        <td className="pl-5 pr-3 py-0.5 text-[10px] text-amber-800">
+                        <td className="pl-5 pr-3 py-1 text-[10px] text-amber-800">
                           <span className="text-amber-400 mr-1">↳</span>
                           {rd.remark}
                         </td>
-                        <td className="px-3 py-0.5 text-right text-[10px] font-semibold text-amber-700 tabular-nums">{rd.count}</td>
+                        <td className="px-3 py-1 text-right text-[10px] font-semibold text-amber-700 tabular-nums">{rd.count}</td>
                       </tr>
                     )),
                   ])}
@@ -443,10 +472,10 @@ function TargetRow({ target: t }: { target: TargetAchievementResult }) {
                 const fixThis = document.getElementById('fix-this-section');
                 if (fixThis) fixThis.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#C8922A] hover:text-[#b07e22] transition-colors"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#C8922A] hover:text-[#b07e22] transition-colors"
             >
               See blockers
-              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5" />
               </svg>
             </button>
