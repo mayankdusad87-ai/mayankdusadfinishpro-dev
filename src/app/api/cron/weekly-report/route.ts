@@ -165,6 +165,7 @@ export async function GET(req: NextRequest) {
                 totalFlats: result.totalFlats,
                 completedFlats: result.completedFlats,
                 progressPct: result.progressPct,
+                activityPct: result.activityPct,
                 daysRemaining: result.daysRemaining,
                 status: result.status,
               });
@@ -180,6 +181,7 @@ export async function GET(req: NextRequest) {
             totalFlats: result.totalFlats,
             completedFlats: result.completedFlats,
             progressPct: result.progressPct,
+            activityPct: result.activityPct,
             daysRemaining: result.daysRemaining,
             status: result.status,
           });
@@ -256,7 +258,7 @@ async function fetchScopeActivities(
   while (true) {
     const { data, error } = await supabaseAdmin
       .from('activities')
-      .select('floor, flat_number, status, actual_end, delay_reason')
+      .select('floor, flat_number, status, actual_end, delay_reason, stage_gate')
       .eq('project_id', projectId)
       .eq('stage', stage)
       .gte('floor', floorFrom)
