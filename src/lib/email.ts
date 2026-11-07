@@ -221,6 +221,7 @@ export interface WeeklyTargetRow {
   totalFlats: number;
   completedFlats: number;
   progressPct: number;
+  activityPct: number;
   daysRemaining: number;
   status: 'achieved' | 'delayed' | 'missed' | 'on_track' | 'at_risk' | 'not_started' | 'behind';
 }
@@ -349,7 +350,7 @@ export function weeklyReportEmailHtml(
             </td>
           </tr></table>
           <div style="margin-top: 6px; font-size: 13px; color: #64748b; line-height: 1.5;">
-            ${floorRangeLabel(t.floorFrom, t.floorTo)} · <strong style="color: #475569;">${t.completedFlats}/${t.totalFlats}</strong> flats · <span style="color: ${badge.timingColor}; font-weight: 600;">${timing}</span>
+            ${floorRangeLabel(t.floorFrom, t.floorTo)} · <strong style="color: #475569;">${t.completedFlats}/${t.totalFlats}</strong> flats${t.activityPct > t.progressPct && t.status !== 'achieved' && t.status !== 'delayed' ? ` · <strong style="color: #059669;">${t.activityPct}% activities done</strong>` : ''} · <span style="color: ${badge.timingColor}; font-weight: 600;">${timing}</span>
           </div>
         </td>
       </tr></table>`;

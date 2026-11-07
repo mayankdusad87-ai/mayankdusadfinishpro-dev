@@ -7,7 +7,6 @@ import {
   type TargetAchievementResult,
   type TargetSummary,
   type TargetStatus,
-  type StatusBreakdown,
 } from '@/lib/target-engine';
 
 interface Props {
@@ -64,23 +63,53 @@ const DOT_COLORS: Record<TargetStatus, string> = {
   behind: '#EF4444',
 };
 
+const ROW_STYLES: Record<TargetStatus, { bg: string; border: string }> = {
+  achieved: { bg: 'bg-emerald-50/50', border: 'border-l-emerald-500' },
+  delayed: { bg: 'bg-amber-50/40', border: 'border-l-amber-500' },
+  missed: { bg: 'bg-red-50/50', border: 'border-l-red-500' },
+  on_track: { bg: 'bg-green-50/30', border: 'border-l-green-500' },
+  at_risk: { bg: 'bg-orange-50/40', border: 'border-l-orange-400' },
+  not_started: { bg: 'bg-gray-50/40', border: 'border-l-gray-300' },
+  behind: { bg: 'bg-red-50/40', border: 'border-l-red-400' },
+};
+
+// ---- Stat tile styles ----
+const TILE_STYLES = {
+  green: { bg: 'bg-emerald-50', label: 'text-emerald-800', count: 'text-emerald-700', sub: 'text-emerald-600/70' },
+  amber: { bg: 'bg-amber-50', label: 'text-amber-800', count: 'text-amber-700', sub: 'text-amber-600/70' },
+  red: { bg: 'bg-red-50', label: 'text-red-800', count: 'text-red-700', sub: 'text-red-600/70' },
+  gray: { bg: 'bg-gray-50', label: 'text-gray-600', count: 'text-gray-700', sub: 'text-gray-500/70' },
+};
+
+function StatTile({ label, count, total, variant }: { label: string; count: number; total: number; variant: keyof typeof TILE_STYLES }) {
+  const s = TILE_STYLES[variant];
+  return (
+    <div className={`${s.bg} rounded-lg px-3 py-2.5`}>
+      <div className={`text-[11px] font-semibold ${s.label} tracking-wide`}>{label}</div>
+      <div className="flex items-baseline gap-1 mt-0.5">
+        <span className={`text-xl font-bold ${s.count} tabular-nums`}>{count}</span>
+        <span className={`text-[11px] ${s.sub}`}>of {total}</span>
+      </div>
+    </div>
+  );
+}
+
 // ---- Circular progress ring (SVG) ----
-function ProgressRing({ pct, status, size = 64 }: { pct: number; status: TargetStatus; size?: number }) {
-  const strokeWidth = 5;
+function ProgressRing({ pct, status, size = 32 }: { pct: number; status: TargetStatus; size?: number }) {
+  const strokeWidth = size <= 36 ? 3 : 5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (pct / 100) * circumference;
   const color = RING_COLORS[status];
+  const textClass = size <= 36 ? 'text-[9px]' : 'text-sm';
 
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+    <div className="relative flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        {/* Background track */}
         <circle
           cx={size / 2} cy={size / 2} r={radius}
           fill="none" stroke="#E5E7EB" strokeWidth={strokeWidth}
         />
-        {/* Progress arc */}
         <circle
           cx={size / 2} cy={size / 2} r={radius}
           fill="none" stroke={color} strokeWidth={strokeWidth}
@@ -90,8 +119,7 @@ function ProgressRing({ pct, status, size = 64 }: { pct: number; status: TargetS
           className="transition-all duration-700"
         />
       </svg>
-      {/* Center text */}
-      <span className="absolute text-sm font-bold text-gray-900 tabular-nums">{pct}%</span>
+      <span className={`absolute ${textClass} font-bold text-gray-900 tabular-nums`}>{pct}%</span>
     </div>
   );
 }
@@ -143,16 +171,17 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
   if (loading && !data) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-pulse">
-        <div className="px-5 py-4 bg-gray-50 border-b border-gray-100">
-          <div className="h-5 w-52 bg-gray-200 rounded" />
+        <div className="px-5 py-3.5 bg-gray-100">
+          <div className="h-4 w-44 bg-gray-200 rounded" />
         </div>
-        <div className="p-5 space-y-4">
-          {[...Array(2)].map((_, i) => (
-            <div key={i} className="flex gap-4 items-center">
-              <div className="w-16 h-16 rounded-full bg-gray-100" />
-              <div className="flex-1 space-y-2">
-                <div className="h-4 w-36 bg-gray-100 rounded" />
-                <div className="h-3 w-48 bg-gray-100 rounded" />
+        <div className="px-3 py-2 space-y-2">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex gap-2.5 items-center px-3 py-2">
+              <div className="w-8 h-8 rounded-full bg-gray-100 shrink-0" />
+              <div className="flex-1 flex gap-2 items-center">
+                <div className="h-3.5 w-24 bg-gray-100 rounded" />
+                <div className="h-3 w-16 bg-gray-100 rounded" />
+                <div className="h-3 w-20 bg-gray-100 rounded" />
               </div>
             </div>
           ))}
@@ -166,6 +195,10 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
 
   const { targets, summary } = data;
   const achievedCount = summary.achieved + summary.delayed;
+  const onTrackCount = targets.filter(t => t.status === 'achieved' || t.status === 'delayed' || t.status === 'on_track').length;
+  const needsAttentionCount = targets.filter(t => t.status === 'at_risk' || t.status === 'behind').length;
+  const missedCount = targets.filter(t => t.status === 'missed').length;
+  const notStartedCount = targets.filter(t => t.status === 'not_started').length;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -240,10 +273,23 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
         </div>
       )}
 
-      {/* ---- Target cards (2-col grid on desktop, stack on mobile) ---- */}
-      <div className={`p-4 grid gap-4 grid-cols-1 ${targets.length > 1 ? 'md:grid-cols-2' : ''}`}>
+      {/* ---- Stat tiles ---- */}
+      <div className="px-3 pt-3 pb-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <StatTile label="On track" count={onTrackCount} total={targets.length} variant="green" />
+          <StatTile label="Needs attention" count={needsAttentionCount} total={targets.length} variant="amber" />
+          <StatTile label="Missed" count={missedCount} total={targets.length} variant="red" />
+          <StatTile label="Not started" count={notStartedCount} total={targets.length} variant="gray" />
+        </div>
+      </div>
+
+      {/* ---- Target rows ---- */}
+      <div className="px-3 pt-2 pb-1">
+        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">All targets</span>
+      </div>
+      <div className="px-2.5 pb-2.5 space-y-1">
         {targets.map(t => (
-          <TargetCard key={t.id} target={t} />
+          <TargetRow key={t.id} target={t} />
         ))}
       </div>
     </div>
@@ -251,16 +297,6 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
 }
 
 // ---- Target card sub-component ----
-
-/** Build a concise flat-level breakdown string, e.g. "5 flats not started · 2 in progress" */
-function formatStatusBreakdown(sb: StatusBreakdown): string {
-  const parts: string[] = [];
-  const f = (n: number) => n === 1 ? 'flat' : 'flats';
-  if (sb.notStarted > 0) parts.push(`${sb.notStarted} ${f(sb.notStarted)} not started`);
-  if (sb.inProgress > 0) parts.push(`${sb.inProgress} in progress`);
-  if (sb.onHold > 0) parts.push(`${sb.onHold} on hold`);
-  return parts.join(' · ');
-}
 
 /** Smart "why" message for actionable statuses */
 function getWhyMessage(t: TargetAchievementResult): string | null {
@@ -295,176 +331,180 @@ function getWhyMessage(t: TargetAchievementResult): string | null {
   return null;
 }
 
-function TargetCard({ target: t }: { target: TargetAchievementResult }) {
+function TargetRow({ target: t }: { target: TargetAchievementResult }) {
+  const [expanded, setExpanded] = useState(false);
   const cfg = TARGET_STATUS_CONFIG[t.status];
+  const rowStyle = ROW_STYLES[t.status];
   const floorLabel = formatFloorRange(t.floorFrom, t.floorTo);
+  const isComplete = t.status === 'achieved' || t.status === 'delayed';
 
   function fmtDate(d: string): string {
     return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  // Timing label
+  // Compact timing label
   let timingText = '';
   let timingColor = '';
+  if (t.status === 'achieved') { timingText = '✓ On time'; timingColor = 'text-emerald-600'; }
+  else if (t.status === 'delayed' && t.daysLate !== null) { timingText = `${t.daysLate}d late`; timingColor = 'text-amber-600'; }
+  else if (t.status === 'missed') { timingText = `${Math.abs(t.daysRemaining)}d overdue`; timingColor = 'text-red-600'; }
+  else if (t.status === 'not_started' && t.daysRemaining > 0) { timingText = `${t.daysRemaining}d left`; timingColor = 'text-gray-500'; }
+  else if (t.status === 'behind' && t.daysRemaining > 0) { timingText = `${t.daysRemaining}d left`; timingColor = 'text-red-600'; }
+  else if (t.status === 'on_track' && t.daysRemaining > 0) { timingText = `${t.daysRemaining}d left`; timingColor = 'text-green-600'; }
+  else if (t.status === 'at_risk' && t.daysRemaining > 0) { timingText = `${t.daysRemaining}d left`; timingColor = 'text-orange-600'; }
 
-  if (t.status === 'achieved') {
-    timingText = '✓ Completed on time';
-    timingColor = 'text-emerald-600';
-  } else if (t.status === 'delayed' && t.daysLate !== null) {
-    timingText = `${t.daysLate} day${t.daysLate === 1 ? '' : 's'} late`;
-    timingColor = 'text-amber-600';
-  } else if (t.status === 'missed') {
-    const overdue = Math.abs(t.daysRemaining);
-    timingText = `${overdue} day${overdue === 1 ? '' : 's'} overdue`;
-    timingColor = 'text-red-600';
-  } else if (t.status === 'not_started' && t.daysRemaining > 0) {
-    timingText = `${t.daysRemaining} day${t.daysRemaining === 1 ? '' : 's'} remaining — not started`;
-    timingColor = 'text-gray-500';
-  } else if (t.status === 'behind' && t.daysRemaining > 0) {
-    timingText = `${t.daysRemaining} day${t.daysRemaining === 1 ? '' : 's'} left — no progress`;
-    timingColor = 'text-red-600';
-  } else if (t.status === 'on_track' && t.daysRemaining > 0) {
-    timingText = `${t.daysRemaining} day${t.daysRemaining === 1 ? '' : 's'} remaining`;
-    timingColor = 'text-green-600';
-  } else if (t.status === 'at_risk' && t.daysRemaining > 0) {
-    timingText = `${t.daysRemaining} day${t.daysRemaining === 1 ? '' : 's'} left — pace slow`;
-    timingColor = 'text-orange-600';
-  }
-
-  const breakdownText = formatStatusBreakdown(t.statusBreakdown);
   const whyMessage = getWhyMessage(t);
-
+  const hasDetails = whyMessage || (t.delayReasons.length > 0 && !isComplete && t.status !== 'on_track') || t.notes || t.status === 'missed';
   return (
-    <div className="px-4 py-4 flex gap-4 items-start rounded-xl border border-gray-100 hover:bg-gray-50/50 transition-colors">
-      {/* Progress ring */}
-      <div className="shrink-0 pt-0.5">
-        <ProgressRing pct={t.progressPct} status={t.status} size={64} />
-      </div>
+    <div className={`border-l-[3px] ${rowStyle.border} ${rowStyle.bg} rounded-r-lg my-1`}>
+      {/* Collapsed row — always visible */}
+      <button
+        onClick={() => hasDetails && setExpanded(p => !p)}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${hasDetails ? 'cursor-pointer hover:brightness-[0.97]' : 'cursor-default'}`}
+      >
+        <ProgressRing pct={t.progressPct} status={t.status} size={36} />
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        {/* Top row: stage + status badge */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <h4 className="text-sm font-bold text-gray-900">{t.stage}</h4>
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${cfg.bg} ${cfg.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-            {cfg.label}
-          </span>
-        </div>
+        <div className="flex-1 min-w-0">
+          {/* Top line: stage name + badge + timing */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[13px] font-bold text-gray-900">{t.stage}</span>
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide ${cfg.bg} ${cfg.text}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+              {cfg.label}
+            </span>
+            {timingText && (
+              <span className={`text-[11px] font-bold ${timingColor} ml-auto`}>{timingText}</span>
+            )}
+          </div>
 
-        {/* Floor range + target date */}
-        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-          <span>{floorLabel}</span>
-          <span className="text-gray-300">·</span>
-          <span>Target: <strong className="text-gray-700">{fmtDate(t.targetDate)}</strong></span>
-        </div>
-
-        {/* Completion stats + timing */}
-        <div className="flex items-center gap-4 mt-2">
-          <span className="text-xs text-gray-600 tabular-nums">
-            <span className="font-bold text-gray-800">{t.completedFlats}</span>/{t.totalFlats} flats
-            {t.activityPct > t.progressPct && t.status !== 'achieved' && t.status !== 'delayed' && (
+          {/* Bottom line: floor, flats, activity %, progress bar */}
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[11px] text-gray-400">{floorLabel}</span>
+            <span className="text-gray-300">·</span>
+            <span className="text-[11px] text-gray-600 tabular-nums">
+              <strong className="text-gray-800">{t.completedFlats}/{t.totalFlats}</strong> flats
+            </span>
+            {t.activityPct > t.progressPct && !isComplete && (
               <>
-                <span className="text-gray-300 mx-1">·</span>
-                <span className="font-semibold text-emerald-600">{t.activityPct}% activities done</span>
+                <span className="text-gray-300">·</span>
+                <span className="text-[11px] font-semibold text-emerald-600">{t.activityPct}% activities</span>
               </>
             )}
-          </span>
-          {timingText && (
-            <span className={`text-xs font-semibold ${timingColor}`}>
-              {timingText}
-            </span>
-          )}
+          </div>
         </div>
 
-        {/* Flat-level status breakdown (one-liner) */}
-        {breakdownText && t.status !== 'achieved' && (
-          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-gray-500">
-            {t.statusBreakdown.notStarted > 0 && (
-              <span className="inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                {t.statusBreakdown.notStarted} {t.statusBreakdown.notStarted === 1 ? 'flat' : 'flats'} not started
-              </span>
-            )}
-            {t.statusBreakdown.inProgress > 0 && (
-              <span className="inline-flex items-center gap-1">
-                <span className="text-gray-300">·</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                {t.statusBreakdown.inProgress} in progress
-              </span>
-            )}
-            {t.statusBreakdown.onHold > 0 && (
-              <span className="inline-flex items-center gap-1">
-                <span className="text-gray-300">·</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                {t.statusBreakdown.onHold} on hold
-              </span>
-            )}
+        {hasDetails && (
+          <svg className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+          </svg>
+        )}
+      </button>
+
+      {/* Expanded details */}
+      {expanded && (
+        <div className="pl-14 pr-4 pb-3 space-y-2">
+          {/* Target date */}
+          <div className="text-[11px] text-gray-500">
+            Target: <strong className="text-gray-700">{fmtDate(t.targetDate)}</strong>
+            {t.status === 'not_started' && ' — not started'}
+            {t.status === 'behind' && ' — no progress'}
+            {t.status === 'at_risk' && ' — pace slow'}
           </div>
-        )}
 
-        {/* Smart "why" one-liner for missed/at-risk without delay reasons */}
-        {whyMessage && (
-          <div className="flex items-center gap-1.5 mt-2 text-xs">
-            <svg className={`w-3.5 h-3.5 flex-shrink-0 ${t.status === 'not_started' ? 'text-gray-400' : 'text-red-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-            </svg>
-            <span className={`font-medium ${t.status === 'not_started' ? 'text-gray-500' : 'text-red-600'}`}>{whyMessage}</span>
-          </div>
-        )}
+          {/* Status breakdown */}
+          {t.status !== 'achieved' && (
+            <div className="flex items-center gap-3 text-[11px] text-gray-500">
+              {t.statusBreakdown.completed > 0 && !isComplete && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  {t.statusBreakdown.completed} done
+                </span>
+              )}
+              {t.statusBreakdown.inProgress > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  {t.statusBreakdown.inProgress} in progress
+                </span>
+              )}
+              {t.statusBreakdown.onHold > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-orange-500" />
+                  {t.statusBreakdown.onHold} on hold
+                </span>
+              )}
+              {t.statusBreakdown.notStarted > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-gray-300" />
+                  {t.statusBreakdown.notStarted} not started
+                </span>
+              )}
+            </div>
+          )}
 
-        {/* Delay reasons table (for missed/at_risk/delayed) */}
-        {t.delayReasons.length > 0 && t.status !== 'achieved' && t.status !== 'on_track' && (
-          <div className="mt-2.5 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-gray-100/80">
-                  <th className="text-left px-3 py-1.5 font-semibold text-gray-500">Delay Reason</th>
-                  <th className="text-right px-3 py-1.5 font-semibold text-gray-500 w-16">Flats</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {t.delayReasons.flatMap((r, i) => [
-                  <tr key={i}>
-                    <td className="px-3 py-1.5 text-gray-700">{r.reason}</td>
-                    <td className="px-3 py-1.5 text-right font-semibold text-gray-900 tabular-nums">{r.count}</td>
-                  </tr>,
-                  ...(r.remarkDetails || []).map((rd, j) => (
-                    <tr key={`${i}-rd-${j}`} className="bg-amber-50/60">
-                      <td className="pl-6 pr-3 py-1 text-[11px] text-amber-800">
-                        <span className="text-amber-400 mr-1">↳</span>
-                        {rd.remark}
-                      </td>
-                      <td className="px-3 py-1 text-right text-[11px] font-semibold text-amber-700 tabular-nums">{rd.count}</td>
-                    </tr>
-                  )),
-                ])}
-              </tbody>
-            </table>
-          </div>
-        )}
+          {/* Why message */}
+          {whyMessage && (
+            <div className={`flex items-center gap-1.5 text-[11px] px-2 py-1.5 rounded-md ${t.status === 'not_started' ? 'bg-gray-100 text-gray-600' : 'bg-red-50 text-red-700'}`}>
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+              <span className="font-medium">{whyMessage}</span>
+            </div>
+          )}
 
-        {/* "See blockers" link for missed targets — scrolls to Fix This section */}
-        {t.status === 'missed' && (
-          <button
-            onClick={() => {
-              const fixThis = document.getElementById('fix-this-section');
-              if (fixThis) fixThis.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }}
-            className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#C8922A] hover:text-[#b07e22] transition-colors"
-          >
-            See blockers
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5" />
-            </svg>
-          </button>
-        )}
+          {/* Delay reasons */}
+          {t.delayReasons.length > 0 && !isComplete && t.status !== 'on_track' && (
+            <div className="rounded-lg bg-white border border-gray-200 overflow-hidden shadow-sm">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left px-3 py-1.5 font-semibold text-gray-500">Delay Reason</th>
+                    <th className="text-right px-3 py-1.5 font-semibold text-gray-500 w-14">Flats</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {t.delayReasons.flatMap((r, i) => [
+                    <tr key={i}>
+                      <td className="px-3 py-1.5 text-gray-700">{r.reason}</td>
+                      <td className="px-3 py-1.5 text-right font-bold text-gray-900 tabular-nums">{r.count}</td>
+                    </tr>,
+                    ...(r.remarkDetails || []).map((rd, j) => (
+                      <tr key={`${i}-rd-${j}`} className="bg-amber-50/60">
+                        <td className="pl-5 pr-3 py-1 text-[10px] text-amber-800">
+                          <span className="text-amber-400 mr-1">↳</span>
+                          {rd.remark}
+                        </td>
+                        <td className="px-3 py-1 text-right text-[10px] font-semibold text-amber-700 tabular-nums">{rd.count}</td>
+                      </tr>
+                    )),
+                  ])}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-        {/* Notes */}
-        {t.notes && (
-          <p className="mt-1.5 text-[11px] text-gray-400 italic truncate">{t.notes}</p>
-        )}
-      </div>
+          {/* See blockers */}
+          {t.status === 'missed' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const fixThis = document.getElementById('fix-this-section');
+                if (fixThis) fixThis.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#C8922A] hover:text-[#b07e22] transition-colors"
+            >
+              See blockers
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 5.25 7.5 7.5 7.5-7.5m-15 6 7.5 7.5 7.5-7.5" />
+              </svg>
+            </button>
+          )}
+
+          {/* Notes */}
+          {t.notes && (
+            <p className="text-[10px] text-gray-400 italic">{t.notes}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
