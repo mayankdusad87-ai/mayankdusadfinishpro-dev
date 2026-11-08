@@ -33,14 +33,20 @@ export interface ChangelogEntry {
 // Newest entry first
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '2026.11.07',
-    headline: 'Target Achievement Redesign & Fixes',
-    date: 'November 7, 2026',
+    version: '2026.11.08',
+    headline: 'Priority Stack & Smart Filtering',
+    date: 'November 8, 2026',
     features: [
       {
-        emoji: '📊',
-        title: 'Stat tiles for quick status overview',
-        description: 'Target Achievement now shows 4 summary tiles at the top — On Track, Needs Attention, Missed, Not Started — so you can scan project health in 2 seconds.',
+        emoji: '🎯',
+        title: 'Priority Stack for targets',
+        description: 'Target Achievement now groups targets by urgency — Needs Action (missed/at risk/behind) at the top, Active (on track/achieved) in the middle, Upcoming at the bottom — so you instantly see what needs attention.',
+        roles: ['admin', 'management'],
+      },
+      {
+        emoji: '🧹',
+        title: 'Smart filtering hides old completed targets',
+        description: 'Completed and delayed targets older than 30 days and before the current month are automatically hidden. Toggle "done (hidden)" to reveal them anytime.',
         roles: ['admin', 'management'],
       },
       {
