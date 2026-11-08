@@ -73,25 +73,51 @@ const ROW_STYLES: Record<TargetStatus, { bg: string; border: string }> = {
   behind: { bg: 'bg-red-50/40', border: 'border-l-red-400' },
 };
 
-// ---- Stat tile styles ----
-const TILE_STYLES = {
-  green: { bg: 'bg-emerald-50', label: 'text-emerald-800', count: 'text-emerald-700', sub: 'text-emerald-600/70' },
-  amber: { bg: 'bg-amber-50', label: 'text-amber-800', count: 'text-amber-700', sub: 'text-amber-600/70' },
-  red: { bg: 'bg-red-50', label: 'text-red-800', count: 'text-red-700', sub: 'text-red-600/70' },
-  gray: { bg: 'bg-gray-50', label: 'text-gray-600', count: 'text-gray-700', sub: 'text-gray-500/70' },
+// ---- Target filtering (hide old completed targets) ----
+function filterTargets(targets: TargetAchievementResult[]): { visible: TargetAchievementResult[]; hidden: TargetAchievementResult[] } {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const visible: TargetAchievementResult[] = [];
+  const hidden: TargetAchievementResult[] = [];
+
+  for (const t of targets) {
+    if (t.status !== 'achieved' && t.status !== 'delayed') {
+      visible.push(t);
+      continue;
+    }
+    const td = new Date(t.targetDate);
+    if (td >= currentMonthStart || td >= thirtyDaysAgo) {
+      visible.push(t);
+    } else {
+      hidden.push(t);
+    }
+  }
+  return { visible, hidden };
+}
+
+// ---- Priority grouping (urgency-sorted sections) ----
+type PrioritySection = 'needsAction' | 'active' | 'upcoming';
+
+const PRIORITY_ORDER: Record<TargetStatus, number> = {
+  missed: 0, at_risk: 1, behind: 2,
+  on_track: 3, delayed: 4, achieved: 5,
+  not_started: 6,
 };
 
-function StatTile({ label, count, total, variant }: { label: string; count: number; total: number; variant: keyof typeof TILE_STYLES }) {
-  const s = TILE_STYLES[variant];
-  return (
-    <div className={`${s.bg} rounded-lg px-3 py-2.5`}>
-      <div className={`text-[11px] font-semibold ${s.label} tracking-wide`}>{label}</div>
-      <div className="flex items-baseline gap-1 mt-0.5">
-        <span className={`text-xl font-bold ${s.count} tabular-nums`}>{count}</span>
-        <span className={`text-[11px] ${s.sub}`}>of {total}</span>
-      </div>
-    </div>
-  );
+function groupByPriority(targets: TargetAchievementResult[]): Record<PrioritySection, TargetAchievementResult[]> {
+  const groups: Record<PrioritySection, TargetAchievementResult[]> = { needsAction: [], active: [], upcoming: [] };
+  for (const t of targets) {
+    if (t.status === 'missed' || t.status === 'at_risk' || t.status === 'behind') groups.needsAction.push(t);
+    else if (t.status === 'not_started') groups.upcoming.push(t);
+    else groups.active.push(t);
+  }
+  groups.needsAction.sort((a, b) => PRIORITY_ORDER[a.status] - PRIORITY_ORDER[b.status] || a.daysRemaining - b.daysRemaining);
+  groups.active.sort((a, b) => PRIORITY_ORDER[a.status] - PRIORITY_ORDER[b.status] || a.daysRemaining - b.daysRemaining);
+  groups.upcoming.sort((a, b) => a.daysRemaining - b.daysRemaining);
+  return groups;
 }
 
 // ---- Circular progress ring (SVG) ----
@@ -133,6 +159,7 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
   const [data, setData] = useState<AchievementData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLegend, setShowLegend] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
   const loadedForProject = useRef<string | null>(null);
 
   const loadAchievements = useCallback(async (skipCache = false) => {
@@ -194,11 +221,8 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
   if (!data || data.targets.length === 0) return null;
 
   const { targets, summary } = data;
-  const achievedCount = summary.achieved + summary.delayed;
-  const onTrackCount = targets.filter(t => t.status === 'achieved' || t.status === 'delayed' || t.status === 'on_track').length;
-  const needsAttentionCount = targets.filter(t => t.status === 'at_risk' || t.status === 'behind').length;
-  const missedCount = targets.filter(t => t.status === 'missed').length;
-  const notStartedCount = targets.filter(t => t.status === 'not_started').length;
+  const { visible, hidden } = filterTargets(targets);
+  const groups = groupByPriority(visible);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -213,8 +237,10 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
           <div>
             <h3 className="text-sm font-bold text-white">Target Achievement</h3>
             <p className="text-xs text-gray-400 mt-0.5">
-              <span className="text-[#C8922A] font-semibold">{achievedCount}</span> of{' '}
-              <span className="text-white font-semibold">{summary.total}</span> targets achieved
+              <span className="text-white font-semibold">{visible.length}</span> active targets
+              {groups.needsAction.length > 0 && (
+                <> · <span className="text-red-400 font-semibold">{groups.needsAction.length} needs action</span></>
+              )}
             </p>
           </div>
         </div>
@@ -273,24 +299,78 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
         </div>
       )}
 
-      {/* ---- Stat tiles ---- */}
-      <div className="px-3 pt-3 pb-1">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <StatTile label="On track" count={onTrackCount} total={targets.length} variant="green" />
-          <StatTile label="Needs attention" count={needsAttentionCount} total={targets.length} variant="amber" />
-          <StatTile label="Missed" count={missedCount} total={targets.length} variant="red" />
-          <StatTile label="Not started" count={notStartedCount} total={targets.length} variant="gray" />
-        </div>
+      {/* ---- Chip strip ---- */}
+      <div className="px-4 pt-3 pb-1 flex flex-wrap gap-1.5">
+        {groups.needsAction.length > 0 && (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-600">
+            {groups.needsAction.length} needs action
+          </span>
+        )}
+        {groups.active.length > 0 && (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600">
+            {groups.active.length} on track
+          </span>
+        )}
+        {groups.upcoming.length > 0 && (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-gray-100 text-gray-500">
+            {groups.upcoming.length} upcoming
+          </span>
+        )}
+        {hidden.length > 0 && (
+          <button
+            onClick={() => setShowHidden(p => !p)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-gray-400 border border-dashed border-gray-300 hover:bg-gray-50 transition-colors"
+          >
+            {hidden.length} done (hidden)
+            <svg className={`w-3 h-3 transition-transform ${showHidden ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+        )}
       </div>
 
-      {/* ---- Target rows ---- */}
-      <div className="px-3 pt-2 pb-1">
-        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">All targets</span>
-      </div>
-      <div className="px-2.5 pb-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1">
-        {targets.map(t => (
-          <TargetRow key={t.id} target={t} />
-        ))}
+      {/* ---- Priority sections ---- */}
+      <div className="px-2.5 pb-2.5 space-y-0.5">
+        {groups.needsAction.length > 0 && (
+          <>
+            <div className="px-1.5 pt-2 pb-1">
+              <span className="text-[10px] font-extrabold text-red-600 uppercase tracking-[0.08em]">▼ Needs action</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {groups.needsAction.map(t => <TargetRow key={t.id} target={t} />)}
+            </div>
+          </>
+        )}
+        {groups.active.length > 0 && (
+          <>
+            <div className="px-1.5 pt-2 pb-1">
+              <span className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-[0.08em]">● Active</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {groups.active.map(t => <TargetRow key={t.id} target={t} />)}
+            </div>
+          </>
+        )}
+        {groups.upcoming.length > 0 && (
+          <>
+            <div className="px-1.5 pt-2 pb-1">
+              <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.08em]">○ Upcoming</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {groups.upcoming.map(t => <TargetRow key={t.id} target={t} />)}
+            </div>
+          </>
+        )}
+        {showHidden && hidden.length > 0 && (
+          <>
+            <div className="px-1.5 pt-2 pb-1">
+              <span className="text-[10px] font-extrabold text-gray-300 uppercase tracking-[0.08em]">✓ Completed (older)</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {hidden.map(t => <TargetRow key={t.id} target={t} />)}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
