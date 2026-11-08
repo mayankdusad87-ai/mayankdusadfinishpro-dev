@@ -336,7 +336,9 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
             <div className="px-1.5 pt-2 pb-1">
               <span className="text-[10px] font-extrabold text-red-600 uppercase tracking-[0.08em]">▼ Needs action</span>
             </div>
-            {groups.needsAction.map(t => <TargetRow key={t.id} target={t} />)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {groups.needsAction.map(t => <TargetRow key={t.id} target={t} />)}
+            </div>
           </>
         )}
         {groups.active.length > 0 && (
@@ -344,7 +346,9 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
             <div className="px-1.5 pt-2 pb-1">
               <span className="text-[10px] font-extrabold text-emerald-600 uppercase tracking-[0.08em]">● Active</span>
             </div>
-            {groups.active.map(t => <TargetRow key={t.id} target={t} />)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {groups.active.map(t => <TargetRow key={t.id} target={t} />)}
+            </div>
           </>
         )}
         {groups.upcoming.length > 0 && (
@@ -352,7 +356,9 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
             <div className="px-1.5 pt-2 pb-1">
               <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.08em]">○ Upcoming</span>
             </div>
-            {groups.upcoming.map(t => <TargetRow key={t.id} target={t} />)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {groups.upcoming.map(t => <TargetRow key={t.id} target={t} />)}
+            </div>
           </>
         )}
         {showHidden && hidden.length > 0 && (
@@ -360,7 +366,9 @@ export default function TargetAchievement({ projectId, projectName }: Props) {
             <div className="px-1.5 pt-2 pb-1">
               <span className="text-[10px] font-extrabold text-gray-300 uppercase tracking-[0.08em]">✓ Completed (older)</span>
             </div>
-            {hidden.map(t => <TargetRow key={t.id} target={t} />)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+              {hidden.map(t => <TargetRow key={t.id} target={t} />)}
+            </div>
           </>
         )}
       </div>
